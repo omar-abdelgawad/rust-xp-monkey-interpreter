@@ -22,6 +22,8 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
         }
 
         // Create a lexer
+        // TODO: make the hashtable inside the lexer
+        // a global variable.
         let mut lexer = Lexer::new(line.trim());
 
         // Tokenize input

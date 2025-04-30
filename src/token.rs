@@ -47,3 +47,11 @@ impl Token {
         }
     }
 }
+impl Default for Token {
+    fn default() -> Self {
+        Token {
+            ttype: TokenType::EOF,
+            literal: "".to_string(),
+        }
+    }
+}
