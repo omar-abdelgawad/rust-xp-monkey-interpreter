@@ -3,18 +3,35 @@
 pub enum TokenType {
     ILLEGAL,
     EOF,
-    IDENT,  // add, foobar, x, y
-    INT,    //123
+    IDENT, // add, foobar, x, y
+    INT,   //123
+    // Operators
     ASSIGN, // '='
     PLUS,
+    MINUS,
+    BANG,
+    ASTERISK, // *
+    SLASH,    // /
+
+    LT,     // <
+    GT,     // >
+    EQ,     // ==
+    NOT_EQ, // !=
+
     COMMA,
     SEMICOLON,
-    LPAREN,
-    RPAREN,
-    LBRACE,
-    RBRACE,
+    LPAREN, // (
+    RPAREN, // )
+    LBRACE, // {
+    RBRACE, // }
+    //keywords
     FUNCTION,
     LET,
+    TRUE,
+    FALSE,
+    IF,
+    ELSE,
+    RETURN,
 }
 #[allow(clippy::all)]
 pub struct Token {

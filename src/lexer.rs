@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::format;
 
 use crate::token;
 use crate::token::{Token, TokenType};
@@ -16,6 +17,11 @@ impl Lexer {
         let mut keywords = HashMap::new();
         keywords.insert("fn".to_string(), TokenType::FUNCTION);
         keywords.insert("let".to_string(), TokenType::LET);
+        keywords.insert("true".to_string(), TokenType::TRUE);
+        keywords.insert("false".to_string(), TokenType::FALSE);
+        keywords.insert("if".to_string(), TokenType::IF);
+        keywords.insert("else".to_string(), TokenType::ELSE);
+        keywords.insert("return".to_string(), TokenType::RETURN);
         let mut l = Lexer {
             input: input.into(),
             position: 0,
@@ -39,6 +45,13 @@ impl Lexer {
         }
         self.position = self.readPosition;
         self.readPosition += 1;
+    }
+    fn peak_char(&self) -> u8 {
+        if self.readPosition as usize >= self.input.len() {
+            0
+        } else {
+            self.input.as_bytes()[self.readPosition as usize]
+        }
     }
     fn lookup_ident(&self, ident: &str) -> TokenType {
         if let Some(tok) = self.keywords.get(ident) {
@@ -68,12 +81,37 @@ impl Lexer {
     pub fn next_token(&mut self) -> Token {
         self.skip_white_space();
         let out = match self.ch {
-            b'=' => Token::new(TokenType::ASSIGN, self.ch as char),
+            b'=' => {
+                if self.peak_char() == b'=' {
+                    let ch = self.ch;
+                    self.read_char();
+                    Token::new(TokenType::EQ, format!("{}{}", ch as char, self.ch as char))
+                } else {
+                    Token::new(TokenType::ASSIGN, self.ch as char)
+                }
+            }
+            b'+' => Token::new(TokenType::PLUS, self.ch as char),
+            b'-' => Token::new(TokenType::MINUS, self.ch as char),
+            b'!' => {
+                if self.peak_char() == b'=' {
+                    let ch = self.ch;
+                    self.read_char();
+                    Token::new(
+                        TokenType::NOT_EQ,
+                        format!("{}{}", ch as char, self.ch as char),
+                    )
+                } else {
+                    Token::new(TokenType::BANG, self.ch as char)
+                }
+            }
+            b'/' => Token::new(TokenType::SLASH, self.ch as char),
+            b'*' => Token::new(TokenType::ASTERISK, self.ch as char),
+            b'<' => Token::new(TokenType::LT, self.ch as char),
+            b'>' => Token::new(TokenType::GT, self.ch as char),
             b';' => Token::new(TokenType::SEMICOLON, self.ch as char),
             b'(' => Token::new(TokenType::LPAREN, self.ch as char),
             b')' => Token::new(TokenType::RPAREN, self.ch as char),
             b',' => Token::new(TokenType::COMMA, self.ch as char),
-            b'+' => Token::new(TokenType::PLUS, self.ch as char),
             b'{' => Token::new(TokenType::LBRACE, self.ch as char),
             b'}' => Token::new(TokenType::RBRACE, self.ch as char),
             0 => Token::new(TokenType::EOF, ""),
@@ -138,7 +176,19 @@ let ten = 10;
 let add = fn(x, y) {
 x + y;
 };
+
 let result = add(five, ten);
+!-/*5;
+5 < 10 > 5;
+
+if (5 < 10) {
+    return true;
+} else {
+    return false;
+}
+
+10 == 10;
+10 != 9;
 ";
         let tests = [
             Token::new(TokenType::LET, "let"),
@@ -177,9 +227,46 @@ let result = add(five, ten);
             Token::new(TokenType::IDENT, "ten"),
             Token::new(TokenType::RPAREN, ")"),
             Token::new(TokenType::SEMICOLON, ";"),
+            Token::new(TokenType::BANG, "!"),
+            Token::new(TokenType::MINUS, "-"),
+            Token::new(TokenType::SLASH, "/"),
+            Token::new(TokenType::ASTERISK, "*"),
+            Token::new(TokenType::INT, "5"),
+            Token::new(TokenType::SEMICOLON, ";"),
+            Token::new(TokenType::INT, "5"),
+            Token::new(TokenType::LT, "<"),
+            Token::new(TokenType::INT, "10"),
+            Token::new(TokenType::GT, ">"),
+            Token::new(TokenType::INT, "5"),
+            Token::new(TokenType::SEMICOLON, ";"),
+            Token::new(TokenType::IF, "if"),
+            Token::new(TokenType::LPAREN, "("),
+            Token::new(TokenType::INT, "5"),
+            Token::new(TokenType::LT, "<"),
+            Token::new(TokenType::INT, "10"),
+            Token::new(TokenType::RPAREN, ")"),
+            Token::new(TokenType::LBRACE, "{"),
+            Token::new(TokenType::RETURN, "return"),
+            Token::new(TokenType::TRUE, "true"),
+            Token::new(TokenType::SEMICOLON, ";"),
+            Token::new(TokenType::RBRACE, "}"),
+            Token::new(TokenType::ELSE, "else"),
+            Token::new(TokenType::LBRACE, "{"),
+            Token::new(TokenType::RETURN, "return"),
+            Token::new(TokenType::FALSE, "false"),
+            Token::new(TokenType::SEMICOLON, ";"),
+            Token::new(TokenType::RBRACE, "}"),
+            Token::new(TokenType::INT, "10"),
+            Token::new(TokenType::EQ, "=="),
+            Token::new(TokenType::INT, "10"),
+            Token::new(TokenType::SEMICOLON, ";"),
+            Token::new(TokenType::INT, "10"),
+            Token::new(TokenType::NOT_EQ, "!="),
+            Token::new(TokenType::INT, "9"),
+            Token::new(TokenType::SEMICOLON, ";"),
             Token::new(TokenType::EOF, ""),
         ];
-        let mut lexer = Lexer::new(input); // assuming you have a Lexer struct with new()
+        let mut lexer = Lexer::new(input);
 
         for (i, expected) in tests.iter().enumerate() {
             let tok = lexer.next_token();
@@ -189,14 +276,14 @@ let result = add(five, ten);
             //    println!("actual:{:?}, exp:{:?};", tok.ttype, expected.ttype);
             //}
             assert_eq!(
-                tok.ttype, expected.ttype,
-                "tests[{}] - token_type wrong. expected={:?}, got={:?}",
-                i, expected.ttype, tok.ttype
-            );
-            assert_eq!(
                 tok.literal, expected.literal,
                 "tests[{}] - literal wrong. expected={}, got={}",
                 i, expected.literal, tok.literal
+            );
+            assert_eq!(
+                tok.ttype, expected.ttype,
+                "tests[{}] - token_type wrong. expected={:?}, got={:?}",
+                i, expected.ttype, tok.ttype
             );
         }
     }
