@@ -9,6 +9,7 @@ struct Parser {
     l: lexer::Lexer,
     cur_token: token::Token,
     peek_token: token::Token,
+    errors: Vec<String>,
 }
 impl Parser {
     pub fn new(l: lexer::Lexer) -> Self {
@@ -17,6 +18,7 @@ impl Parser {
             l,
             cur_token: token::Token::default(),
             peek_token: token::Token::default(),
+            errors: vec![],
         };
 
         // Read two tokens so cur_token and peek_token are set
@@ -24,6 +26,16 @@ impl Parser {
         parser.next_token();
 
         parser
+    }
+    fn errors(&self) -> &[String] {
+        &self.errors // Returns a reference to the vector as a slice
+    }
+    fn peek_error(&mut self, t: TokenType) {
+        let msg = format!(
+            "expected next token to be {:?}, got {:?} instead",
+            t, self.peek_token.ttype
+        );
+        self.errors.push(msg);
     }
     fn next_token(&mut self) {
         // equivalent to:
@@ -60,16 +72,17 @@ impl Parser {
         self.peek_token.ttype == t
     }
     fn expect_peek(&mut self, t: TokenType) -> bool {
-        if self.peek_token_is(t) {
+        if self.peek_token_is(t.clone()) {
             self.next_token();
             true
         } else {
+            self.peek_error(t);
             false
         }
     }
-    pub fn parse_program(mut self) -> Program {
+    pub fn parse_program(&mut self) -> Program {
         let mut program = ast::Program { statements: vec![] };
-        while self.cur_token.ttype != TokenType::EOF {
+        while !self.cur_token_is(TokenType::EOF) {
             let stmt = self.parse_statement();
             if let Some(stmt) = stmt {
                 program.statements.push(stmt);
@@ -94,9 +107,10 @@ let y = 10;
 let foobar = 838383;
 ";
         let l = lexer::Lexer::new(input);
-        let p = Parser::new(l);
+        let mut p = Parser::new(l);
 
         let program = p.parse_program(); //.expect("Parse program returned None");
+        check_parser_errors(p);
         assert_eq!(
             program.statements.len(),
             3,
@@ -146,5 +160,16 @@ let foobar = 838383;
             eprintln!("stmt is not a LetStatement. got={:?}", stmt);
             false
         }
+    }
+    fn check_parser_errors(p: Parser) {
+        let errors = p.errors();
+        if errors.len() == 0 {
+            return;
+        }
+        eprintln!("parser had {} errors", errors.len());
+        for (i, msg) in errors.iter().enumerate() {
+            eprintln!("{}. parser error: {}", i, msg);
+        }
+        panic!();
     }
 }
