@@ -271,10 +271,6 @@ if (5 < 10) {
         for (i, expected) in tests.iter().enumerate() {
             let tok = lexer.next_token();
 
-            //if i == 1 {
-            //    println!("actual:{}, exp:{};", tok.literal, expected.literal);
-            //    println!("actual:{:?}, exp:{:?};", tok.ttype, expected.ttype);
-            //}
             assert_eq!(
                 tok.literal, expected.literal,
                 "tests[{}] - literal wrong. expected={}, got={}",

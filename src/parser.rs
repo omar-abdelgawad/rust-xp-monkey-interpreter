@@ -1,4 +1,8 @@
-use crate::{ast, lexer, token};
+use crate::{
+    ast::{self, Identifier, LetStatement, Statement},
+    lexer,
+    token::{self, TokenType},
+};
 use ast::Program;
 
 struct Parser {
@@ -22,10 +26,57 @@ impl Parser {
         parser
     }
     fn next_token(&mut self) {
+        // equivalent to:
+        // p.curToken = p.peekToken
+        // p.peekToken = p.l.NextToken()
         self.cur_token = std::mem::replace(&mut self.peek_token, self.l.next_token());
     }
-    pub fn parse_program(self) -> Option<Program> {
-        todo!()
+    fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
+        match self.cur_token.ttype {
+            TokenType::LET => self.parse_let_statement(),
+            _ => None,
+        }
+    }
+    fn parse_let_statement(&mut self) -> Option<Box<dyn Statement>> {
+        let cur_token_tmp = self.cur_token.clone();
+        if !self.expect_peek(TokenType::IDENT) {
+            return None;
+        }
+        let ident = Identifier::new(self.cur_token.clone(), self.cur_token.literal.clone());
+        let stmt = LetStatement::new(cur_token_tmp, ident.clone(), Box::new(ident.clone()));
+        if !self.expect_peek(TokenType::ASSIGN) {
+            return None;
+        }
+        // TODO: we're skipping the expressions until SEMICOLON
+        while !self.cur_token_is(TokenType::SEMICOLON) {
+            self.next_token();
+        }
+        Some(Box::new(stmt))
+    }
+    fn cur_token_is(&self, t: TokenType) -> bool {
+        self.cur_token.ttype == t
+    }
+    fn peek_token_is(&self, t: TokenType) -> bool {
+        self.peek_token.ttype == t
+    }
+    fn expect_peek(&mut self, t: TokenType) -> bool {
+        if self.peek_token_is(t) {
+            self.next_token();
+            true
+        } else {
+            false
+        }
+    }
+    pub fn parse_program(mut self) -> Program {
+        let mut program = ast::Program { statements: vec![] };
+        while self.cur_token.ttype != TokenType::EOF {
+            let stmt = self.parse_statement();
+            if let Some(stmt) = stmt {
+                program.statements.push(stmt);
+            }
+            self.next_token();
+        }
+        program
     }
 }
 #[cfg(test)]
@@ -45,13 +96,13 @@ let foobar = 838383;
         let l = lexer::Lexer::new(input);
         let p = Parser::new(l);
 
-        let program = p.parse_program().expect("Parse program returned None");
-        if program.statements.len() != 3 {
-            panic!(
-                "program.statements does not contain 3 statements. got={}",
-                program.statements.len()
-            );
-        }
+        let program = p.parse_program(); //.expect("Parse program returned None");
+        assert_eq!(
+            program.statements.len(),
+            3,
+            "program.statements doesnt contain 3 statements. got={}",
+            program.statements.len()
+        );
         let tests = vec!["x", "y", "foobar"];
         for (i, expected_ident) in tests.iter().enumerate() {
             let stmt = &program.statements[i];

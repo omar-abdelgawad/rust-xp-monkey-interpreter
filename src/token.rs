@@ -34,7 +34,7 @@ pub enum TokenType {
     RETURN,
 }
 #[allow(clippy::all)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub ttype: TokenType,
     pub literal: String,

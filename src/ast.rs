@@ -2,18 +2,22 @@ use crate::token::Token;
 use std::any::Any;
 use std::fmt::Debug;
 
-pub trait Node {
+pub trait Node: Debug {
     fn token_literal(&self) -> String;
 }
 
-pub trait Statement: Node + Debug {
+pub trait Statement: Node {
+    /// unnecessary marker function (check go marker interfaces).
     fn statement_node(&self);
+    /// for testing only maybe remove it from trait later
     fn as_any(&self) -> &dyn Any;
 }
 
-pub trait Expression: Node + Debug {
+pub trait Expression: Node {
+    /// unnecessary marker function (check go marker interfaces).
     fn expression_node(&self);
 }
+#[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Box<dyn Statement>>,
 }
@@ -33,13 +37,19 @@ pub struct LetStatement {
     value: Box<dyn Expression>,
 }
 impl LetStatement {
+    // used in tests
     pub fn name_value(&self) -> String {
         self.name.value.clone()
     }
+    // used in tests
     pub fn name_token_literal(&self) -> String {
-        self.name.token.literal.clone()
+        self.name.token_literal()
+    }
+    pub fn new(token: Token, name: Identifier, value: Box<dyn Expression>) -> LetStatement {
+        LetStatement { token, name, value }
     }
 }
+
 impl Node for LetStatement {
     fn token_literal(&self) -> String {
         self.token.literal.clone()
@@ -51,10 +61,15 @@ impl Statement for LetStatement {
         self
     }
 }
-#[derive(Debug)]
-struct Identifier {
+#[derive(Debug, Clone)]
+pub struct Identifier {
     token: Token,
     value: String,
+}
+impl Identifier {
+    pub fn new(token: Token, value: String) -> Identifier {
+        Identifier { token, value }
+    }
 }
 impl Node for Identifier {
     fn token_literal(&self) -> String {
