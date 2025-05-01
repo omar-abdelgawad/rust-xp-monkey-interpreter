@@ -1,5 +1,5 @@
 use crate::{
-    ast::{self, Identifier, LetStatement, Statement},
+    ast::{self, Identifier, LetStatement, ReturnStatement, Statement},
     lexer,
     token::{self, TokenType},
 };
@@ -46,8 +46,21 @@ impl Parser {
     fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
         match self.cur_token.ttype {
             TokenType::LET => self.parse_let_statement(),
+            TokenType::RETURN => self.parse_return_statement(),
             _ => None,
         }
+    }
+    fn parse_return_statement(&mut self) -> Option<Box<dyn Statement>> {
+        let cur_token_tmp = self.cur_token.clone();
+        self.next_token();
+        // fake expression used here
+        let ident = Identifier::new(cur_token_tmp.clone(), cur_token_tmp.literal.clone());
+        let stmt = ReturnStatement::new(cur_token_tmp, Box::new(ident));
+        // TODO: We're skipping the expression until SEMICOLON
+        while !self.cur_token_is(TokenType::SEMICOLON) {
+            self.next_token();
+        }
+        Some(Box::new(stmt))
     }
     fn parse_let_statement(&mut self) -> Option<Box<dyn Statement>> {
         let cur_token_tmp = self.cur_token.clone();
@@ -95,6 +108,8 @@ impl Parser {
 #[cfg(test)]
 mod test {
     use crate::ast::LetStatement;
+    use crate::ast::Node;
+    use crate::ast::ReturnStatement;
     use crate::ast::Statement;
 
     use super::*;
@@ -171,5 +186,37 @@ let foobar = 838383;
             eprintln!("{}. parser error: {}", i, msg);
         }
         panic!();
+    }
+    #[test]
+    fn test_return_statements() {
+        let input = "
+return 5;
+return 10;
+return 993322;
+";
+        let l = lexer::Lexer::new(input);
+        let mut p = Parser::new(l);
+
+        let program = p.parse_program(); //.expect("Parse program returned None");
+        check_parser_errors(p);
+        assert_eq!(
+            program.statements.len(),
+            3,
+            "program.statements doesnt contain 3 statements. got={}",
+            program.statements.len()
+        );
+        for (i, stmt) in program.statements.iter().enumerate() {
+            let return_stmt = stmt.as_ref().as_any().downcast_ref::<ReturnStatement>();
+            if let Some(return_stmt) = return_stmt {
+                assert_eq!(
+                    return_stmt.token_literal(),
+                    "return",
+                    "return_stmt.token_literal() not 'return', got {}",
+                    return_stmt.token_literal()
+                );
+            } else {
+                panic!("stmt not ast::ReturnStatement. got={:?}", stmt);
+            }
+        }
     }
 }

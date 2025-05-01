@@ -32,7 +32,7 @@ impl Node for Program {
 }
 #[derive(Debug)]
 pub struct LetStatement {
-    token: Token,
+    token: Token, // the token.let token
     name: Identifier,
     value: Box<dyn Expression>,
 }
@@ -63,7 +63,7 @@ impl Statement for LetStatement {
 }
 #[derive(Debug, Clone)]
 pub struct Identifier {
-    token: Token,
+    token: Token, // the token.IDENT token
     value: String,
 }
 impl Identifier {
@@ -78,4 +78,28 @@ impl Node for Identifier {
 }
 impl Expression for Identifier {
     fn expression_node(&self) {}
+}
+#[derive(Debug)]
+pub struct ReturnStatement {
+    token: Token, // the 'return' token
+    return_value: Box<dyn Expression>,
+}
+impl ReturnStatement {
+    pub fn new(token: Token, return_value: Box<dyn Expression>) -> ReturnStatement {
+        ReturnStatement {
+            token,
+            return_value,
+        }
+    }
+}
+impl Node for ReturnStatement {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+}
+impl Statement for ReturnStatement {
+    fn statement_node(&self) {}
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
