@@ -6,13 +6,13 @@ use std::fmt::Display;
 // in the book it also has a String method to print it
 pub trait Node: Debug + Display {
     fn token_literal(&self) -> String;
+    /// for testing only maybe remove it from trait later
+    fn as_any(&self) -> &dyn Any;
 }
 
 pub trait Statement: Node {
     /// unnecessary marker function (check go marker interfaces).
     fn statement_node(&self);
-    /// for testing only maybe remove it from trait later
-    fn as_any(&self) -> &dyn Any;
 }
 
 pub trait Expression: Node {
@@ -39,6 +39,9 @@ impl Node for Program {
             "".to_string()
         }
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 #[derive(Debug)]
 pub struct LetStatement {
@@ -55,7 +58,7 @@ impl LetStatement {
     pub fn name_token_literal(&self) -> String {
         self.name.token_literal()
     }
-    pub fn new(token: Token, name: Identifier, value: Box<dyn Expression>) -> LetStatement {
+    pub fn new(token: Token, name: Identifier, value: Box<dyn Expression>) -> Self {
         LetStatement { token, name, value }
     }
 }
@@ -73,34 +76,39 @@ impl Node for LetStatement {
     fn token_literal(&self) -> String {
         self.token.literal.clone()
     }
-}
-impl Statement for LetStatement {
-    fn statement_node(&self) {}
     fn as_any(&self) -> &dyn Any {
         self
     }
 }
+impl Statement for LetStatement {
+    fn statement_node(&self) {}
+}
 #[derive(Debug, Clone)]
 pub struct Identifier {
     token: Token, // the token.IDENT token
-    value: String,
+    pub value: String,
 }
 impl Identifier {
-    pub fn new(token: Token, value: String) -> Identifier {
-        Identifier { token, value }
+    pub fn new(token: Token, value: impl Into<String>) -> Self {
+        Identifier {
+            token,
+            value: value.into(),
+        }
     }
 }
 // this one could probably be replaced by implementing Display
 // for token only
 impl Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ", self.token_literal())?;
         write!(f, "{}", self.value)
     }
 }
 impl Node for Identifier {
     fn token_literal(&self) -> String {
         self.token.literal.clone()
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 impl Expression for Identifier {
@@ -112,7 +120,7 @@ pub struct ReturnStatement {
     return_value: Box<dyn Expression>,
 }
 impl ReturnStatement {
-    pub fn new(token: Token, return_value: Box<dyn Expression>) -> ReturnStatement {
+    pub fn new(token: Token, return_value: Box<dyn Expression>) -> Self {
         ReturnStatement {
             token,
             return_value,
@@ -129,17 +137,22 @@ impl Node for ReturnStatement {
     fn token_literal(&self) -> String {
         self.token.literal.clone()
     }
-}
-impl Statement for ReturnStatement {
-    fn statement_node(&self) {}
     fn as_any(&self) -> &dyn Any {
         self
     }
 }
+impl Statement for ReturnStatement {
+    fn statement_node(&self) {}
+}
 #[derive(Debug)]
 pub struct ExpressionStatement {
     token: Token, // the first token of the Expression
-    expression: Box<dyn Expression>,
+    pub expression: Box<dyn Expression>,
+}
+impl ExpressionStatement {
+    pub fn new(token: Token, expression: Box<dyn Expression>) -> Self {
+        ExpressionStatement { token, expression }
+    }
 }
 impl Display for ExpressionStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -150,10 +163,60 @@ impl Node for ExpressionStatement {
     fn token_literal(&self) -> String {
         self.token.literal.clone()
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 impl Statement for ExpressionStatement {
     fn statement_node(&self) {}
+}
+#[derive(Debug)]
+pub struct IntegerLiteral {
+    pub token: Token,
+    pub value: i64,
+}
+impl IntegerLiteral {
+    pub fn new(token: Token, value: i64) -> Self {
+        IntegerLiteral { token, value }
+    }
+}
+impl Display for IntegerLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token.literal)
+    }
+}
+impl Node for IntegerLiteral {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+impl Expression for IntegerLiteral {
+    fn expression_node(&self) {}
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_string() {
+        let program = Program {
+            statements: vec![Box::new(LetStatement {
+                token: Token::new(TokenType::LET, "let"),
+                name: Identifier::new(Token::new(TokenType::IDENT, "myVar"), "myVar"),
+                value: Box::new(Identifier::new(
+                    Token::new(TokenType::IDENT, "anotherVar"),
+                    "anotherVar",
+                )),
+            })],
+        };
+        let prog_str = format!("{}", program);
+        assert_eq!(
+            prog_str, "let myVar = anotherVar;",
+            "prog_str wrong. got {}",
+            prog_str
+        );
     }
 }

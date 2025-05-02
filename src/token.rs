@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 #[allow(clippy::all)]
 pub enum TokenType {
     ILLEGAL,
@@ -34,7 +34,7 @@ pub enum TokenType {
     RETURN,
 }
 #[allow(clippy::all)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Token {
     pub ttype: TokenType,
     pub literal: String,
