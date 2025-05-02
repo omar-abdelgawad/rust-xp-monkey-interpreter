@@ -196,7 +196,75 @@ impl Node for IntegerLiteral {
 impl Expression for IntegerLiteral {
     fn expression_node(&self) {}
 }
-
+#[derive(Debug)]
+pub struct PrefixExpression {
+    pub token: Token, // the prefix token
+    pub operator: String,
+    pub right: Box<dyn Expression>,
+}
+impl PrefixExpression {
+    pub fn new(token: Token, operator: impl Into<String>, right: Box<dyn Expression>) -> Self {
+        PrefixExpression {
+            token,
+            operator: operator.into(),
+            right,
+        }
+    }
+}
+impl Display for PrefixExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}{})", self.operator, self.right)
+    }
+}
+impl Node for PrefixExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+impl Expression for PrefixExpression {
+    fn expression_node(&self) {}
+}
+#[derive(Debug)]
+pub struct InfixExpression {
+    token: Token, // the operator token
+    pub left: Box<dyn Expression>,
+    pub operator: String,
+    pub right: Box<dyn Expression>,
+}
+impl InfixExpression {
+    pub fn new(
+        token: Token,
+        left: Box<dyn Expression>,
+        operator: impl Into<String>,
+        right: Box<dyn Expression>,
+    ) -> Self {
+        InfixExpression {
+            token,
+            left,
+            operator: operator.into(),
+            right,
+        }
+    }
+}
+impl Display for InfixExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} {} {})", self.left, self.operator, self.right)
+    }
+}
+impl Node for InfixExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+impl Expression for InfixExpression {
+    fn expression_node(&self) {}
+}
 #[cfg(test)]
 mod test {
     use super::*;

@@ -1,3 +1,3 @@
 # Monkey-rs
-Still reading 2.6 now.  
-Should start from page 59. 
+Finished reading 2.6 now.  
+Should start from page 69 section 2.7. 
