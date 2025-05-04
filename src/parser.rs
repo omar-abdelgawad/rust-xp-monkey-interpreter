@@ -141,6 +141,9 @@ impl Parser {
             return None;
         }
         let mut left_exp = prefix.unwrap()(self)?;
+        // note that SEMICOLON check is not necessary
+        // since default precedence if not found is LOWEST
+        // but this is more explicit and clear
         while !self.peek_token_is(TokenType::SEMICOLON) && precedence < self.peek_precedence() {
             // Get infix function *first*, clone or copy the reference to drop the immutable borrow
             let infix_fn = match self.infix_parse_fns.get(&self.peek_token.ttype).copied() {
