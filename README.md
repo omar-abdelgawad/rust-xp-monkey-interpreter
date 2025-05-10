@@ -1,3 +1,4 @@
 # Monkey-rs
-Finished reading 2.7 now.  
-Should start from page 77 section 2.8. 
+Started reading 2.8 now.  
+Should start from page 78 'The fun part is now using testIntegerLiteral and testIdentifier to build more generic helper
+functions:'. 

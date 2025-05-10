@@ -599,4 +599,26 @@ return 993322;
             assert_eq!(actual, expected, "expected {}, got={}", expected, actual);
         }
     }
+    fn test_identifier(exp: &Box<dyn Expression>, value: String) -> bool {
+        let ident = exp.as_ref().as_any().downcast_ref::<Identifier>();
+
+        if ident.is_none() {
+            eprintln!("exp not ast::Identifier. got={}", exp);
+            return false;
+        }
+        let ident = ident.unwrap();
+        if ident.value != value {
+            eprintln!("ident.value not {}. got={}", value, ident.value);
+            return false;
+        }
+        if ident.token_literal() != value {
+            eprintln!(
+                "ident.token_literal() not {}. got={}",
+                value,
+                ident.token_literal()
+            );
+            return false;
+        }
+        true
+    }
 }
