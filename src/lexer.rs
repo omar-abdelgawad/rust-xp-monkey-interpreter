@@ -1,7 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::format;
 
-use crate::token;
 use crate::token::{Token, TokenType};
 
 #[allow(clippy::all)]
@@ -135,6 +133,7 @@ fn is_letter(ch: u8) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*; // <- cleaner, imports Token and TokenType
+    use crate::token::Token;
 
     #[test]
     fn test_next_token() {

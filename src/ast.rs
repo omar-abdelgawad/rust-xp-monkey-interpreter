@@ -1,4 +1,4 @@
-use crate::token::{Token, TokenType};
+use crate::token::Token;
 use std::any::Any;
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -33,7 +33,7 @@ impl Display for Program {
 }
 impl Node for Program {
     fn token_literal(&self) -> String {
-        if self.statements.len() > 0 {
+        if !self.statements.is_empty() {
             self.statements[0].token_literal()
         } else {
             "".to_string()
@@ -268,6 +268,7 @@ impl Expression for InfixExpression {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::token::TokenType;
     #[test]
     fn test_string() {
         let program = Program {

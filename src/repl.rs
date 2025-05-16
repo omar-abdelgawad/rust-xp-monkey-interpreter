@@ -1,6 +1,6 @@
 use crate::lexer::Lexer;
 use crate::token::TokenType;
-use std::io::{self, BufRead, Write};
+use std::io::{BufRead, Write};
 
 const PROMPT: &str = ">> ";
 
@@ -17,7 +17,7 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
         let bytes_read = input.read_line(&mut line).unwrap();
         if bytes_read == 0 {
             // EOF reached
-            writeln!(output, "").unwrap();
+            writeln!(output).unwrap();
             break;
         }
 
