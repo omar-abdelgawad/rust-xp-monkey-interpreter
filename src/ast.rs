@@ -115,6 +115,35 @@ impl Expression for Identifier {
     fn expression_node(&self) {}
 }
 #[derive(Debug)]
+pub struct Boolean {
+    token: Token,
+    pub value: bool,
+}
+impl Boolean {
+    pub fn new(token: Token, value: impl Into<bool>) -> Self {
+        Boolean {
+            token,
+            value: value.into(),
+        }
+    }
+}
+impl Display for Boolean {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+impl Node for Boolean {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+impl Expression for Boolean {
+    fn expression_node(&self) {}
+}
+#[derive(Debug)]
 pub struct ReturnStatement {
     token: Token, // the 'return' token
     return_value: Box<dyn Expression>,

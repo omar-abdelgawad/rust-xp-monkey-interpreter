@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        self, Expression, ExpressionStatement, Identifier, InfixExpression, IntegerLiteral,
-        LetStatement, PrefixExpression, ReturnStatement, Statement,
+        self, Boolean, Expression, ExpressionStatement, Identifier, InfixExpression,
+        IntegerLiteral, LetStatement, PrefixExpression, ReturnStatement, Statement,
     },
     lexer,
     token::{self, TokenType},
@@ -50,6 +50,8 @@ impl Parser {
         parser.register_prefix(TokenType::INT, Parser::parse_integer_literal);
         parser.register_prefix(TokenType::BANG, Parser::parse_prefix_expression);
         parser.register_prefix(TokenType::MINUS, Parser::parse_prefix_expression);
+        parser.register_prefix(TokenType::TRUE, Parser::parse_boolean);
+        parser.register_prefix(TokenType::FALSE, Parser::parse_boolean);
         parser.register_infix(TokenType::PLUS, Parser::parse_infix_expression);
         parser.register_infix(TokenType::MINUS, Parser::parse_infix_expression);
         parser.register_infix(TokenType::SLASH, Parser::parse_infix_expression);
@@ -60,6 +62,10 @@ impl Parser {
         parser.register_infix(TokenType::GT, Parser::parse_infix_expression);
 
         parser
+    }
+    fn parse_boolean(&mut self) -> Option<Box<dyn Expression>> {
+        let exp = Boolean::new(self.cur_token.clone(), self.cur_token_is(TokenType::TRUE));
+        Some(Box::new(exp))
     }
     fn parse_infix_expression(&mut self, left: Box<dyn Expression>) -> Option<Box<dyn Expression>> {
         let cur_token_tmp = self.cur_token.clone();
@@ -246,6 +252,7 @@ impl Parser {
 mod test {
     use std::collections::hash_map::Values;
 
+    use crate::ast::Boolean;
     use crate::ast::ExpressionStatement;
     use crate::ast::LetStatement;
     use crate::ast::Node;
@@ -442,6 +449,56 @@ return 993322;
             "5",
             "literal.token_literal() not {}. got={}",
             "5",
+            literal.token_literal()
+        );
+    }
+
+    #[test]
+    fn test_boolean_exp() {
+        let input = "true;";
+        let l = lexer::Lexer::new(input);
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        check_parser_errors(p);
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "program has not enough statements. got={:?}",
+            program.statements.len()
+        );
+        let express_stmt = program.statements[0]
+            .as_ref()
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect(
+                format!(
+                    "program.statements[0] is not ast::ExpressionStatement. got={:?}",
+                    program.statements[0]
+                )
+                .as_str(),
+            );
+        let literal = express_stmt
+            .expression
+            .as_ref()
+            .as_any()
+            .downcast_ref::<Boolean>()
+            .expect(
+                format!(
+                    "exp not ast::IntegerLiteral. got={:?}",
+                    express_stmt.expression
+                )
+                .as_str(),
+            );
+        assert_eq!(
+            literal.value, true,
+            "literal.value not {}. got={:?}",
+            true, literal.value
+        );
+        assert_eq!(
+            literal.token_literal(),
+            "true",
+            "literal.token_literal() not {}. got={}",
+            "true",
             literal.token_literal()
         );
     }
