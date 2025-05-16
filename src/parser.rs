@@ -599,7 +599,7 @@ return 993322;
             assert_eq!(actual, expected, "expected {}, got={}", expected, actual);
         }
     }
-    fn test_identifier(exp: &Box<dyn Expression>, value: String) -> bool {
+    fn test_identifier(exp: &Box<dyn Expression>, value: &str) -> bool {
         let ident = exp.as_ref().as_any().downcast_ref::<Identifier>();
 
         if ident.is_none() {
@@ -621,42 +621,51 @@ return 993322;
         }
         true
     }
-    //fn test_literal_expression(exp: &Box<dyn Expression>, expected)
-    //func testLiteralExpression(
-    //t *testing.T,
-    //exp ast.Expression,
-    //expected interface{},
-    //) bool {
-    //switch v := expected.(type) {
-    //case int:
-    //return testIntegerLiteral(t, exp, int64(v))
-    //case int64:
-    //return testIntegerLiteral(t, exp, v)
-    //case string:
-    //return testIdentifier(t, exp, v)
-    //}
-    //t.Errorf("type of exp not handled. got=%T", exp)
-    //return false
-    //}
-    //fn test_infix_expression(exp: &Box<dyn Expression>,left,operator: &str, right)
-    //func testInfixExpression(t *testing.T, exp ast.Expression, left interface{},
-    //operator string, right interface{}) bool {
-    //opExp, ok := exp.(*ast.InfixExpression)
-    //if !ok {
-    //t.Errorf("exp is not ast.OperatorExpression. got=%T(%s)", exp, exp)
-    //return false
-    //}
-    //if !testLiteralExpression(t, opExp.Left, left) {
-    //return false
-    //}
-    //if opExp.Operator != operator {
-    //t.Errorf("exp.Operator is not '%s'. got=%q", operator, opExp.Operator)
-    //return false
-    //}
-    //if !testLiteralExpression(t, opExp.Right, right) {
-    //return false
-    //}
-    //return true
-    //}
-    //
+    use std::any::Any;
+    fn test_literal_expression(exp: &Box<dyn Expression>, expected: &dyn Any) -> bool {
+        if let Some(&int_val) = expected.downcast_ref::<i64>() {
+            return test_integer_literal(exp, int_val);
+        }
+        if let Some(&int_val) = expected.downcast_ref::<i32>() {
+            return test_integer_literal(exp, int_val as i64);
+        }
+        if let Some(str_val) = expected.downcast_ref::<&str>() {
+            return test_identifier(exp, str_val);
+        }
+        eprintln!("type of exp not handled. got={:?}", exp);
+        false
+    }
+    fn test_infix_expression(
+        exp: &Box<dyn Expression>,
+        left: &dyn Any,
+        operator: &str,
+        right: &dyn Any,
+    ) -> bool {
+        let op_exp = exp.as_any().downcast_ref::<InfixExpression>();
+        if op_exp.is_none() {
+            eprintln!(
+                "exp is not InfixExpression. got={}",
+                std::any::type_name_of_val(&**exp)
+            );
+            return false;
+        }
+        let op_exp = op_exp.unwrap();
+
+        if !test_literal_expression(&op_exp.left, left) {
+            return false;
+        }
+
+        if op_exp.operator != operator {
+            eprintln!(
+                "exp.operator is not '{}'. got='{}'",
+                operator, op_exp.operator
+            );
+            return false;
+        }
+
+        if !test_literal_expression(&op_exp.right, right) {
+            return false;
+        }
+        true
+    }
 }
