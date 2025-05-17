@@ -318,10 +318,8 @@ impl IfExpression {
 }
 impl Display for IfExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "if")?;
-        write!(f, "{}", self.condition)?;
-        write!(f, " ")?;
-        write!(f, "{}", self.consequence)?;
+        write!(f, "if ")?;
+        write!(f, "{} {}", self.condition, self.consequence)?;
         if let Some(alt) = &self.alternative {
             write!(f, "else {}", alt)?;
         }

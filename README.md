@@ -1,3 +1,3 @@
 # Monkey-rs
-still reading 2.8 now.  
-Should start from page 80. 
+finished chapter 2.  
+Should start from chapter 3 page 103. 

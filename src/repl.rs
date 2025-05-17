@@ -4,6 +4,18 @@ use crate::token::TokenType;
 use std::io::{BufRead, Write};
 
 const PROMPT: &str = ">> ";
+const MONKEY_FACE: &str = r#"            __,__
+   .--.  .-"     "-.  .--.
+  / .. \/  .-. .-.  \/ .. \
+ | |  '|  /   Y   \  |'  | |
+ | \   \  \ 0 | 0 /  /   / |
+  \ '- ,\.-"`` ``"-./, -' /
+   `'-' /_   ^ ^   _\ '-'`
+       |  \._   _./  |
+       \   \ `~` /   /
+        '._ '-=-' _.'
+           '~---~'
+"#;
 
 pub fn start(mut input: impl BufRead, mut output: impl Write) {
     let mut line = String::new();
@@ -33,5 +45,10 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
     }
 }
 fn print_parser_errors(mut output: impl Write, errors: &[String]) {
-    todo!();
+    write!(output, "{}", MONKEY_FACE);
+    write!(output, "Woops! We ran into some monkey business here!\n");
+    write!(output, " parser errors:\n");
+    for msg in errors {
+        write!(output, "\t{}\n", msg);
+    }
 }
