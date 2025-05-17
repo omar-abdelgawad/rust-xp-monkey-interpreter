@@ -1,4 +1,5 @@
 use crate::lexer::Lexer;
+use crate::parser::Parser;
 use crate::token::TokenType;
 use std::io::{BufRead, Write};
 
@@ -21,18 +22,16 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
             break;
         }
 
-        // Create a lexer
-        // TODO: make the hashtable inside the lexer
-        // a global variable.
-        let mut lexer = Lexer::new(line.trim());
-
-        // Tokenize input
-        loop {
-            let tok = lexer.next_token();
-            if tok.ttype == TokenType::EOF {
-                break;
-            }
-            writeln!(output, "{:?}", tok).unwrap();
+        let l = Lexer::new(line.trim());
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        if !p.errors().is_empty() {
+            print_parser_errors(&mut output, p.errors());
+            continue;
         }
+        writeln!(output, "{}", program);
     }
+}
+fn print_parser_errors(mut output: impl Write, errors: &[String]) {
+    todo!();
 }

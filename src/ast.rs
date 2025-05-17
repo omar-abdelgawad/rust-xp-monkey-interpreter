@@ -47,7 +47,7 @@ impl Node for Program {
 pub struct LetStatement {
     token: Token, // the token.let token
     name: Identifier,
-    value: Box<dyn Expression>,
+    pub value: Box<dyn Expression>,
 }
 impl LetStatement {
     // used in tests
@@ -146,7 +146,7 @@ impl Expression for Boolean {
 #[derive(Debug)]
 pub struct ReturnStatement {
     token: Token, // the 'return' token
-    return_value: Box<dyn Expression>,
+    pub return_value: Box<dyn Expression>,
 }
 impl ReturnStatement {
     pub fn new(token: Token, return_value: Box<dyn Expression>) -> Self {
@@ -294,6 +294,167 @@ impl Node for InfixExpression {
 impl Expression for InfixExpression {
     fn expression_node(&self) {}
 }
+#[derive(Debug)]
+pub struct IfExpression {
+    token: Token, // the 'if' token
+    pub condition: Box<dyn Expression>,
+    pub consequence: Box<BlockStatement>,
+    pub alternative: Option<Box<BlockStatement>>,
+}
+impl IfExpression {
+    pub fn new(
+        token: Token,
+        condition: Box<dyn Expression>,
+        consequence: Box<BlockStatement>,
+        alternative: Option<Box<BlockStatement>>,
+    ) -> Self {
+        Self {
+            token,
+            condition,
+            consequence,
+            alternative,
+        }
+    }
+}
+impl Display for IfExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "if")?;
+        write!(f, "{}", self.condition)?;
+        write!(f, " ")?;
+        write!(f, "{}", self.consequence)?;
+        if let Some(alt) = &self.alternative {
+            write!(f, "else {}", alt)?;
+        }
+        Ok(())
+    }
+}
+impl Node for IfExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+impl Expression for IfExpression {
+    fn expression_node(&self) {}
+}
+#[derive(Debug)]
+pub struct BlockStatement {
+    token: Token, // the { token
+    pub statements: Vec<Box<dyn Statement>>,
+}
+
+impl BlockStatement {
+    pub fn new(token: Token, statements: Vec<Box<dyn Statement>>) -> Self {
+        BlockStatement { token, statements }
+    }
+}
+impl Display for BlockStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for s in &self.statements {
+            write!(f, "{}", s)?;
+        }
+        Ok(())
+        //write!(f, "{} ", self.token_literal())?; // e.g., "let "
+        //write!(f, "{}", self.name)?; // variable name
+        //write!(f, " = ")?;
+        //write!(f, "{}", self.value)?;
+        //write!(f, ";") // ending semicolon
+    }
+}
+
+impl Node for BlockStatement {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+impl Statement for BlockStatement {
+    fn statement_node(&self) {}
+}
+
+#[derive(Debug)]
+pub struct FunctionLiteral {
+    token: Token, // the 'fn' token
+    pub parameters: Vec<Identifier>,
+    pub body: Option<Box<BlockStatement>>,
+}
+impl FunctionLiteral {
+    pub fn new(
+        token: Token,
+        parameters: Vec<Identifier>,
+        body: Option<Box<BlockStatement>>,
+    ) -> Self {
+        Self {
+            token,
+            parameters,
+            body,
+        }
+    }
+}
+impl Display for FunctionLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let params: Vec<String> = self.parameters.iter().map(|p| p.to_string()).collect();
+        write!(f, "{}({})", self.token.literal, params.join(", "))?;
+        if let Some(body) = &self.body {
+            write!(f, " {}", body)
+        } else {
+            write!(f, " {{}}")
+        }
+    }
+}
+impl Node for FunctionLiteral {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+impl Expression for FunctionLiteral {
+    fn expression_node(&self) {}
+}
+
+#[derive(Debug)]
+pub struct CallExpression {
+    token: Token, // the '(' token
+    pub funciton: Box<dyn Expression>,
+    pub arguments: Vec<Box<dyn Expression>>,
+}
+impl CallExpression {
+    pub fn new(
+        token: Token,
+        funciton: Box<dyn Expression>,
+        arguments: Vec<Box<dyn Expression>>,
+    ) -> Self {
+        Self {
+            token,
+            funciton,
+            arguments,
+        }
+    }
+}
+impl Display for CallExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let args: Vec<String> = self.arguments.iter().map(|p| p.to_string()).collect();
+        write!(f, "{}({})", self.funciton, args.join(", "))
+    }
+}
+impl Node for CallExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+impl Expression for CallExpression {
+    fn expression_node(&self) {}
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
