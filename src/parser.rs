@@ -504,7 +504,13 @@ return 993322;
     }
     #[test]
     fn test_parsing_prefix_expressions() {
-        let prefix_tests = vec![("!5;", "!", 5i64), ("-15", "-", 15i64)];
+        let prefix_tests: Vec<(&str, &str, &dyn Any)> = vec![
+            ("!5;", "!", &5i64),
+            ("-15;", "-", &15i64),
+            ("!true;", "!", &true),
+            ("!false;", "!", &false),
+            ("!false", "!", &false), // TODO: why does this also work?
+        ];
         for (input, operator, integer_value) in prefix_tests {
             let l = lexer::Lexer::new(input);
             let mut p = Parser::new(l);
@@ -545,7 +551,7 @@ return 993322;
                 "exp.operator is not {}. got={}",
                 operator, exp.operator
             );
-            assert!(test_integer_literal(&exp.right, integer_value));
+            assert!(test_literal_expression(&exp.right, integer_value));
         }
     }
     fn test_integer_literal(il: &Box<dyn Expression>, value: i64) -> bool {
@@ -569,16 +575,19 @@ return 993322;
         true
     }
     #[test]
-    fn test_parsing_infix() {
-        let infix_tests = vec![
-            ("5 + 5;", 5i64, "+", 5i64),
-            ("5 - 5;", 5i64, "-", 5i64),
-            ("5 * 5;", 5i64, "*", 5i64),
-            ("5 / 5;", 5i64, "/", 5i64),
-            ("5 > 5;", 5i64, ">", 5i64),
-            ("5 < 5;", 5i64, "<", 5i64),
-            ("5 == 5;", 5i64, "==", 5i64),
-            ("5 != 5;", 5i64, "!=", 5i64),
+    fn test_parsing_infix_expressions_bool_version() {
+        let infix_tests: Vec<(&str, &dyn Any, &str, &dyn Any)> = vec![
+            ("5 + 5;", &5i64, "+", &5i64),
+            ("5 - 5;", &5i64, "-", &5i64),
+            ("5 * 5;", &5i64, "*", &5i64),
+            ("5 / 5;", &5i64, "/", &5i64),
+            ("5 > 5;", &5i64, ">", &5i64),
+            ("5 < 5;", &5i64, "<", &5i64),
+            ("5 == 5;", &5i64, "==", &5i64),
+            ("5 != 5;", &5i64, "!=", &5i64),
+            ("true == true", &true, "==", &true),
+            ("true != false", &true, "!=", &false),
+            ("false == false", &false, "==", &false),
         ];
         for (input, left_val, op, right_val) in infix_tests {
             let l = lexer::Lexer::new(input);
@@ -615,13 +624,13 @@ return 993322;
                     )
                     .as_str(),
                 );
-            assert!(test_integer_literal(&exp.left, left_val));
+            assert!(test_literal_expression(&exp.left, left_val));
             assert_eq!(
                 exp.operator, op,
                 "exp.operator is not {}. got={}",
                 op, exp.operator
             );
-            assert!(test_integer_literal(&exp.right, right_val));
+            assert!(test_literal_expression(&exp.right, right_val));
         }
     }
     #[test]
@@ -646,6 +655,10 @@ return 993322;
                 "3 + 4 * 5 == 3 * 1 + 4 * 5",
                 "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
             ),
+            ("true", "true"),
+            ("false", "false"),
+            ("3 > 5 == false", "((3 > 5) == false)"),
+            ("3 < 5 == true", "((3 < 5) == true)"),
         ];
         for (input, expected) in tests {
             let l = lexer::Lexer::new(input);
@@ -689,8 +702,31 @@ return 993322;
         if let Some(str_val) = expected.downcast_ref::<&str>() {
             return test_identifier(exp, str_val);
         }
+        if let Some(&bool_val) = expected.downcast_ref::<bool>() {
+            return test_boolean_literal(exp, bool_val);
+        }
         eprintln!("type of exp not handled. got={:?}", exp);
         false
+    }
+    fn test_boolean_literal(exp: &Box<dyn Expression>, value: bool) -> bool {
+        let bool_exp = exp
+            .as_ref()
+            .as_any()
+            .downcast_ref::<Boolean>()
+            .expect(format!("exp not ast::Boolean. got={:?}", exp).as_str());
+        if bool_exp.value != value {
+            eprintln!("bool_exp.value not {}. got={}", value, bool_exp.value);
+            return false;
+        }
+        if bool_exp.token_literal() != format!("{}", value) {
+            eprintln!(
+                "integ.token_literal() not {}. got={}",
+                value,
+                bool_exp.token_literal()
+            );
+            return false;
+        }
+        true
     }
     fn test_infix_expression(
         exp: &Box<dyn Expression>,
