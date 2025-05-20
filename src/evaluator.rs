@@ -5,8 +5,8 @@ pub fn eval(node: Box<dyn Node>) -> Option<Object> {
     if let Some(int_lit) = node.as_any().downcast_ref::<IntegerLiteral>() {
         Some(Object::Integer(Integer::new(int_lit.value)))
     } else if let Some(program) = node.as_any().downcast_ref::<Program>() {
-        //None
-        eval_statements(program.statements)
+        None
+        //eval_statements(program.statements)
     } else if let Some(expression_stmt) = node.as_any().downcast_ref::<ExpressionStatement>() {
         None
         //eval(
