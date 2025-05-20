@@ -15,7 +15,7 @@ pub fn eval(node: Node) -> Option<Object> {
         Node::Program(prog) => eval_statements(prog.statements),
         Node::Expression(exp) => match exp {
             Exp::Integer(int_lit) => Some(Object::Integer(Integer::new(int_lit.value))),
-            Exp::Boolean(int_lit) => Some(native_bool_to_boolean_object(int_lit.value)),
+            Exp::Boolean(bool_lit) => Some(native_bool_to_boolean_object(bool_lit.value)),
             _ => None,
         },
     }
