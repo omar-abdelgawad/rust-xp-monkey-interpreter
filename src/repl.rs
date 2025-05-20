@@ -1,6 +1,8 @@
-use crate::lexer::Lexer;
+use crate::ast::Node;
+use crate::object::ObjectTrait;
 use crate::parser::Parser;
 use crate::token::TokenType;
+use crate::{evaluator, lexer::Lexer};
 use std::io::{BufRead, Write};
 
 const PROMPT: &str = ">> ";
@@ -41,7 +43,12 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
             print_parser_errors(&mut output, p.errors());
             continue;
         }
-        writeln!(output, "{}", program);
+        writeln!(output, "debug:{:#?}", program);
+        writeln!(output, "prog:{}", program);
+        let evaluated = evaluator::eval(Node::Program(program));
+        if evaluated.is_some() {
+            writeln!(output, "eval:{}", evaluated.unwrap().inspect());
+        }
     }
 }
 fn print_parser_errors(mut output: impl Write, errors: &[String]) {

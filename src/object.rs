@@ -11,6 +11,22 @@ pub enum Object {
     Boolean(Boolean),
     Null(Null),
 }
+impl ObjectTrait for Object {
+    fn r#type(&self) -> ObjectType {
+        match self {
+            Object::Integer(s) => s.r#type(),
+            Object::Boolean(s) => s.r#type(),
+            Object::Null(s) => s.r#type(),
+        }
+    }
+    fn inspect(&self) -> String {
+        match self {
+            Object::Integer(s) => s.inspect(),
+            Object::Boolean(s) => s.inspect(),
+            Object::Null(s) => s.inspect(),
+        }
+    }
+}
 pub trait ObjectTrait {
     fn r#type(&self) -> ObjectType;
     fn inspect(&self) -> String;
@@ -37,6 +53,11 @@ impl ObjectTrait for Integer {
 #[derive(Debug)]
 pub struct Boolean {
     pub value: bool,
+}
+impl Boolean {
+    pub const fn new(value: bool) -> Self {
+        Boolean { value }
+    }
 }
 impl ObjectTrait for Boolean {
     fn r#type(&self) -> ObjectType {
