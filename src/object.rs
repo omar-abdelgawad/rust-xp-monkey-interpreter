@@ -1,22 +1,33 @@
 #[derive(Debug)]
-enum ObjectType {
+pub enum ObjectType {
     Integer_OBJ,
     BOOLEAN_OBJ,
     NULL_OBJ,
 }
 
-trait Object {
-    fn r#type() -> ObjectType;
+#[derive(Debug)]
+pub enum Object {
+    Integer(Integer),
+    Boolean(Boolean),
+    Null(Null),
+}
+pub trait ObjectTrait {
+    fn r#type(&self) -> ObjectType;
     fn inspect(&self) -> String;
 }
 
 #[derive(Debug)]
-struct Integer {
-    value: i64,
+pub struct Integer {
+    pub value: i64,
+}
+impl Integer {
+    pub fn new(value: i64) -> Self {
+        Integer { value }
+    }
 }
 
-impl Object for Integer {
-    fn r#type() -> ObjectType {
+impl ObjectTrait for Integer {
+    fn r#type(&self) -> ObjectType {
         ObjectType::Integer_OBJ
     }
     fn inspect(&self) -> String {
@@ -24,11 +35,11 @@ impl Object for Integer {
     }
 }
 #[derive(Debug)]
-struct Boolean {
-    value: bool,
+pub struct Boolean {
+    pub value: bool,
 }
-impl Object for Boolean {
-    fn r#type() -> ObjectType {
+impl ObjectTrait for Boolean {
+    fn r#type(&self) -> ObjectType {
         ObjectType::BOOLEAN_OBJ
     }
     fn inspect(&self) -> String {
@@ -36,9 +47,9 @@ impl Object for Boolean {
     }
 }
 #[derive(Debug)]
-struct Null;
-impl Object for Null {
-    fn r#type() -> ObjectType {
+pub struct Null;
+impl ObjectTrait for Null {
+    fn r#type(&self) -> ObjectType {
         ObjectType::NULL_OBJ
     }
     fn inspect(&self) -> String {
