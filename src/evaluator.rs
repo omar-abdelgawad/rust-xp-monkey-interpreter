@@ -1,26 +1,13 @@
 use crate::ast::{ExpressionStatement, IntegerLiteral, Node, Program, Statement};
 use crate::object::{Integer, Object};
 
-pub fn eval(node: Box<dyn Node>) -> Option<Object> {
-    if let Some(int_lit) = node.as_any().downcast_ref::<IntegerLiteral>() {
-        Some(Object::Integer(Integer::new(int_lit.value)))
-    } else if let Some(program) = node.as_any().downcast_ref::<Program>() {
-        None
-        //eval_statements(program.statements)
-    } else if let Some(expression_stmt) = node.as_any().downcast_ref::<ExpressionStatement>() {
-        None
-        //eval(
-        //    expression as Box<dyn Node>, //.as_any()
-        //                                 //.downcast_ref::<Box<dyn Node>>()
-        //                                 //.unwrap(),
-        //)
-    } else if let Some(statement) = node.as_any().downcast_ref::<Program>() {
-        None
-    } else {
-        None
+pub fn eval(node: Node) -> Option<Object> {
+    match node {
+        Node::Statement(stmt) => None,
+        _ => None,
     }
 }
-fn eval_statements(stmts: Vec<Box<dyn Statement>>) -> Option<Object> {
+fn eval_statements(stmts: Vec<Box<Statement>>) -> Option<Object> {
     let mut result = None;
     for statement in stmts {
         result = eval(statement);
