@@ -1,3 +1,3 @@
 # Monkey-rs
-finished chapter 2.  
-Should start from chapter 3 page 103. 
+started chapter 3 section 4.  
+Should start from 3.5 page 110. 
