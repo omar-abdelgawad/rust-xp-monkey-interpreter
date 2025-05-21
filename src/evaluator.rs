@@ -18,6 +18,10 @@ pub fn eval(node: Node) -> Option<Object> {
         Node::Expression(exp) => match exp {
             Exp::Integer(int_lit) => Some(Object::Integer(Integer::new(int_lit.value))),
             Exp::Boolean(bool_lit) => Some(native_bool_to_boolean_object(bool_lit.value)),
+            Exp::Prefix(prefix_exp) => {
+                let right = eval(Node::Expression(*prefix_exp.right));
+                Some(eval_prefix_expression(&prefix_exp.operator, right))
+            }
             _ => None,
         },
     }
@@ -36,6 +40,37 @@ fn native_bool_to_boolean_object(input: bool) -> Object {
         FALSE
     }
 }
+fn eval_prefix_expression(operator: &str, right: Option<Object>) -> Object {
+    match operator {
+        "!" => eval_bang_operator_expression(right),
+        "-" => eval_minus_prefix_operator_exprssion(right),
+        _ => NULL,
+    }
+}
+fn eval_bang_operator_expression(right: Option<Object>) -> Object {
+    let Some(right) = right else {
+        panic!("ERROR: deal with null values on the right of bang exprssions YOU MR!")
+    };
+    match right {
+        TRUE => FALSE,
+        FALSE => TRUE,
+        NULL => TRUE,
+        // TODO: remove this false or make it panic?
+        // this default means that all objects are "truthy"
+        _ => FALSE,
+    }
+}
+fn eval_minus_prefix_operator_exprssion(right: Option<Object>) -> Object {
+    let Some(right) = right else {
+        panic!("ERROR: deal with null values on the right of minus exprssions YOU MR!")
+    };
+    match right {
+        Object::Integer(integer) => Object::new_int_var(-integer.value),
+        // I REALLY HATE THIS
+        _ => NULL,
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -46,10 +81,10 @@ mod test {
 
     #[test]
     fn test_eval_integer_expression() {
-        let tests = vec![("5", 5i64), ("10", 10)];
+        let tests = vec![("5", 5i64), ("10", 10), ("-5", -5), ("-10", -10)];
         for (input, expected) in tests {
             let evaluated = test_eval(input);
-            test_integer_object(&evaluated, expected);
+            assert!(test_integer_object(&evaluated, expected));
         }
     }
     fn test_eval(input: &str) -> Object {
@@ -79,7 +114,7 @@ mod test {
         let tests = vec![("true", true), ("false", false)];
         for (input, expected) in tests {
             let evaluated = test_eval(input);
-            test_boolean_object(&evaluated, expected);
+            assert!(test_boolean_object(&evaluated, expected));
         }
     }
     fn test_boolean_object(obj: &Object, expected: bool) -> bool {
@@ -112,5 +147,20 @@ mod test {
         println!("obj2 addr: {:p}", addr2);
 
         assert_eq!(addr1, addr2, "Objects should have different addresses");
+    }
+    #[test]
+    fn test_bang_operator() {
+        let tests = vec![
+            ("!true", false),
+            ("!false", true),
+            ("!5", false),
+            ("!!true", true),
+            ("!!false", false),
+            ("!!5", true),
+        ];
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            test_boolean_object(&evaluated, expected);
+        }
     }
 }

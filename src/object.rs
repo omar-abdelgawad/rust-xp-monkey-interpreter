@@ -5,11 +5,16 @@ pub enum ObjectType {
     NULL_OBJ,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Object {
     Integer(Integer),
     Boolean(Boolean),
     Null(Null),
+}
+impl Object {
+    pub fn new_int_var(value: i64) -> Object {
+        Object::Integer(Integer::new(value))
+    }
 }
 impl ObjectTrait for Object {
     fn r#type(&self) -> ObjectType {
@@ -32,7 +37,7 @@ pub trait ObjectTrait {
     fn inspect(&self) -> String;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Integer {
     pub value: i64,
 }
@@ -50,7 +55,7 @@ impl ObjectTrait for Integer {
         format!("{}", self.value)
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Boolean {
     pub value: bool,
 }
@@ -67,7 +72,7 @@ impl ObjectTrait for Boolean {
         format!("{}", self.value)
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Null;
 impl Null {
     pub const fn new() -> Self {
