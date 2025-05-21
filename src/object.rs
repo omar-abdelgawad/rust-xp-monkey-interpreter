@@ -69,6 +69,11 @@ impl ObjectTrait for Boolean {
 }
 #[derive(Debug)]
 pub struct Null;
+impl Null {
+    pub const fn new() -> Self {
+        Null
+    }
+}
 impl ObjectTrait for Null {
     fn r#type(&self) -> ObjectType {
         ObjectType::NULL_OBJ

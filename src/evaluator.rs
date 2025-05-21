@@ -1,8 +1,10 @@
 use crate::ast::{Expression, ExpressionStatement, IntegerLiteral, Node, Program, Statement};
-use crate::object::{Boolean, Integer, Object};
+use crate::object::{Boolean, Integer, Null, Object};
 
+//TODO: make all of the values below singletons with no copies
 const TRUE: Object = Object::Boolean(Boolean::new(true));
 const FALSE: Object = Object::Boolean(Boolean::new(false));
+const NULL: Object = Object::Null(Null::new());
 
 pub fn eval(node: Node) -> Option<Object> {
     use Expression as Exp;
