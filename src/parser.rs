@@ -149,12 +149,12 @@ impl Parser {
     }
     fn parse_block_statement(&mut self) -> Option<Box<BlockStatement>> {
         let cur_token_tmp = self.cur_token.clone();
-        let mut stmts_tmp: Vec<Box<Statement>> = vec![];
+        let mut stmts_tmp: Vec<Statement> = vec![];
         self.next_token();
         while !self.cur_token_is(TokenType::RBRACE) && !self.cur_token_is(TokenType::EOF) {
             let stmt = self.parse_statement();
             if let Some(stmt) = stmt {
-                stmts_tmp.push(stmt);
+                stmts_tmp.push(*stmt);
             }
             self.next_token();
         }
@@ -865,7 +865,7 @@ mod test {
                 express_stmt.expression
             );
         };
-        let Statement::Expression(consequence) = &*exp.consequence.statements[0] else {
+        let Statement::Expression(consequence) = &exp.consequence.statements[0] else {
             panic!(
                 "statements[0] is not ast::ExpressionStatement. got={:?}",
                 exp.consequence.statements[0]
@@ -919,7 +919,7 @@ mod test {
             exp.consequence.statements.len()
         );
 
-        let Statement::Expression(consequence) = &*exp.consequence.statements[0] else {
+        let Statement::Expression(consequence) = &exp.consequence.statements[0] else {
             panic!(
                 "statements[0] is not ast::ExpressionStatement. got={:?}",
                 exp.consequence.statements[0]
@@ -939,7 +939,7 @@ mod test {
             alt.statements.len()
         );
 
-        let Statement::Expression(alt) = &*alt.statements[0] else {
+        let Statement::Expression(alt) = &alt.statements[0] else {
             panic!(
                 "statements[0] is not ast::ExpressionStatement. got={:?}",
                 alt.statements[0]
@@ -996,7 +996,7 @@ mod test {
                 "function.body.statements has not 1 statements. got={}",
                 body.statements.len()
             );
-            let Statement::Expression(body_stmt) = &*body.statements[0] else {
+            let Statement::Expression(body_stmt) = &body.statements[0] else {
                 panic!(
                     "function body stmt is not ast::ExpressionStatement. got={:?}",
                     body.statements[0]

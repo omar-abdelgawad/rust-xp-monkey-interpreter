@@ -349,11 +349,11 @@ impl Display for IfExpression {
 #[derive(Debug)]
 pub struct BlockStatement {
     token: Token, // the { token
-    pub statements: Vec<Box<Statement>>,
+    pub statements: Vec<Statement>,
 }
 
 impl BlockStatement {
-    pub fn new(token: Token, statements: Vec<Box<Statement>>) -> Self {
+    pub fn new(token: Token, statements: Vec<Statement>) -> Self {
         BlockStatement { token, statements }
     }
     pub fn token_literal(&self) -> String {

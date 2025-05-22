@@ -1,3 +1,16 @@
+//TODO: make all of the values below singletons with no copies
+pub const TRUE: Object = Object::Boolean(Boolean::new(true));
+pub const FALSE: Object = Object::Boolean(Boolean::new(false));
+pub const NULL: Object = Object::Null(Null::new());
+
+pub fn native_bool_to_boolean_object(input: bool) -> Object {
+    if input {
+        TRUE
+    } else {
+        FALSE
+    }
+}
+
 #[derive(Debug)]
 pub enum ObjectType {
     Integer_OBJ,
@@ -55,6 +68,7 @@ impl ObjectTrait for Integer {
         format!("{}", self.value)
     }
 }
+
 #[derive(Debug, PartialEq)]
 pub struct Boolean {
     pub value: bool,
@@ -72,6 +86,7 @@ impl ObjectTrait for Boolean {
         format!("{}", self.value)
     }
 }
+
 #[derive(Debug, PartialEq)]
 pub struct Null;
 impl Null {
