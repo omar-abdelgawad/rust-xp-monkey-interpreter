@@ -1,7 +1,7 @@
 use crate::ast::{
     Expression, ExpressionStatement, IfExpression, IntegerLiteral, Node, Program, Statement,
 };
-use crate::object::native_bool_to_boolean_object;
+use crate::object::{native_bool_to_boolean_object, ReturnValue};
 use crate::object::{Boolean, Integer, Null, Object};
 use crate::object::{FALSE, NULL, TRUE};
 
@@ -9,10 +9,14 @@ pub fn eval(node: Node) -> Option<Object> {
     use Expression as Exp;
     use Statement as St;
     match node {
-        Node::Program(prog) => eval_statements(prog.statements),
+        Node::Program(prog) => eval_program(prog.statements),
         Node::Statement(stmt) => match stmt {
             St::Expression(exp_stmt) => eval(Node::Expression(*exp_stmt.expression)),
-            St::Block(block_stmt) => eval_statements(block_stmt.statements),
+            St::Block(block_stmt) => eval_block_statement(block_stmt.statements),
+            St::Return(ret_stmt) => {
+                let val = eval(Node::Expression(*ret_stmt.return_value))?;
+                Some(Object::new_ret_var(val))
+            }
             _ => None,
         },
         Node::Expression(exp) => match exp {
@@ -32,10 +36,24 @@ pub fn eval(node: Node) -> Option<Object> {
         },
     }
 }
-fn eval_statements(stmts: Vec<Statement>) -> Option<Object> {
+fn eval_program(stmts: Vec<Statement>) -> Option<Object> {
     let mut result = None;
     for statement in stmts {
         result = eval(Node::Statement(statement));
+        if let Some(Object::Ret(ret_obj)) = result {
+            return Some(*ret_obj.value);
+        }
+    }
+    result
+}
+
+fn eval_block_statement(stmts: Vec<Statement>) -> Option<Object> {
+    let mut result = None;
+    for statement in stmts {
+        result = eval(Node::Statement(statement));
+        if let Some(Object::Ret(ret_obj)) = result {
+            return Some(Object::Ret(ret_obj));
+        }
     }
     result
 }
@@ -257,7 +275,7 @@ mod test {
         ];
         for (input, expected) in tests {
             let evaluated = test_eval(input);
-            test_boolean_object(&evaluated, expected);
+            assert!(test_boolean_object(&evaluated, expected));
         }
     }
 
@@ -276,8 +294,8 @@ mod test {
         for (input, expected) in tests {
             let evaluated = test_eval(input);
             match expected {
-                Some(expected) => test_integer_object(&evaluated, expected),
-                None => test_null_object(&evaluated),
+                Some(expected) => assert!(test_integer_object(&evaluated, expected)),
+                None => assert!(test_null_object(&evaluated)),
             };
         }
     }
@@ -288,6 +306,28 @@ mod test {
             false
         } else {
             true
+        }
+    }
+    #[test]
+    fn test_return_statements() {
+        let tests = vec![
+            ("return 10;", 10),
+            ("return 10; 9;", 10),
+            ("return 2 * 5; 9;", 10),
+            ("9; return 2 * 5; 9;", 10),
+            (
+                "if (10 > 1) {
+                    if (10 > 1) {
+                        return 10;  
+                    }
+                    return 1;
+                }",
+                10,
+            ),
+        ];
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            assert!(test_integer_object(&evaluated, expected))
         }
     }
 }

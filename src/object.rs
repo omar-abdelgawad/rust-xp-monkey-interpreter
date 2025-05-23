@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 //TODO: make all of the values below singletons with no copies
 pub const TRUE: Object = Object::Boolean(Boolean::new(true));
 pub const FALSE: Object = Object::Boolean(Boolean::new(false));
@@ -16,6 +18,12 @@ pub enum ObjectType {
     Integer_OBJ,
     BOOLEAN_OBJ,
     NULL_OBJ,
+    RETURN_VALUE_OBJ,
+}
+
+pub trait ObjectTrait {
+    fn r#type(&self) -> ObjectType;
+    fn inspect(&self) -> String;
 }
 
 #[derive(Debug, PartialEq)]
@@ -23,10 +31,14 @@ pub enum Object {
     Integer(Integer),
     Boolean(Boolean),
     Null(Null),
+    Ret(ReturnValue),
 }
 impl Object {
     pub fn new_int_var(value: i64) -> Object {
         Object::Integer(Integer::new(value))
+    }
+    pub fn new_ret_var(value: Object) -> Object {
+        Object::Ret(ReturnValue::new(Box::new(value)))
     }
 }
 impl ObjectTrait for Object {
@@ -35,6 +47,7 @@ impl ObjectTrait for Object {
             Object::Integer(s) => s.r#type(),
             Object::Boolean(s) => s.r#type(),
             Object::Null(s) => s.r#type(),
+            Object::Ret(s) => s.r#type(),
         }
     }
     fn inspect(&self) -> String {
@@ -42,13 +55,19 @@ impl ObjectTrait for Object {
             Object::Integer(s) => s.inspect(),
             Object::Boolean(s) => s.inspect(),
             Object::Null(s) => s.inspect(),
+            Object::Ret(s) => s.inspect(),
         }
     }
 }
-pub trait ObjectTrait {
-    fn r#type(&self) -> ObjectType;
-    fn inspect(&self) -> String;
-}
+
+//impl Display for Object {
+//    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//        match self {
+//            Object::Integer(s) => write!(f, "{}", s),
+//            _ => panic!(),
+//        }
+//    }
+//}
 
 #[derive(Debug, PartialEq)]
 pub struct Integer {
@@ -100,5 +119,24 @@ impl ObjectTrait for Null {
     }
     fn inspect(&self) -> String {
         "null".to_string()
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ReturnValue {
+    pub value: Box<Object>,
+}
+impl ReturnValue {
+    pub fn new(value: Box<Object>) -> Self {
+        ReturnValue { value }
+    }
+}
+
+impl ObjectTrait for ReturnValue {
+    fn r#type(&self) -> ObjectType {
+        ObjectType::RETURN_VALUE_OBJ
+    }
+    fn inspect(&self) -> String {
+        self.value.inspect()
     }
 }
