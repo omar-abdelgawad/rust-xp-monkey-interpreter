@@ -19,6 +19,7 @@ pub enum ObjectType {
     BOOLEAN_OBJ,
     NULL_OBJ,
     RETURN_VALUE_OBJ,
+    ERROR_OBJ,
 }
 
 pub trait ObjectTrait {
@@ -32,6 +33,7 @@ pub enum Object {
     Boolean(Boolean),
     Null(Null),
     Ret(ReturnValue),
+    Err(Error),
 }
 impl Object {
     pub fn new_int_var(value: i64) -> Object {
@@ -48,6 +50,7 @@ impl ObjectTrait for Object {
             Object::Boolean(s) => s.r#type(),
             Object::Null(s) => s.r#type(),
             Object::Ret(s) => s.r#type(),
+            Object::Err(s) => s.r#type(),
         }
     }
     fn inspect(&self) -> String {
@@ -56,6 +59,7 @@ impl ObjectTrait for Object {
             Object::Boolean(s) => s.inspect(),
             Object::Null(s) => s.inspect(),
             Object::Ret(s) => s.inspect(),
+            Object::Err(s) => s.inspect(),
         }
     }
 }
@@ -138,5 +142,24 @@ impl ObjectTrait for ReturnValue {
     }
     fn inspect(&self) -> String {
         self.value.inspect()
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Error {
+    pub message: String,
+}
+impl Error {
+    pub fn new(message: String) -> Self {
+        Self { message }
+    }
+}
+
+impl ObjectTrait for Error {
+    fn r#type(&self) -> ObjectType {
+        ObjectType::ERROR_OBJ
+    }
+    fn inspect(&self) -> String {
+        format!("ERROR: {}", self.message)
     }
 }
