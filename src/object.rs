@@ -13,13 +13,26 @@ pub fn native_bool_to_boolean_object(input: bool) -> Object {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ObjectType {
     Integer_OBJ,
     BOOLEAN_OBJ,
     NULL_OBJ,
     RETURN_VALUE_OBJ,
     ERROR_OBJ,
+}
+impl Display for ObjectType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use ObjectType as ObjT;
+        let mut to_write = match self {
+            ObjT::Integer_OBJ => "INTEGER",
+            ObjT::BOOLEAN_OBJ => "BOOLEAN",
+            ObjT::NULL_OBJ => "NULL",
+            ObjT::RETURN_VALUE_OBJ => "RETURN",
+            ObjT::ERROR_OBJ => "ERROR",
+        };
+        write!(f, "{}", to_write)
+    }
 }
 
 pub trait ObjectTrait {

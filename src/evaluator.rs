@@ -1,7 +1,7 @@
 use crate::ast::{
     Expression, ExpressionStatement, IfExpression, IntegerLiteral, Node, Program, Statement,
 };
-use crate::object::{native_bool_to_boolean_object, ReturnValue};
+use crate::object::{native_bool_to_boolean_object, Error, ObjectTrait, ObjectType, ReturnValue};
 use crate::object::{Boolean, Integer, Null, Object};
 use crate::object::{FALSE, NULL, TRUE};
 
@@ -14,8 +14,11 @@ pub fn eval(node: Node) -> Option<Object> {
             St::Expression(exp_stmt) => eval(Node::Expression(*exp_stmt.expression)),
             St::Block(block_stmt) => eval_block_statement(block_stmt.statements),
             St::Return(ret_stmt) => {
-                let val = eval(Node::Expression(*ret_stmt.return_value))?;
-                Some(Object::new_ret_var(val))
+                let val = eval(Node::Expression(*ret_stmt.return_value));
+                if is_error(&val) {
+                    return val;
+                }
+                Some(Object::new_ret_var(val?))
             }
             _ => None,
         },
@@ -24,11 +27,20 @@ pub fn eval(node: Node) -> Option<Object> {
             Exp::Boolean(bool_lit) => Some(native_bool_to_boolean_object(bool_lit.value)),
             Exp::Prefix(prefix_exp) => {
                 let right = eval(Node::Expression(*prefix_exp.right));
+                if is_error(&right) {
+                    return right;
+                }
                 Some(eval_prefix_expression(&prefix_exp.operator, right))
             }
             Exp::Infix(infix_exp) => {
                 let left = eval(Node::Expression(*infix_exp.left));
+                if is_error(&left) {
+                    return left;
+                }
                 let right = eval(Node::Expression(*infix_exp.right));
+                if is_error(&right) {
+                    return right;
+                }
                 Some(eval_infix_expression(&infix_exp.operator, left, right))
             }
             Exp::If(if_exp) => eval_if_exp(if_exp),
@@ -40,8 +52,10 @@ fn eval_program(stmts: Vec<Statement>) -> Option<Object> {
     let mut result = None;
     for statement in stmts {
         result = eval(Node::Statement(statement));
-        if let Some(Object::Ret(ret_obj)) = result {
-            return Some(*ret_obj.value);
+        match result {
+            Some(Object::Ret(ret_obj)) => return Some(*ret_obj.value),
+            Some(Object::Err(ref err_obj)) => return result,
+            _ => {}
         }
     }
     result
@@ -51,8 +65,9 @@ fn eval_block_statement(stmts: Vec<Statement>) -> Option<Object> {
     let mut result = None;
     for statement in stmts {
         result = eval(Node::Statement(statement));
-        if let Some(Object::Ret(ret_obj)) = result {
-            return Some(Object::Ret(ret_obj));
+        match result {
+            Some(Object::Ret(_) | Object::Err(_)) => return result,
+            _ => {}
         }
     }
     result
@@ -62,7 +77,11 @@ fn eval_prefix_expression(operator: &str, right: Option<Object>) -> Object {
     match operator {
         "!" => eval_bang_operator_expression(right),
         "-" => eval_minus_prefix_operator_exprssion(right),
-        _ => NULL,
+        _ => new_error(format!(
+            "unknown operator: {}{}",
+            operator,
+            right.unwrap().r#type(),
+        )),
     }
 }
 
@@ -70,6 +89,9 @@ fn eval_bang_operator_expression(right: Option<Object>) -> Object {
     let Some(right) = right else {
         panic!("ERROR: deal with null values on the right of bang exprssions YOU MR!")
     };
+    //if right.r#type() != ObjectType::Integer_OBJ {
+    //    return new_error(format!("unknown operator: -{}", right.r#type()));
+    //}
     match right {
         TRUE => FALSE,
         FALSE => TRUE,
@@ -87,7 +109,7 @@ fn eval_minus_prefix_operator_exprssion(right: Option<Object>) -> Object {
     match right {
         Object::Integer(integer) => Object::new_int_var(-integer.value),
         // I REALLY HATE THIS
-        _ => NULL,
+        _ => new_error(format!("unknown operator: -{}", right.r#type())),
     }
 }
 
@@ -109,7 +131,18 @@ fn eval_infix_expression(operator: &str, left: Option<Object>, right: Option<Obj
         (_, Obj::Integer(left), Obj::Integer(right)) => {
             eval_integer_infix_expression(operator, left, right)
         }
-        _ => NULL,
+        (op, l, r) if l.r#type() != r.r#type() => new_error(format!(
+            "type mismatch: {} {} {}",
+            l.r#type(),
+            operator,
+            r.r#type()
+        )),
+        (op, l, r) => new_error(format!(
+            "unknown operator: {} {} {}",
+            l.r#type(),
+            op,
+            r.r#type(),
+        )),
     }
 }
 
@@ -126,12 +159,23 @@ fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) 
         "==" => native_bool_to_boolean_object(left_val == right_val),
         "!=" => native_bool_to_boolean_object(left_val != right_val),
         // I still hate this default operator shit
-        _ => NULL,
+        (op) => {
+            return new_error(format!(
+                "unknown operator: {} {} {}",
+                left.r#type(),
+                op,
+                right.r#type()
+            ))
+        }
     }
 }
 
 fn eval_if_exp(ie: IfExpression) -> Option<Object> {
-    let cond = eval(Node::Expression(*ie.condition)).unwrap();
+    let cond = eval(Node::Expression(*ie.condition));
+    if is_error(&cond) {
+        return cond;
+    }
+    let cond = cond.unwrap();
     if is_truthy(cond) {
         return eval(Node::Statement(Statement::Block(*ie.consequence)));
     } else if ie.alternative.is_some() {
@@ -147,6 +191,18 @@ fn is_truthy(obj: Object) -> bool {
         TRUE => true,
         FALSE => false,
         _ => true,
+    }
+}
+
+fn new_error(formt: String) -> Object {
+    Object::Err(Error::new(formt))
+}
+
+fn is_error(obj: &Option<Object>) -> bool {
+    if let Some(obj) = obj {
+        obj.r#type() == ObjectType::ERROR_OBJ
+    } else {
+        false
     }
 }
 
@@ -328,6 +384,48 @@ mod test {
         for (input, expected) in tests {
             let evaluated = test_eval(input);
             assert!(test_integer_object(&evaluated, expected))
+        }
+    }
+    #[test]
+    fn test_error_handling() {
+        let tests = vec![
+            ("5 + true;", "type mismatch: INTEGER + BOOLEAN"),
+            ("5 + true; 5;", "type mismatch: INTEGER + BOOLEAN"),
+            ("-true", "unknown operator: -BOOLEAN"),
+            ("true + false;", "unknown operator: BOOLEAN + BOOLEAN"),
+            ("5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"),
+            (
+                "if (10 > 1) { true + false; }",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+            (
+                "if (10 > 1) {\
+                    if (10 > 1) {\
+                        return true + false;\
+                    }\
+                    return 1;\
+                }",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+        ];
+        let mut errors = vec![];
+        for (input, expected_message) in tests {
+            let evaluated = test_eval(input);
+            let Object::Err(err_obj) = evaluated else {
+                errors.push((
+                    input,
+                    format!("no error object returned. got={:?}", evaluated),
+                ));
+                continue;
+            };
+            assert_eq!(
+                err_obj.message, expected_message,
+                "wrong error message. expected={}, got={}",
+                expected_message, err_obj.message
+            )
+        }
+        if !errors.is_empty() {
+            panic!("Tests failed with errors:\n{:?}", errors)
         }
     }
 }
