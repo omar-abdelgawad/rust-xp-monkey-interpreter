@@ -1,3 +1,4 @@
+pub mod environment;
 use std::fmt::Display;
 
 //TODO: make all of the values below singletons with no copies
@@ -40,7 +41,7 @@ pub trait ObjectTrait {
     fn inspect(&self) -> String;
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Object {
     Integer(Integer),
     Boolean(Boolean),
@@ -86,7 +87,7 @@ impl ObjectTrait for Object {
 //    }
 //}
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Integer {
     pub value: i64,
 }
@@ -105,7 +106,7 @@ impl ObjectTrait for Integer {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Boolean {
     pub value: bool,
 }
@@ -123,7 +124,7 @@ impl ObjectTrait for Boolean {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Null;
 impl Null {
     pub const fn new() -> Self {
@@ -139,7 +140,7 @@ impl ObjectTrait for Null {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ReturnValue {
     pub value: Box<Object>,
 }
@@ -158,7 +159,7 @@ impl ObjectTrait for ReturnValue {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Error {
     pub message: String,
 }

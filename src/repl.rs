@@ -1,4 +1,5 @@
 use crate::ast::Node;
+use crate::object::environment::Environment;
 use crate::object::ObjectTrait;
 use crate::parser::Parser;
 use crate::token::TokenType;
@@ -21,6 +22,7 @@ const MONKEY_FACE: &str = r#"            __,__
 
 pub fn start(mut input: impl BufRead, mut output: impl Write) {
     let mut line = String::new();
+    let mut env = Environment::new();
 
     loop {
         // Print prompt
@@ -45,7 +47,7 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
         }
         writeln!(output, "debug:{:#?}", program);
         writeln!(output, "prog:{}", program);
-        let evaluated = evaluator::eval(Node::Program(program));
+        let evaluated = evaluator::eval(Node::Program(program), &mut env);
         if evaluated.is_some() {
             writeln!(output, "eval:{}", evaluated.unwrap().inspect());
         }
