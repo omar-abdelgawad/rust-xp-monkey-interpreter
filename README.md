@@ -1,3 +1,3 @@
 # Monkey-rs
-Finished reading chapter 3 section 8.  
-Should start from 3.9 page 136. 
+Finished reading chapter 3 section 9.  
+Should start from 3.10 page 140. 
