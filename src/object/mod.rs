@@ -1,6 +1,10 @@
 pub mod environment;
 use std::fmt::Display;
 
+use environment::Environment;
+
+use crate::ast::{BlockStatement, Identifier};
+
 //TODO: make all of the values below singletons with no copies
 pub const TRUE: Object = Object::Boolean(Boolean::new(true));
 pub const FALSE: Object = Object::Boolean(Boolean::new(false));
@@ -21,6 +25,7 @@ pub enum ObjectType {
     NULL_OBJ,
     RETURN_VALUE_OBJ,
     ERROR_OBJ,
+    FUNCTION_OBJ,
 }
 impl Display for ObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -31,6 +36,7 @@ impl Display for ObjectType {
             ObjT::NULL_OBJ => "NULL",
             ObjT::RETURN_VALUE_OBJ => "RETURN",
             ObjT::ERROR_OBJ => "ERROR",
+            ObjT::FUNCTION_OBJ => "FUNCTION",
         };
         write!(f, "{}", to_write)
     }
@@ -175,5 +181,35 @@ impl ObjectTrait for Error {
     }
     fn inspect(&self) -> String {
         format!("ERROR: {}", self.message)
+    }
+}
+#[derive(Debug)]
+pub struct Function {
+    parameters: Vec<Identifier>,
+    body: BlockStatement,
+    env: Environment,
+}
+impl Function {
+    pub fn new(parameters: Vec<Identifier>, body: BlockStatement, env: Environment) -> Self {
+        Self {
+            parameters,
+            body,
+            env,
+        }
+    }
+}
+
+impl ObjectTrait for Function {
+    fn r#type(&self) -> ObjectType {
+        ObjectType::FUNCTION_OBJ
+    }
+    fn inspect(&self) -> String {
+        let params = self
+            .parameters
+            .iter()
+            .map(|a| a.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        format!("fn({}){{\n{}\n}}", params, self.body)
     }
 }
