@@ -2,9 +2,14 @@ use crate::ast::{
     self, Expression, ExpressionStatement, IfExpression, IntegerLiteral, Node, Program, Statement,
 };
 use crate::object::environment::Environment;
-use crate::object::{native_bool_to_boolean_object, Error, ObjectTrait, ObjectType, ReturnValue};
+use crate::object::{
+    native_bool_to_boolean_object, Error, Function, ObjectTrait, ObjectType, ReturnValue,
+};
 use crate::object::{Boolean, Integer, Null, Object};
 use crate::object::{FALSE, NULL, TRUE};
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
     use Expression as Exp;
@@ -54,6 +59,22 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
             }
             Exp::If(if_exp) => eval_if_exp(if_exp, env),
             Exp::Identifier(ident) => Some(eval_identifier(ident, env)),
+            Exp::Function(fun_exp) => {
+                let params = fun_exp.parameters;
+                let body = *fun_exp.body.unwrap();
+                Some(Object::Func(Function::new(params, body, env)))
+            }
+            Exp::Call(call_exp) => {
+                let func = eval(Node::Expression(*call_exp.function), env);
+                if is_error(&func) {
+                    return func;
+                }
+                let mut args = eval_expressions(call_exp.arguments, env);
+                if args.len() == 1 && is_error(&args[0]) {
+                    return args.remove(0);
+                }
+                apply_function(&func.unwrap(), &args)
+            }
             _ => None,
         },
     }
@@ -99,9 +120,6 @@ fn eval_bang_operator_expression(right: Option<Object>) -> Object {
     let Some(right) = right else {
         panic!("ERROR: deal with null values on the right of bang exprssions YOU MR!")
     };
-    //if right.r#type() != ObjectType::Integer_OBJ {
-    //    return new_error(format!("unknown operator: -{}", right.r#type()));
-    //}
     match right {
         TRUE => FALSE,
         FALSE => TRUE,
@@ -224,6 +242,31 @@ fn eval_identifier(ident: ast::Identifier, env: &mut Environment) -> Object {
         Some(obj) => obj,
         None => new_error(format!("identifier not found: {}", ident.value)),
     }
+}
+
+fn eval_expressions(exps: Vec<Box<Expression>>, env: &mut Environment) -> Vec<Option<Object>> {
+    let mut res = Vec::new();
+    for e in exps {
+        let evaluated = eval(Node::Expression(*e), env);
+        if is_error(&evaluated) {
+            return vec![evaluated];
+        }
+        res.push(evaluated);
+    }
+    res
+}
+
+fn apply_function(fn_obj: &Object, args: &[Option<Object>]) -> Option<Object> {
+    let Object::Func(fn_obj) = fn_obj else {
+        return Some(new_error(format!("not a function: {}", fn_obj.r#type())));
+    };
+    let extended_env = extend_function_env(fn_obj, args);
+    let evaluated = eval(Node::Statement(Statement::Block(fn_obj.body)), extended_env);
+    None
+}
+
+fn extend_function_env(fn_obj: &Function,args: &[Option<Object>]) -> Environment{
+    let mut env = Environment::new_enclosed_environment(Rc::new(RefCell::new(fn_obj.env)))
 }
 
 #[cfg(test)]
@@ -378,11 +421,12 @@ mod test {
     }
 
     fn test_null_object(obj: &Object) -> bool {
-        if *obj != NULL {
-            eprintln!("object is not NULL. got={:?} ({:?})", obj, obj);
-            false
-        } else {
-            true
+        match obj {
+            Object::Null(_) => true,
+            _ => {
+                eprintln!("object is not NULL. got={:?} ({:?})", obj, obj);
+                false
+            }
         }
     }
     #[test]
@@ -459,6 +503,49 @@ mod test {
             ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
         ];
 
+        for (input, expected) in tests {
+            assert!(test_integer_object(&test_eval(input), expected));
+        }
+    }
+    #[test]
+    fn test_function_object() {
+        let input = "fn(x) {x+2;};";
+        let evaluated = test_eval(input);
+        //println!("{:?}", evaluated);
+        let Object::Func(func_obj) = evaluated else {
+            panic!(
+                "object is not Function. got={:?} ({:?})",
+                evaluated, evaluated
+            )
+        };
+        if func_obj.parameters.len() != 1 {
+            panic!(
+                "function has wrong parameters. Parameters ={:?}",
+                func_obj.parameters
+            )
+        }
+        if func_obj.parameters[0].to_string() != "x" {
+            panic!("parameter is not 'x'. got={}", func_obj.parameters[0])
+        }
+        let expected_body = "(x + 2)";
+        if func_obj.body.to_string() != expected_body {
+            panic!(
+                "body is not {}. got={}",
+                expected_body,
+                func_obj.body.to_string()
+            )
+        }
+    }
+    #[test]
+    fn test_function_application() {
+        let tests = vec![
+            ("let identity = fn(x) { x; }; identity(5);", 5),
+            ("let identity = fn(x) { return x; }; identity(5);", 5),
+            ("let double = fn(x) { x * 2; }; double(5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5, 5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20),
+            ("fn(x) { x; }(5)", 5),
+        ];
         for (input, expected) in tests {
             assert!(test_integer_object(&test_eval(input), expected));
         }

@@ -19,7 +19,7 @@ impl Display for Node {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -37,7 +37,7 @@ impl Display for Statement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Identifier(Identifier),
     Boolean(Boolean),
@@ -123,7 +123,7 @@ impl Program {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LetStatement {
     token: Token, // the token.let token
     name: Identifier,
@@ -158,7 +158,7 @@ impl Display for LetStatement {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Identifier {
     token: Token, // the token.IDENT token
     pub value: String,
@@ -180,7 +180,7 @@ impl Display for Identifier {
         write!(f, "{}", self.value)
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Boolean {
     token: Token,
     pub value: bool,
@@ -201,7 +201,7 @@ impl Display for Boolean {
         write!(f, "{}", self.value)
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ReturnStatement {
     token: Token, // the 'return' token
     pub return_value: Box<Expression>,
@@ -222,7 +222,7 @@ impl Display for ReturnStatement {
         write!(f, "{} {};", self.token_literal(), self.return_value)
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ExpressionStatement {
     token: Token, // the first token of the Expression
     pub expression: Box<Expression>,
@@ -240,7 +240,7 @@ impl Display for ExpressionStatement {
         write!(f, "{}", self.expression)
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: i64,
@@ -258,7 +258,7 @@ impl Display for IntegerLiteral {
         write!(f, "{}", self.token.literal)
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PrefixExpression {
     pub token: Token, // the prefix token
     pub operator: String,
@@ -281,7 +281,7 @@ impl Display for PrefixExpression {
         write!(f, "({}{})", self.operator, self.right)
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct InfixExpression {
     token: Token, // the operator token
     pub left: Box<Expression>,
@@ -311,7 +311,7 @@ impl Display for InfixExpression {
         write!(f, "({} {} {})", self.left, self.operator, self.right)
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfExpression {
     token: Token, // the 'if' token
     pub condition: Box<Expression>,
@@ -346,7 +346,7 @@ impl Display for IfExpression {
         Ok(())
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BlockStatement {
     token: Token, // the { token
     pub statements: Vec<Statement>,
@@ -369,10 +369,11 @@ impl Display for BlockStatement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionLiteral {
     token: Token, // the 'fn' token
     pub parameters: Vec<Identifier>,
+    // how is this an option again?
     pub body: Option<Box<BlockStatement>>,
 }
 impl FunctionLiteral {
@@ -403,7 +404,7 @@ impl Display for FunctionLiteral {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CallExpression {
     token: Token, // the '(' token
     pub function: Box<Expression>,

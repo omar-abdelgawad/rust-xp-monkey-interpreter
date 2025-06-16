@@ -54,6 +54,7 @@ pub enum Object {
     Null(Null),
     Ret(ReturnValue),
     Err(Error),
+    Func(Function),
 }
 impl Object {
     pub fn new_int_var(value: i64) -> Object {
@@ -71,6 +72,7 @@ impl ObjectTrait for Object {
             Object::Null(s) => s.r#type(),
             Object::Ret(s) => s.r#type(),
             Object::Err(s) => s.r#type(),
+            Object::Func(s) => s.r#type(),
         }
     }
     fn inspect(&self) -> String {
@@ -80,6 +82,7 @@ impl ObjectTrait for Object {
             Object::Null(s) => s.inspect(),
             Object::Ret(s) => s.inspect(),
             Object::Err(s) => s.inspect(),
+            Object::Func(s) => s.inspect(),
         }
     }
 }
@@ -183,14 +186,15 @@ impl ObjectTrait for Error {
         format!("ERROR: {}", self.message)
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Function {
-    parameters: Vec<Identifier>,
-    body: BlockStatement,
-    env: Environment,
+    pub parameters: Vec<Identifier>,
+    pub body: BlockStatement,
+    pub env: Environment,
 }
 impl Function {
-    pub fn new(parameters: Vec<Identifier>, body: BlockStatement, env: Environment) -> Self {
+    pub fn new(parameters: Vec<Identifier>, body: BlockStatement, env: &mut Environment) -> Self {
+        let env = env.clone();
         Self {
             parameters,
             body,
