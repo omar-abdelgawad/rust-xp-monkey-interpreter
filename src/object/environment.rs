@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::Object;
+use super::{Object, NULL};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -30,9 +30,13 @@ impl Environment {
         }
         obj
     }
-    /// returns the old value for the indent
-    pub fn set(&mut self, name: String, val: Object) -> Option<Object> {
-        self.store.insert(name, val)
+    /// returns the old value for the indent or NULL
+    pub fn set(&mut self, name: String, val: Object) -> Object {
+        let old_val = self.store.insert(name, val);
+        match old_val {
+            Some(obj) => obj,
+            None => NULL,
+        }
     }
 
     pub fn new_enclosed_environment(outer: Rc<RefCell<Environment>>) -> Self {

@@ -11,7 +11,7 @@ use crate::object::{FALSE, NULL, TRUE};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
+pub fn eval(node: Node, env: &mut Environment) -> Object {
     use Expression as Exp;
     use Statement as St;
     match node {
@@ -24,7 +24,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
                 if is_error(&val) {
                     return val;
                 }
-                Some(Object::new_ret_var(val?))
+                Object::new_ret_var(val)
             }
             St::Let(let_stmt) => {
                 let tmp_name_value = let_stmt.name_value();
@@ -32,19 +32,24 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
                 if is_error(&val) {
                     return val;
                 }
-                env.set(tmp_name_value, val.unwrap())
+                env.set(tmp_name_value, val)
             }
-            _ => unreachable!(),
+            unknown_st_node => {
+                unreachable!(
+                    "you have reached an unhandled Statement node: {:?}",
+                    unknown_st_node
+                )
+            }
         },
         Node::Expression(exp) => match exp {
-            Exp::Integer(int_lit) => Some(Object::Integer(Integer::new(int_lit.value))),
-            Exp::Boolean(bool_lit) => Some(native_bool_to_boolean_object(bool_lit.value)),
+            Exp::Integer(int_lit) => Object::Integer(Integer::new(int_lit.value)),
+            Exp::Boolean(bool_lit) => native_bool_to_boolean_object(bool_lit.value),
             Exp::Prefix(prefix_exp) => {
                 let right = eval(Node::Expression(*prefix_exp.right), env);
                 if is_error(&right) {
                     return right;
                 }
-                Some(eval_prefix_expression(&prefix_exp.operator, right))
+                eval_prefix_expression(&prefix_exp.operator, right)
             }
             Exp::Infix(infix_exp) => {
                 let left = eval(Node::Expression(*infix_exp.left), env);
@@ -55,14 +60,14 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
                 if is_error(&right) {
                     return right;
                 }
-                Some(eval_infix_expression(&infix_exp.operator, left, right))
+                eval_infix_expression(&infix_exp.operator, left, right)
             }
             Exp::If(if_exp) => eval_if_exp(if_exp, env),
-            Exp::Identifier(ident) => Some(eval_identifier(ident, env)),
+            Exp::Identifier(ident) => eval_identifier(ident, env),
             Exp::Function(fun_exp) => {
                 let params = fun_exp.parameters;
                 let body = *fun_exp.body.unwrap();
-                Some(Object::Func(Function::new(params, body, env)))
+                Object::Func(Function::new(params, body, env))
             }
             Exp::Call(call_exp) => {
                 let func = eval(Node::Expression(*call_exp.function), env);
@@ -73,53 +78,51 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
                 if args.len() == 1 && is_error(&args[0]) {
                     return args.remove(0);
                 }
-                Some(apply_function(&func.unwrap(), &args))
+                apply_function(&func, &args)
             }
-            _ => unreachable!(),
+            unknown_exp_node => {
+                unreachable!(
+                    "you have reached an unhandled Expression node: {:?}",
+                    unknown_exp_node
+                )
+            }
         },
     }
 }
-fn eval_program(stmts: Vec<Statement>, env: &mut Environment) -> Option<Object> {
-    let mut result = None;
+fn eval_program(stmts: Vec<Statement>, env: &mut Environment) -> Object {
+    let mut result = NULL;
     for statement in stmts {
         result = eval(Node::Statement(statement), env);
         match result {
-            Some(Object::Ret(ret_obj)) => return Some(*ret_obj.value),
-            Some(Object::Err(ref err_obj)) => return result,
+            Object::Ret(ret_obj) => return *ret_obj.value,
+            Object::Err(ref err_obj) => return result,
             _ => {}
         }
     }
     result
 }
 
-fn eval_block_statement(stmts: Vec<Statement>, env: &mut Environment) -> Option<Object> {
-    let mut result = None;
+fn eval_block_statement(stmts: Vec<Statement>, env: &mut Environment) -> Object {
+    let mut result = NULL;
     for statement in stmts {
         result = eval(Node::Statement(statement), env);
         match result {
-            Some(Object::Ret(_) | Object::Err(_)) => return result,
+            Object::Ret(_) | Object::Err(_) => return result,
             _ => {}
         }
     }
     result
 }
 
-fn eval_prefix_expression(operator: &str, right: Option<Object>) -> Object {
+fn eval_prefix_expression(operator: &str, right: Object) -> Object {
     match operator {
         "!" => eval_bang_operator_expression(right),
         "-" => eval_minus_prefix_operator_exprssion(right),
-        _ => new_error(format!(
-            "unknown operator: {}{}",
-            operator,
-            right.unwrap().r#type(),
-        )),
+        _ => new_error(format!("unknown operator: {}{}", operator, right.r#type(),)),
     }
 }
 
-fn eval_bang_operator_expression(right: Option<Object>) -> Object {
-    let Some(right) = right else {
-        panic!("ERROR: deal with null values on the right of bang exprssions YOU MR!")
-    };
+fn eval_bang_operator_expression(right: Object) -> Object {
     match right {
         TRUE => FALSE,
         FALSE => TRUE,
@@ -130,10 +133,7 @@ fn eval_bang_operator_expression(right: Option<Object>) -> Object {
     }
 }
 
-fn eval_minus_prefix_operator_exprssion(right: Option<Object>) -> Object {
-    let Some(right) = right else {
-        panic!("ERROR: deal with null values on the right of minus exprssions YOU MR!")
-    };
+fn eval_minus_prefix_operator_exprssion(right: Object) -> Object {
     match right {
         Object::Integer(integer) => Object::new_int_var(-integer.value),
         // I REALLY HATE THIS
@@ -141,13 +141,7 @@ fn eval_minus_prefix_operator_exprssion(right: Option<Object>) -> Object {
     }
 }
 
-fn eval_infix_expression(operator: &str, left: Option<Object>, right: Option<Object>) -> Object {
-    let Some(left) = left else {
-        panic!("ERROR: deal with null values on the left of infix exprssions YOU MR!")
-    };
-    let Some(right) = right else {
-        panic!("ERROR: deal with null values on the right of infix exprssions YOU MR!")
-    };
+fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object {
     use Object as Obj;
     match (operator, left, right) {
         ("==", Obj::Boolean(left), Obj::Boolean(right)) => {
@@ -198,12 +192,11 @@ fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) 
     }
 }
 
-fn eval_if_exp(ie: IfExpression, env: &mut Environment) -> Option<Object> {
+fn eval_if_exp(ie: IfExpression, env: &mut Environment) -> Object {
     let cond = eval(Node::Expression(*ie.condition), env);
     if is_error(&cond) {
         return cond;
     }
-    let cond = cond.unwrap();
     if is_truthy(cond) {
         return eval(Node::Statement(Statement::Block(*ie.consequence)), env);
     } else if ie.alternative.is_some() {
@@ -212,7 +205,7 @@ fn eval_if_exp(ie: IfExpression, env: &mut Environment) -> Option<Object> {
             env,
         );
     } else {
-        Some(NULL)
+        NULL
     }
 }
 
@@ -229,12 +222,8 @@ fn new_error(formt: String) -> Object {
     Object::Err(Error::new(formt))
 }
 
-fn is_error(obj: &Option<Object>) -> bool {
-    if let Some(obj) = obj {
-        obj.r#type() == ObjectType::ERROR_OBJ
-    } else {
-        false
-    }
+fn is_error(obj: &Object) -> bool {
+    obj.r#type() == ObjectType::ERROR_OBJ
 }
 fn eval_identifier(ident: ast::Identifier, env: &mut Environment) -> Object {
     let val = env.get(&ident.value);
@@ -244,7 +233,7 @@ fn eval_identifier(ident: ast::Identifier, env: &mut Environment) -> Object {
     }
 }
 
-fn eval_expressions(exps: Vec<Box<Expression>>, env: &mut Environment) -> Vec<Option<Object>> {
+fn eval_expressions(exps: Vec<Box<Expression>>, env: &mut Environment) -> Vec<Object> {
     let mut res = Vec::new();
     for e in exps {
         let evaluated = eval(Node::Expression(*e), env);
@@ -261,7 +250,7 @@ fn eval_expressions(exps: Vec<Box<Expression>>, env: &mut Environment) -> Vec<Op
 // nothing except compiling but probably the types are all wrong
 // from the Option<Object> to the not shared Environment in
 // fn_obj of type Object::Fun(Function)
-fn apply_function(fn_obj: &Object, args: &[Option<Object>]) -> Object {
+fn apply_function(fn_obj: &Object, args: &[Object]) -> Object {
     let Object::Func(fn_obj) = fn_obj else {
         return new_error(format!("not a function: {}", fn_obj.r#type()));
     };
@@ -271,16 +260,16 @@ fn apply_function(fn_obj: &Object, args: &[Option<Object>]) -> Object {
         &mut extended_env,
     );
 
-    unwrap_return_value(evaluated.unwrap())
+    unwrap_return_value(evaluated)
 }
 
-fn extend_function_env(fn_obj: &Function, args: &[Option<Object>]) -> Environment {
+fn extend_function_env(fn_obj: &Function, args: &[Object]) -> Environment {
     // FIX: this clones a snapshot of enclosing environment but
     // it should take a reference instead so maybe make
     // fn_obj already have an Rc<RefCell<Environment>>
     let mut env = Environment::new_enclosed_environment(Rc::new(RefCell::new(fn_obj.env.clone())));
     for (param_idx, param) in fn_obj.parameters.iter().enumerate() {
-        env.set(param.value.clone(), args[param_idx].clone().unwrap());
+        env.set(param.value.clone(), args[param_idx].clone());
     }
     env
 }
@@ -329,7 +318,7 @@ mod test {
         let mut p = Parser::new(l);
         let program = p.parse_program();
         let mut env = Environment::new();
-        eval(Node::Program(program), &mut env).unwrap()
+        eval(Node::Program(program), &mut env)
     }
     fn test_integer_object(obj: &Object, expected: i64) -> bool {
         if let Object::Integer(result) = obj {

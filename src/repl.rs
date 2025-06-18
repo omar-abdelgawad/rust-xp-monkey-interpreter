@@ -48,9 +48,9 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
         writeln!(output, "debug:{:#?}", program);
         writeln!(output, "prog:{}", program);
         let evaluated = evaluator::eval(Node::Program(program), &mut env);
-        if evaluated.is_some() {
-            writeln!(output, "eval:{}", evaluated.unwrap().inspect());
-        }
+        //if evaluated.is_some() {
+        writeln!(output, "eval:{}", evaluated.inspect());
+        //}
     }
 }
 fn print_parser_errors(mut output: impl Write, errors: &[String]) {
