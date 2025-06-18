@@ -34,7 +34,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
                 }
                 env.set(tmp_name_value, val.unwrap())
             }
-            _ => None,
+            _ => unreachable!(),
         },
         Node::Expression(exp) => match exp {
             Exp::Integer(int_lit) => Some(Object::Integer(Integer::new(int_lit.value))),
@@ -73,9 +73,9 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
                 if args.len() == 1 && is_error(&args[0]) {
                     return args.remove(0);
                 }
-                apply_function(&func.unwrap(), &args)
+                Some(apply_function(&func.unwrap(), &args))
             }
-            _ => None,
+            _ => unreachable!(),
         },
     }
 }
@@ -256,17 +256,40 @@ fn eval_expressions(exps: Vec<Box<Expression>>, env: &mut Environment) -> Vec<Op
     res
 }
 
-fn apply_function(fn_obj: &Object, args: &[Option<Object>]) -> Option<Object> {
+// TODO: the following 3 functions below are not well thought and I
+// just used clone everytime I saw an error. I don't care now about
+// nothing except compiling but probably the types are all wrong
+// from the Option<Object> to the not shared Environment in
+// fn_obj of type Object::Fun(Function)
+fn apply_function(fn_obj: &Object, args: &[Option<Object>]) -> Object {
     let Object::Func(fn_obj) = fn_obj else {
-        return Some(new_error(format!("not a function: {}", fn_obj.r#type())));
+        return new_error(format!("not a function: {}", fn_obj.r#type()));
     };
-    let extended_env = extend_function_env(fn_obj, args);
-    let evaluated = eval(Node::Statement(Statement::Block(fn_obj.body)), extended_env);
-    None
+    let mut extended_env = extend_function_env(fn_obj, args);
+    let evaluated = eval(
+        Node::Statement(Statement::Block(fn_obj.body.clone())),
+        &mut extended_env,
+    );
+
+    unwrap_return_value(evaluated.unwrap())
 }
 
-fn extend_function_env(fn_obj: &Function,args: &[Option<Object>]) -> Environment{
-    let mut env = Environment::new_enclosed_environment(Rc::new(RefCell::new(fn_obj.env)))
+fn extend_function_env(fn_obj: &Function, args: &[Option<Object>]) -> Environment {
+    // FIX: this clones a snapshot of enclosing environment but
+    // it should take a reference instead so maybe make
+    // fn_obj already have an Rc<RefCell<Environment>>
+    let mut env = Environment::new_enclosed_environment(Rc::new(RefCell::new(fn_obj.env.clone())));
+    for (param_idx, param) in fn_obj.parameters.iter().enumerate() {
+        env.set(param.value.clone(), args[param_idx].clone().unwrap());
+    }
+    env
+}
+
+fn unwrap_return_value(obj: Object) -> Object {
+    if let Object::Ret(ret_obj) = obj {
+        return *ret_obj.value;
+    }
+    return obj;
 }
 
 #[cfg(test)]
