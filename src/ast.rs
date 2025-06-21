@@ -47,6 +47,7 @@ pub enum Expression {
     If(IfExpression),
     Function(FunctionLiteral),
     Call(CallExpression),
+    Str(StringLiteral),
 }
 impl Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -60,6 +61,7 @@ impl Display for Expression {
             Exp::If(s) => write!(f, "{}", s),
             Exp::Function(s) => write!(f, "{}", s),
             Exp::Call(s) => write!(f, "{}", s),
+            Exp::Str(s) => write!(f, "{}", s),
         }
     }
 }
@@ -95,6 +97,7 @@ impl Expression {
             Expression::If(e) => e.token_literal(),
             Expression::Function(e) => e.token_literal(),
             Expression::Call(e) => e.token_literal(),
+            Expression::Str(e) => e.token_literal(),
         }
     }
 }
@@ -426,6 +429,29 @@ impl Display for CallExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let args: Vec<String> = self.arguments.iter().map(|p| p.to_string()).collect();
         write!(f, "{}({})", self.function, args.join(", "))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StringLiteral {
+    token: Token, // the token.IDENT token
+    pub value: String,
+}
+impl StringLiteral {
+    pub fn new(token: Token, value: impl Into<String>) -> Self {
+        Self {
+            token,
+            value: value.into(),
+        }
+    }
+    pub fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+}
+
+impl Display for StringLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
     }
 }
 

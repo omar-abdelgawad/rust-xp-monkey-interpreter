@@ -2,7 +2,7 @@ use crate::{
     ast::{
         self, BlockStatement, Boolean, CallExpression, Expression, ExpressionStatement,
         FunctionLiteral, Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement,
-        PrefixExpression, ReturnStatement, Statement,
+        PrefixExpression, ReturnStatement, Statement, StringLiteral,
     },
     lexer,
     token::{self, TokenType},
@@ -55,6 +55,7 @@ impl Parser {
         parser.register_prefix(TokenType::FUNCTION, Parser::parse_function_literal);
         parser.register_prefix(TokenType::LPAREN, Parser::parse_grouped_expression);
         parser.register_prefix(TokenType::IF, Parser::parse_if_expression);
+        parser.register_prefix(TokenType::STRING, Parser::parse_string_literal);
         parser.register_infix(TokenType::PLUS, Parser::parse_infix_expression);
         parser.register_infix(TokenType::MINUS, Parser::parse_infix_expression);
         parser.register_infix(TokenType::SLASH, Parser::parse_infix_expression);
@@ -66,6 +67,12 @@ impl Parser {
         parser.register_infix(TokenType::LPAREN, Parser::parse_call_expression);
 
         parser
+    }
+
+    fn parse_string_literal(&mut self) -> Option<Box<Expression>> {
+        let str_lit = StringLiteral::new(self.cur_token.clone(), self.cur_token.literal.clone());
+        let exp = Expression::Str(str_lit);
+        Some(Box::new(exp))
     }
     fn parse_call_expression(&mut self, function: Box<Expression>) -> Option<Box<Expression>> {
         let cur_token_tmp = self.cur_token.clone();
@@ -1078,5 +1085,26 @@ mod test {
         assert!(test_literal_expression(&exp.arguments[0], &1));
         assert!(test_infix_expression(&exp.arguments[1], &2, "*", &3));
         assert!(test_infix_expression(&exp.arguments[2], &4, "+", &5));
+    }
+
+    #[test]
+    fn test_string_literal_expression() {
+        let input = "\"hello world\"";
+        let l = Lexer::new(input);
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        check_parser_errors(p);
+
+        assert_eq!(program.statements.len(), 1);
+        let Statement::Expression(exp_stmt) = &program.statements[0] else {
+            panic!(
+                "program.statements[0] is not ast::ExpressionStatement. got={:?}",
+                program.statements[0]
+            );
+        };
+        let Expression::Str(str_lit) = &*exp_stmt.expression else {
+            panic!("exp not ast::StringLiteral. got={:?}", exp_stmt);
+        };
+        assert_eq!(str_lit.value, "hello world");
     }
 }

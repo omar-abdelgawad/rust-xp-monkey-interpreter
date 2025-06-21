@@ -10,6 +10,8 @@ pub const TRUE: Object = Object::Boolean(Boolean::new(true));
 pub const FALSE: Object = Object::Boolean(Boolean::new(false));
 pub const NULL: Object = Object::Null(Null::new());
 
+type BuiltinFunction = fn(args: &[Object]) -> Object;
+
 pub fn native_bool_to_boolean_object(input: bool) -> Object {
     if input {
         TRUE
@@ -26,6 +28,8 @@ pub enum ObjectType {
     RETURN_VALUE_OBJ,
     ERROR_OBJ,
     FUNCTION_OBJ,
+    String_OBJ,
+    BuiltinFunction,
 }
 impl Display for ObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -37,6 +41,8 @@ impl Display for ObjectType {
             ObjT::RETURN_VALUE_OBJ => "RETURN",
             ObjT::ERROR_OBJ => "ERROR",
             ObjT::FUNCTION_OBJ => "FUNCTION",
+            ObjT::String_OBJ => "STRING",
+            ObjT::BuiltinFunction => "builtin function",
         };
         write!(f, "{}", to_write)
     }
@@ -55,6 +61,8 @@ pub enum Object {
     Ret(ReturnValue),
     Err(Error),
     Func(Function),
+    String(StringObj),
+    Builtin(BuiltinObj),
 }
 impl Object {
     pub fn new_int_var(value: i64) -> Object {
@@ -73,6 +81,8 @@ impl ObjectTrait for Object {
             Object::Ret(s) => s.r#type(),
             Object::Err(s) => s.r#type(),
             Object::Func(s) => s.r#type(),
+            Object::String(s) => s.r#type(),
+            Object::Builtin(s) => s.r#type(),
         }
     }
     fn inspect(&self) -> String {
@@ -83,6 +93,8 @@ impl ObjectTrait for Object {
             Object::Ret(s) => s.inspect(),
             Object::Err(s) => s.inspect(),
             Object::Func(s) => s.inspect(),
+            Object::String(s) => s.inspect(),
+            Object::Builtin(s) => s.inspect(),
         }
     }
 }
@@ -214,5 +226,45 @@ impl ObjectTrait for Function {
             .collect::<Vec<_>>()
             .join(",");
         format!("fn({}){{\n{}\n}}", params, self.body)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StringObj {
+    pub value: String,
+}
+impl StringObj {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self {
+            value: value.into(),
+        }
+    }
+}
+
+impl ObjectTrait for StringObj {
+    fn r#type(&self) -> ObjectType {
+        ObjectType::String_OBJ
+    }
+    fn inspect(&self) -> String {
+        format!("{}", self.value)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct BuiltinObj {
+    pub function: BuiltinFunction,
+}
+impl BuiltinObj {
+    pub fn new(function: BuiltinFunction) -> Self {
+        Self { function }
+    }
+}
+
+impl ObjectTrait for BuiltinObj {
+    fn r#type(&self) -> ObjectType {
+        ObjectType::BuiltinFunction
+    }
+    fn inspect(&self) -> String {
+        "builtin function".to_string()
     }
 }

@@ -75,6 +75,16 @@ impl Lexer {
         let tok_type = self.lookup_ident(ident_slice);
         Token::new(tok_type, ident_slice)
     }
+    fn read_string(&mut self) -> String {
+        let position: usize = (self.position + 1) as usize;
+        loop {
+            self.read_char();
+            if self.ch == b'"' || self.ch == 0 {
+                break;
+            }
+        }
+        self.input[position..self.position as usize].to_owned()
+    }
     /// gets next_token;#![wa()]
     pub fn next_token(&mut self) -> Token {
         self.skip_white_space();
@@ -112,6 +122,7 @@ impl Lexer {
             b',' => Token::new(TokenType::COMMA, self.ch as char),
             b'{' => Token::new(TokenType::LBRACE, self.ch as char),
             b'}' => Token::new(TokenType::RBRACE, self.ch as char),
+            b'"' => Token::new(TokenType::STRING, self.read_string()),
             0 => Token::new(TokenType::EOF, ""),
             _ => {
                 if is_letter(self.ch) {
@@ -188,6 +199,8 @@ if (5 < 10) {
 
 10 == 10;
 10 != 9;
+\"foobar\"
+\"foo bar\"
 ";
         let tests = [
             Token::new(TokenType::LET, "let"),
@@ -263,6 +276,8 @@ if (5 < 10) {
             Token::new(TokenType::NOT_EQ, "!="),
             Token::new(TokenType::INT, "9"),
             Token::new(TokenType::SEMICOLON, ";"),
+            Token::new(TokenType::STRING, "foobar"),
+            Token::new(TokenType::STRING, "foo bar"),
             Token::new(TokenType::EOF, ""),
         ];
         let mut lexer = Lexer::new(input);

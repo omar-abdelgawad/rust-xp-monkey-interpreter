@@ -1,15 +1,18 @@
+use builtins::builtins;
+
 use crate::ast::{
     self, Expression, ExpressionStatement, IfExpression, IntegerLiteral, Node, Program, Statement,
 };
 use crate::object::environment::Environment;
 use crate::object::{
-    native_bool_to_boolean_object, Error, Function, ObjectTrait, ObjectType, ReturnValue,
+    native_bool_to_boolean_object, Error, Function, ObjectTrait, ObjectType, ReturnValue, StringObj,
 };
 use crate::object::{Boolean, Integer, Null, Object};
 use crate::object::{FALSE, NULL, TRUE};
 
 use std::cell::RefCell;
 use std::rc::Rc;
+mod builtins;
 
 pub fn eval(node: Node, env: &mut Environment) -> Object {
     use Expression as Exp;
@@ -80,6 +83,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
                 }
                 apply_function(&func, &args)
             }
+            Exp::Str(str_lit) => Object::String(StringObj::new(str_lit.value)),
             unknown_exp_node => {
                 unreachable!(
                     "you have reached an unhandled Expression node: {:?}",
@@ -153,6 +157,9 @@ fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object 
         (_, Obj::Integer(left), Obj::Integer(right)) => {
             eval_integer_infix_expression(operator, left, right)
         }
+        (_, Obj::String(left), Obj::String(right)) => {
+            eval_string_infix_expression(operator, left, right)
+        }
         (op, l, r) if l.r#type() != r.r#type() => new_error(format!(
             "type mismatch: {} {} {}",
             l.r#type(),
@@ -166,6 +173,19 @@ fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object 
             r.r#type(),
         )),
     }
+}
+
+fn eval_string_infix_expression(operator: &str, left: StringObj, right: StringObj) -> Object {
+    if operator != "+" {
+        return new_error(format!(
+            "unknown operator: {} {} {}",
+            left.r#type(),
+            operator,
+            right.r#type()
+        ));
+    }
+    let new_str = format!("{}{}", left.value, right.value);
+    Object::String(StringObj::new(new_str))
 }
 
 fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) -> Object {
@@ -227,10 +247,14 @@ fn is_error(obj: &Object) -> bool {
 }
 fn eval_identifier(ident: ast::Identifier, env: &mut Environment) -> Object {
     let val = env.get(&ident.value);
-    match val {
-        Some(obj) => obj,
-        None => new_error(format!("identifier not found: {}", ident.value)),
+    if let Some(obj) = val {
+        return obj;
     }
+    let val = builtins(&ident.value);
+    if let Some(built_obj) = val {
+        return Object::Builtin(built_obj);
+    }
+    new_error(format!("identifier not found: {}", ident.value))
 }
 
 fn eval_expressions(exps: Vec<Box<Expression>>, env: &mut Environment) -> Vec<Object> {
@@ -251,16 +275,19 @@ fn eval_expressions(exps: Vec<Box<Expression>>, env: &mut Environment) -> Vec<Ob
 // from the Option<Object> to the not shared Environment in
 // fn_obj of type Object::Fun(Function)
 fn apply_function(fn_obj: &Object, args: &[Object]) -> Object {
-    let Object::Func(fn_obj) = fn_obj else {
-        return new_error(format!("not a function: {}", fn_obj.r#type()));
-    };
-    let mut extended_env = extend_function_env(fn_obj, args);
-    let evaluated = eval(
-        Node::Statement(Statement::Block(fn_obj.body.clone())),
-        &mut extended_env,
-    );
+    match fn_obj {
+        Object::Func(fn_obj) => {
+            let mut extended_env = extend_function_env(fn_obj, args);
+            let evaluated = eval(
+                Node::Statement(Statement::Block(fn_obj.body.clone())),
+                &mut extended_env,
+            );
 
-    unwrap_return_value(evaluated)
+            unwrap_return_value(evaluated)
+        }
+        Object::Builtin(builtin_fn) => (builtin_fn.function)(args),
+        _ => new_error(format!("not a function: {}", fn_obj.r#type())),
+    }
 }
 
 fn extend_function_env(fn_obj: &Function, args: &[Object]) -> Environment {
@@ -485,6 +512,7 @@ mod test {
                 "unknown operator: BOOLEAN + BOOLEAN",
             ),
             ("foobar", "identifier not found: foobar"),
+            ("\"Hello\" - \"World\"", "unknown operator: STRING - STRING"),
         ];
         let mut errors = vec![];
         for (input, expected_message) in tests {
@@ -572,5 +600,71 @@ fn(y) {x + y};
 let addTwo = newAdder(2);
 addTwo(2);";
         assert!(test_integer_object(&test_eval(input), 4));
+    }
+
+    #[test]
+    fn test_string_literal() {
+        let input = "\"Hello World!\"";
+
+        let evaluated = test_eval(input);
+        let Object::String(str_obj) = evaluated else {
+            panic!("object is not String. got={:?}", evaluated);
+        };
+        assert_eq!(
+            str_obj.value, "Hello World!",
+            "String has wrong value. got={}",
+            str_obj.value
+        );
+    }
+
+    #[test]
+    fn test_string_concat() {
+        let input = "\"Hello\" + \" \" + \"World!\"";
+        let evaluated = test_eval(input);
+        let Object::String(str_obj) = evaluated else {
+            panic!("object is not String. got={:?}", evaluated);
+        };
+        assert_eq!(
+            str_obj.value, "Hello World!",
+            "String has wrong value. got={}",
+            str_obj.value
+        );
+    }
+
+    #[test]
+    fn test_builtin_functions() {
+        enum Expec<'a> {
+            Val(i64),
+            Mess(&'a str),
+        }
+        let tests = vec![
+            ("len(\"\")", Expec::Val(0)),
+            ("len(\"four\")", Expec::Val(4)),
+            ("len(\"hello world\")", Expec::Val(11)),
+            (
+                "len(1)",
+                Expec::Mess("argument to \"len\" not supported, got INTEGER"),
+            ),
+            (
+                "len(\"one\", \"two\")",
+                Expec::Mess("wrong number of arguments. got=2, want=1"),
+            ),
+        ];
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            match expected {
+                Expec::Val(val) => assert!(test_integer_object(&evaluated, val)),
+                Expec::Mess(mess) => {
+                    let Object::Err(err_obj) = evaluated else {
+                        panic!("object is not Error. got={:?}", evaluated);
+                    };
+                    assert_eq!(
+                        err_obj.message, mess,
+                        "wrong error message. expected={}, got={}",
+                        mess, err_obj.message
+                    );
+                }
+            }
+        }
     }
 }

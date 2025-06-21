@@ -30,13 +30,10 @@ impl Environment {
         }
         obj
     }
-    /// returns the old value for the indent or NULL
+    /// returns NULL
     pub fn set(&mut self, name: String, val: Object) -> Object {
-        let old_val = self.store.insert(name, val);
-        match old_val {
-            Some(obj) => obj,
-            None => NULL,
-        }
+        let _old_val = self.store.insert(name, val);
+        NULL
     }
 
     pub fn new_enclosed_environment(outer: Rc<RefCell<Environment>>) -> Self {

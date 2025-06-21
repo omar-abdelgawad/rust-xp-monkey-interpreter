@@ -32,6 +32,8 @@ pub enum TokenType {
     IF,
     ELSE,
     RETURN,
+    //extended
+    STRING,
 }
 #[allow(clippy::all)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
