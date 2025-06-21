@@ -67,7 +67,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Object {
             Exp::Function(fun_exp) => {
                 let params = fun_exp.parameters;
                 let body = *fun_exp.body.unwrap();
-                Object::Func(Function::new(params, body, env))
+                Object::Func(Function::new(params, body, env.clone()))
             }
             Exp::Call(call_exp) => {
                 let func = eval(Node::Expression(*call_exp.function), env);
@@ -265,7 +265,7 @@ fn apply_function(fn_obj: &Object, args: &[Object]) -> Object {
 
 fn extend_function_env(fn_obj: &Function, args: &[Object]) -> Environment {
     // FIX: this clones a snapshot of enclosing environment but
-    // it should take a reference instead so maybe make
+    // it should take a reference instead?? so maybe make
     // fn_obj already have an Rc<RefCell<Environment>>
     let mut env = Environment::new_enclosed_environment(Rc::new(RefCell::new(fn_obj.env.clone())));
     for (param_idx, param) in fn_obj.parameters.iter().enumerate() {
@@ -561,5 +561,16 @@ mod test {
         for (input, expected) in tests {
             assert!(test_integer_object(&test_eval(input), expected));
         }
+    }
+
+    #[test]
+    fn test_closures() {
+        let input = "let newAdder = fn(x) {
+fn(y) {x + y};
+};
+
+let addTwo = newAdder(2);
+addTwo(2);";
+        assert!(test_integer_object(&test_eval(input), 4));
     }
 }

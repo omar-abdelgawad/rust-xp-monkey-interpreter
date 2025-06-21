@@ -193,8 +193,7 @@ pub struct Function {
     pub env: Environment,
 }
 impl Function {
-    pub fn new(parameters: Vec<Identifier>, body: BlockStatement, env: &mut Environment) -> Self {
-        let env = env.clone();
+    pub fn new(parameters: Vec<Identifier>, body: BlockStatement, env: Environment) -> Self {
         Self {
             parameters,
             body,
