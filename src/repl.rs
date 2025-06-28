@@ -4,7 +4,9 @@ use crate::object::ObjectTrait;
 use crate::parser::Parser;
 use crate::token::TokenType;
 use crate::{evaluator, lexer::Lexer};
+use std::cell::RefCell;
 use std::io::{BufRead, Write};
+use std::rc::Rc;
 
 const PROMPT: &str = ">> ";
 const MONKEY_FACE: &str = r#"            __,__
@@ -22,7 +24,7 @@ const MONKEY_FACE: &str = r#"            __,__
 
 pub fn start(mut input: impl BufRead, mut output: impl Write) {
     let mut line = String::new();
-    let mut env = Environment::new();
+    let mut env = Rc::new(RefCell::new(Environment::new()));
 
     loop {
         // Print prompt
@@ -45,9 +47,9 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
             print_parser_errors(&mut output, p.errors());
             continue;
         }
-        writeln!(output, "debug: {:#?}", program);
+        //writeln!(output, "debug: {:#?}", program);
         writeln!(output, "prog exp: {}", program);
-        let evaluated = evaluator::eval(Node::Program(program), &mut env);
+        let evaluated = evaluator::eval(Node::Program(program), env.clone());
         //if evaluated.is_some() {
         writeln!(output, "{}", evaluated.inspect());
         //}

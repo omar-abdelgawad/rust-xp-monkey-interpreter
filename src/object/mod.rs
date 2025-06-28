@@ -2,6 +2,8 @@ pub mod environment;
 use std::fmt::Display;
 
 use environment::Environment;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::ast::{BlockStatement, Identifier};
 
@@ -31,6 +33,7 @@ pub enum ObjectType {
     FUNCTION_OBJ,
     String_OBJ,
     BuiltinFunction,
+    ARRAY_OBJ,
 }
 impl Display for ObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -44,6 +47,7 @@ impl Display for ObjectType {
             ObjT::FUNCTION_OBJ => "FUNCTION",
             ObjT::String_OBJ => "STRING",
             ObjT::BuiltinFunction => "builtin function",
+            ObjT::ARRAY_OBJ => "ARRAY",
         };
         write!(f, "{}", to_write)
     }
@@ -64,6 +68,7 @@ pub enum Object {
     Func(Function),
     String(StringObj),
     Builtin(BuiltinObj),
+    Arr(Array),
 }
 impl Object {
     pub fn new_int_var(value: i64) -> Object {
@@ -84,6 +89,7 @@ impl ObjectTrait for Object {
             Object::Func(s) => s.r#type(),
             Object::String(s) => s.r#type(),
             Object::Builtin(s) => s.r#type(),
+            Object::Arr(s) => s.r#type(),
         }
     }
     fn inspect(&self) -> String {
@@ -96,6 +102,7 @@ impl ObjectTrait for Object {
             Object::Func(s) => s.inspect(),
             Object::String(s) => s.inspect(),
             Object::Builtin(s) => s.inspect(),
+            Object::Arr(s) => s.inspect(),
         }
     }
 }
@@ -203,10 +210,14 @@ impl ObjectTrait for Error {
 pub struct Function {
     pub parameters: Vec<Identifier>,
     pub body: BlockStatement,
-    pub env: Environment,
+    pub env: Rc<RefCell<Environment>>,
 }
 impl Function {
-    pub fn new(parameters: Vec<Identifier>, body: BlockStatement, env: Environment) -> Self {
+    pub fn new(
+        parameters: Vec<Identifier>,
+        body: BlockStatement,
+        env: Rc<RefCell<Environment>>,
+    ) -> Self {
         Self {
             parameters,
             body,
@@ -247,7 +258,7 @@ impl ObjectTrait for StringObj {
         ObjectType::String_OBJ
     }
     fn inspect(&self) -> String {
-        format!("{}", self.value)
+        format!("\"{}\"", self.value)
     }
 }
 
@@ -266,6 +277,26 @@ impl ObjectTrait for BuiltinObj {
         ObjectType::BuiltinFunction
     }
     fn inspect(&self) -> String {
-        "builtin function".to_string()
+        format!("builting function")
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Array {
+    pub elements: Vec<Object>,
+}
+impl Array {
+    pub fn new(elements: Vec<Object>) -> Self {
+        Self { elements }
+    }
+}
+
+impl ObjectTrait for Array {
+    fn r#type(&self) -> ObjectType {
+        ObjectType::ARRAY_OBJ
+    }
+    fn inspect(&self) -> String {
+        let elems: Vec<String> = self.elements.iter().map(|p| p.inspect()).collect();
+        format!("[{}]", elems.join(", "))
     }
 }

@@ -1,7 +1,7 @@
 //use lazy_static::lazy_static;
 use std::collections::HashMap;
 
-use crate::object::{BuiltinObj, Object, ObjectTrait};
+use crate::object::{Array, BuiltinObj, Object, ObjectTrait, ObjectType, NULL};
 
 use super::new_error;
 
@@ -42,11 +42,108 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                 }
                 match &args[0] {
                     Object::String(str_obj) => Object::new_int_var(str_obj.value.len() as i64),
+                    Object::Arr(arr_obj) => Object::new_int_var(arr_obj.elements.len() as i64),
                     def_obj => new_error(format!(
                         "argument to \"len\" not supported, got {}",
                         def_obj.r#type()
                     )),
                 }
+            },
+        }),
+        // TODO: the tests for the following builtins are not written yet.
+        "first" => Some(BuiltinObj {
+            function: |args: &[Object]| {
+                if args.len() != 1 {
+                    return new_error(format!(
+                        "wrong number of arguments. got={}, want=1",
+                        args.len()
+                    ));
+                }
+                if args[0].r#type() != ObjectType::ARRAY_OBJ {
+                    return new_error(format!(
+                        "argument to `first` must be ARRAY, got={}",
+                        args[0].r#type()
+                    ));
+                }
+                let Object::Arr(arr) = &args[0] else {
+                    panic!();
+                };
+                if arr.elements.len() > 0 {
+                    return arr.elements[0].clone();
+                }
+                NULL
+            },
+        }),
+        "last" => Some(BuiltinObj {
+            function: |args: &[Object]| {
+                if args.len() != 1 {
+                    return new_error(format!(
+                        "wrong number of arguments. got={}, want=1",
+                        args.len()
+                    ));
+                }
+                if args[0].r#type() != ObjectType::ARRAY_OBJ {
+                    return new_error(format!(
+                        "argument to `first` must be ARRAY, got={}",
+                        args[0].r#type()
+                    ));
+                }
+                let Object::Arr(arr) = &args[0] else {
+                    panic!();
+                };
+                let length = arr.elements.len();
+                if length > 0 {
+                    return arr.elements[length - 1].clone();
+                }
+                NULL
+            },
+        }),
+        "rest" => Some(BuiltinObj {
+            function: |args: &[Object]| {
+                if args.len() != 1 {
+                    return new_error(format!(
+                        "wrong number of arguments. got={}, want=1",
+                        args.len()
+                    ));
+                }
+                if args[0].r#type() != ObjectType::ARRAY_OBJ {
+                    return new_error(format!(
+                        "argument to `first` must be ARRAY, got={}",
+                        args[0].r#type()
+                    ));
+                }
+                let Object::Arr(arr) = &args[0] else {
+                    panic!();
+                };
+                let length = arr.elements.len();
+                if length > 0 {
+                    let new_elements = arr.elements[1..].to_vec();
+                    return Object::Arr(Array::new(new_elements));
+                }
+                NULL
+            },
+        }),
+        "push" => Some(BuiltinObj {
+            function: |args: &[Object]| {
+                if args.len() != 2 {
+                    return new_error(format!(
+                        "wrong number of arguments. got={}, want=2",
+                        args.len()
+                    ));
+                }
+                if args[0].r#type() != ObjectType::ARRAY_OBJ {
+                    return new_error(format!(
+                        "argument to `first` must be ARRAY, got={}",
+                        args[0].r#type()
+                    ));
+                }
+                let Object::Arr(arr) = &args[0] else {
+                    panic!();
+                };
+                let length = arr.elements.len();
+                let mut new_elements = arr.elements.clone();
+                new_elements.push(args[1].clone());
+                return Object::Arr(Array::new(new_elements));
             },
         }),
         _ => None,

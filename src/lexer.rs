@@ -123,6 +123,8 @@ impl Lexer {
             b'{' => Token::new(TokenType::LBRACE, self.ch as char),
             b'}' => Token::new(TokenType::RBRACE, self.ch as char),
             b'"' => Token::new(TokenType::STRING, self.read_string()),
+            b'[' => Token::new(TokenType::LBRACKET, self.ch as char),
+            b']' => Token::new(TokenType::RBRACKET, self.ch as char),
             0 => Token::new(TokenType::EOF, ""),
             _ => {
                 if is_letter(self.ch) {
@@ -201,6 +203,7 @@ if (5 < 10) {
 10 != 9;
 \"foobar\"
 \"foo bar\"
+[1, 2];
 ";
         let tests = [
             Token::new(TokenType::LET, "let"),
@@ -278,6 +281,12 @@ if (5 < 10) {
             Token::new(TokenType::SEMICOLON, ";"),
             Token::new(TokenType::STRING, "foobar"),
             Token::new(TokenType::STRING, "foo bar"),
+            Token::new(TokenType::LBRACKET, "["),
+            Token::new(TokenType::INT, "1"),
+            Token::new(TokenType::COMMA, ","),
+            Token::new(TokenType::INT, "2"),
+            Token::new(TokenType::RBRACKET, "]"),
+            Token::new(TokenType::SEMICOLON, ";"),
             Token::new(TokenType::EOF, ""),
         ];
         let mut lexer = Lexer::new(input);

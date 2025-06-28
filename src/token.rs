@@ -34,6 +34,8 @@ pub enum TokenType {
     RETURN,
     //extended
     STRING,
+    LBRACKET, // [ for arrays
+    RBRACKET, // ] for arrays
 }
 #[allow(clippy::all)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

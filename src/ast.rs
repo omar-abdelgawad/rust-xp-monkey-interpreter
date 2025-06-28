@@ -48,6 +48,8 @@ pub enum Expression {
     Function(FunctionLiteral),
     Call(CallExpression),
     Str(StringLiteral),
+    Arr(ArrayLiteral),
+    Ind(IndexExpression),
 }
 impl Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -62,6 +64,8 @@ impl Display for Expression {
             Exp::Function(s) => write!(f, "{}", s),
             Exp::Call(s) => write!(f, "{}", s),
             Exp::Str(s) => write!(f, "{}", s),
+            Exp::Arr(s) => write!(f, "{}", s),
+            Exp::Ind(s) => write!(f, "{}", s),
         }
     }
 }
@@ -98,6 +102,8 @@ impl Expression {
             Expression::Function(e) => e.token_literal(),
             Expression::Call(e) => e.token_literal(),
             Expression::Str(e) => e.token_literal(),
+            Expression::Arr(e) => e.token_literal(),
+            Expression::Ind(e) => e.token_literal(),
         }
     }
 }
@@ -411,10 +417,10 @@ impl Display for FunctionLiteral {
 pub struct CallExpression {
     token: Token, // the '(' token
     pub function: Box<Expression>,
-    pub arguments: Vec<Box<Expression>>,
+    pub arguments: Vec<Expression>,
 }
 impl CallExpression {
-    pub fn new(token: Token, function: Box<Expression>, arguments: Vec<Box<Expression>>) -> Self {
+    pub fn new(token: Token, function: Box<Expression>, arguments: Vec<Expression>) -> Self {
         Self {
             token,
             function,
@@ -434,7 +440,7 @@ impl Display for CallExpression {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StringLiteral {
-    token: Token, // the token.IDENT token
+    token: Token,
     pub value: String,
 }
 impl StringLiteral {
@@ -451,7 +457,49 @@ impl StringLiteral {
 
 impl Display for StringLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
+        write!(f, "\"{}\"", self.value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArrayLiteral {
+    token: Token, // the [ token
+    pub elements: Vec<Expression>,
+}
+impl ArrayLiteral {
+    pub fn new(token: Token, elements: Vec<Expression>) -> Self {
+        Self { token, elements }
+    }
+    pub fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+}
+
+impl Display for ArrayLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let elems: Vec<String> = self.elements.iter().map(|p| p.to_string()).collect();
+        write!(f, "[{}]", elems.join(", "))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IndexExpression {
+    token: Token, // the [ token
+    pub left: Box<Expression>,
+    pub index: Box<Expression>,
+}
+impl IndexExpression {
+    pub fn new(token: Token, left: Box<Expression>, index: Box<Expression>) -> Self {
+        Self { token, left, index }
+    }
+    pub fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+}
+
+impl Display for IndexExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}[{}])", self.left, self.index)
     }
 }
 
