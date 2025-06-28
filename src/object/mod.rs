@@ -6,6 +6,7 @@ use environment::Environment;
 use crate::ast::{BlockStatement, Identifier};
 
 //TODO: make all of the values below singletons with no copies
+// which should be done with static.
 pub const TRUE: Object = Object::Boolean(Boolean::new(true));
 pub const FALSE: Object = Object::Boolean(Boolean::new(false));
 pub const NULL: Object = Object::Null(Null::new());

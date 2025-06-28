@@ -1,7 +1,7 @@
-use lazy_static::lazy_static;
+//use lazy_static::lazy_static;
 use std::collections::HashMap;
 
-use crate::object::{BuiltinObj, Object, ObjectTrait, NULL};
+use crate::object::{BuiltinObj, Object, ObjectTrait};
 
 use super::new_error;
 
