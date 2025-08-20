@@ -4,6 +4,7 @@ use super::{Object, NULL};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+// WARNING: never try to print struct as it can loop infinitely
 #[derive(Debug, PartialEq, Clone)]
 pub struct Environment {
     store: HashMap<String, Object>,
@@ -30,7 +31,7 @@ impl Environment {
         }
         obj
     }
-    /// returns NULL
+    /// returns NULL if not found in local store
     pub fn set(&mut self, name: String, val: Object) -> Object {
         let _old_val = self.store.insert(name, val);
         NULL

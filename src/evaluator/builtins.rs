@@ -50,7 +50,6 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                 }
             },
         }),
-        // TODO: the tests for the following builtins are not written yet.
         "first" => Some(BuiltinObj {
             function: |args: &[Object]| {
                 if args.len() != 1 {
@@ -69,9 +68,10 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                     panic!();
                 };
                 if arr.elements.len() > 0 {
-                    return arr.elements[0].clone();
+                    arr.elements[0].clone()
+                } else {
+                    NULL
                 }
-                NULL
             },
         }),
         "last" => Some(BuiltinObj {
@@ -93,9 +93,10 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                 };
                 let length = arr.elements.len();
                 if length > 0 {
-                    return arr.elements[length - 1].clone();
+                    arr.elements[length - 1].clone()
+                } else {
+                    NULL
                 }
-                NULL
             },
         }),
         "rest" => Some(BuiltinObj {
@@ -118,11 +119,13 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                 let length = arr.elements.len();
                 if length > 0 {
                     let new_elements = arr.elements[1..].to_vec();
-                    return Object::Arr(Array::new(new_elements));
+                    Object::Arr(Array::new(new_elements))
+                } else {
+                    NULL
                 }
-                NULL
             },
         }),
+        // TODO: the tests for push are not written yet.
         "push" => Some(BuiltinObj {
             function: |args: &[Object]| {
                 if args.len() != 2 {

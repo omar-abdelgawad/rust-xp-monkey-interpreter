@@ -33,7 +33,7 @@ pub enum ObjectType {
     FUNCTION_OBJ,
     String_OBJ,
     BuiltinFunction,
-    ARRAY_OBJ,
+    ARRAY_OBJ, // arrays are immutable in monkey
 }
 impl Display for ObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -68,7 +68,7 @@ pub enum Object {
     Func(Function),
     String(StringObj),
     Builtin(BuiltinObj),
-    Arr(Array),
+    Arr(Array), // arrays are immutable in monkey
 }
 impl Object {
     pub fn new_int_var(value: i64) -> Object {

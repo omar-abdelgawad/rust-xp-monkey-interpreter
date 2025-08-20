@@ -21,10 +21,12 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
     match node {
         Node::Program(prog) => eval_program(prog.statements, Rc::clone(&env)),
         Node::Statement(stmt) => match stmt {
-            St::Expression(exp_stmt) => eval(Node::Expression(*exp_stmt.expression), env.clone()),
-            St::Block(block_stmt) => eval_block_statement(block_stmt.statements, env.clone()),
+            St::Expression(exp_stmt) => {
+                eval(Node::Expression(*exp_stmt.expression), Rc::clone(&env))
+            }
+            St::Block(block_stmt) => eval_block_statement(block_stmt.statements, Rc::clone(&env)),
             St::Return(ret_stmt) => {
-                let val = eval(Node::Expression(*ret_stmt.return_value), env.clone());
+                let val = eval(Node::Expression(*ret_stmt.return_value), Rc::clone(&env));
                 if is_error(&val) {
                     return val;
                 }
@@ -49,7 +51,7 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
             Exp::Integer(int_lit) => Object::Integer(Integer::new(int_lit.value)),
             Exp::Boolean(bool_lit) => native_bool_to_boolean_object(bool_lit.value),
             Exp::Prefix(prefix_exp) => {
-                let right = eval(Node::Expression(*prefix_exp.right), env.clone());
+                let right = eval(Node::Expression(*prefix_exp.right), Rc::clone(&env));
                 if is_error(&right) {
                     return right;
                 }
@@ -60,25 +62,25 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
                 if is_error(&left) {
                     return left;
                 }
-                let right = eval(Node::Expression(*infix_exp.right), env.clone());
+                let right = eval(Node::Expression(*infix_exp.right), Rc::clone(&env));
                 if is_error(&right) {
                     return right;
                 }
                 eval_infix_expression(&infix_exp.operator, left, right)
             }
-            Exp::If(if_exp) => eval_if_exp(if_exp, env),
-            Exp::Identifier(ident) => eval_identifier(ident, env.clone()),
+            Exp::If(if_exp) => eval_if_exp(if_exp, Rc::clone(&env)),
+            Exp::Identifier(ident) => eval_identifier(ident, Rc::clone(&env)),
             Exp::Function(fun_exp) => {
                 let params = fun_exp.parameters;
                 let body = *fun_exp.body.unwrap();
                 Object::Func(Function::new(params, body, Rc::clone(&env)))
             }
             Exp::Call(call_exp) => {
-                let func = eval(Node::Expression(*call_exp.function), env.clone());
+                let func = eval(Node::Expression(*call_exp.function), Rc::clone(&env));
                 if is_error(&func) {
                     return func;
                 }
-                let mut args = eval_expressions(call_exp.arguments, env.clone());
+                let mut args = eval_expressions(call_exp.arguments, Rc::clone(&env));
                 if args.len() == 1 && is_error(&args[0]) {
                     return args.remove(0);
                 }
@@ -86,7 +88,7 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
             }
             Exp::Str(str_lit) => Object::String(StringObj::new(str_lit.value)),
             Exp::Arr(arr_lit) => {
-                let mut elems = eval_expressions(arr_lit.elements, env.clone());
+                let mut elems = eval_expressions(arr_lit.elements, Rc::clone(&env));
                 if elems.len() == 1 && is_error(&elems[0]) {
                     return elems.remove(0);
                 }
@@ -97,7 +99,7 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
                 if is_error(&left) {
                     return left;
                 }
-                let ind = eval(Node::Expression(*ind_exp.index), env.clone());
+                let ind = eval(Node::Expression(*ind_exp.index), Rc::clone(&env));
                 if is_error(&ind) {
                     return ind;
                 }
@@ -115,7 +117,7 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
 fn eval_program(stmts: Vec<Statement>, env: Rc<RefCell<Environment>>) -> Object {
     let mut result = NULL;
     for statement in stmts {
-        result = eval(Node::Statement(statement), env.clone());
+        result = eval(Node::Statement(statement), Rc::clone(&env));
         match result {
             Object::Ret(ret_obj) => return *ret_obj.value,
             Object::Err(ref err_obj) => return result,
@@ -128,7 +130,7 @@ fn eval_program(stmts: Vec<Statement>, env: Rc<RefCell<Environment>>) -> Object 
 fn eval_block_statement(stmts: Vec<Statement>, env: Rc<RefCell<Environment>>) -> Object {
     let mut result = NULL;
     for statement in stmts {
-        result = eval(Node::Statement(statement), env.clone());
+        result = eval(Node::Statement(statement), Rc::clone(&env));
         match result {
             Object::Ret(_) | Object::Err(_) => return result,
             _ => {}
@@ -232,7 +234,7 @@ fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) 
 }
 
 fn eval_if_exp(ie: IfExpression, env: Rc<RefCell<Environment>>) -> Object {
-    let cond = eval(Node::Expression(*ie.condition), env.clone());
+    let cond = eval(Node::Expression(*ie.condition), Rc::clone(&env));
     if is_error(&cond) {
         return cond;
     }
@@ -279,7 +281,7 @@ fn eval_identifier(ident: ast::Identifier, env: Rc<RefCell<Environment>>) -> Obj
 fn eval_expressions(exps: Vec<Expression>, env: Rc<RefCell<Environment>>) -> Vec<Object> {
     let mut res = Vec::new();
     for e in exps {
-        let evaluated = eval(Node::Expression(e), env.clone());
+        let evaluated = eval(Node::Expression(e), Rc::clone(&env));
         if is_error(&evaluated) {
             return vec![evaluated];
         }
@@ -288,11 +290,6 @@ fn eval_expressions(exps: Vec<Expression>, env: Rc<RefCell<Environment>>) -> Vec
     res
 }
 
-// TODO: the following 3 functions below are not well thought and I
-// just used clone everytime I saw an error. I don't care now about
-// nothing except compiling but probably the types are all wrong
-// from the Option<Object> to the not shared Environment in
-// fn_obj of type Object::Fun(Function)
 fn apply_function(fn_obj: &Object, args: &[Object]) -> Object {
     match fn_obj {
         Object::Func(fn_obj) => {
@@ -304,7 +301,6 @@ fn apply_function(fn_obj: &Object, args: &[Object]) -> Object {
                 ));
             }
             let mut extended_env = extend_function_env(fn_obj, args);
-            eprintln!("{:?}\n\n", extended_env);
             let evaluated = eval(
                 Node::Statement(Statement::Block(fn_obj.body.clone())),
                 Rc::new(RefCell::new(extended_env)),
@@ -680,8 +676,10 @@ addTwo(2);";
         enum Expec<'a> {
             Val(i64),
             Mess(&'a str),
+            NULL,
         }
         let tests = vec![
+            // len function
             ("len(\"\")", Expec::Val(0)),
             ("len(\"four\")", Expec::Val(4)),
             ("len(\"hello world\")", Expec::Val(11)),
@@ -693,10 +691,26 @@ addTwo(2);";
                 "len(\"one\", \"two\")",
                 Expec::Mess("wrong number of arguments. got=2, want=1"),
             ),
+            ("len([0,1,2])", Expec::Val(3)),
+            // first function
+            ("first([])", Expec::NULL),
+            ("first([1,2])", Expec::Val(1)),
+            ("first(first([[2,4],3]))", Expec::Val(2)),
+            // last function
+            ("last([])", Expec::NULL),
+            ("last([1,2,3])", Expec::Val(3)),
+            ("last(last([1,2,[3,4]]))", Expec::Val(4)),
+            // rest function
+            ("rest([])", Expec::NULL),
+            ("first(rest([1,2,3,4]))", Expec::Val(2)),
+            ("first(rest(rest([1,2,3,4])))", Expec::Val(3)),
+            ("first(rest(rest(rest([1,2,3,4]))))", Expec::Val(4)),
+            ("first(rest(rest(rest(rest([1,2,3,4]))))", Expec::NULL),
         ];
         for (input, expected) in tests {
             let evaluated = test_eval(input);
             match expected {
+                Expec::NULL => assert!(test_null_object(&evaluated)),
                 Expec::Val(val) => assert!(test_integer_object(&evaluated, val)),
                 Expec::Mess(mess) => {
                     let Object::Err(err_obj) = evaluated else {
@@ -758,6 +772,19 @@ addTwo(2);";
                 None => test_null_object(&evaluated),
             });
         }
+    }
+
+    #[test]
+    fn test_recursion() {
+        let input = "let fibonacci = fn(x) {
+                    if (x == 0) { 0 } 
+                    else { if (x == 1) { 1 } 
+                           else {fibonacci(x - 1) + fibonacci(x - 2);}
+                         }
+                    };
+                    fibonacci(4)"; // fib(4) = 3;
+        let evaluated = test_eval(input);
+        assert!(test_integer_object(&evaluated, 3));
     }
 
     #[test]
