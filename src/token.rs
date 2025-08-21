@@ -1,7 +1,8 @@
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash, Default)]
 #[allow(clippy::all)]
 pub enum TokenType {
     ILLEGAL,
+    #[default]
     EOF,
     IDENT, // add, foobar, x, y
     INT,   //123
@@ -39,7 +40,7 @@ pub enum TokenType {
     COLON,    // : for hash literals
 }
 #[allow(clippy::all)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Token {
     pub ttype: TokenType,
     pub literal: String,
@@ -49,14 +50,6 @@ impl Token {
         Token {
             ttype,
             literal: literal.into(),
-        }
-    }
-}
-impl Default for Token {
-    fn default() -> Self {
-        Token {
-            ttype: TokenType::EOF,
-            literal: "".to_string(),
         }
     }
 }
