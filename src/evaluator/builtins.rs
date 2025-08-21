@@ -84,7 +84,7 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                 }
                 if args[0].r#type() != ObjectType::ARRAY_OBJ {
                     return new_error(format!(
-                        "argument to `first` must be ARRAY, got={}",
+                        "argument to `last` must be ARRAY, got={}",
                         args[0].r#type()
                     ));
                 }
@@ -109,7 +109,7 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                 }
                 if args[0].r#type() != ObjectType::ARRAY_OBJ {
                     return new_error(format!(
-                        "argument to `first` must be ARRAY, got={}",
+                        "argument to `rest` must be ARRAY, got={}",
                         args[0].r#type()
                     ));
                 }
@@ -136,7 +136,7 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                 }
                 if args[0].r#type() != ObjectType::ARRAY_OBJ {
                     return new_error(format!(
-                        "argument to `first` must be ARRAY, got={}",
+                        "argument to `push` must be ARRAY, got={}",
                         args[0].r#type()
                     ));
                 }
@@ -147,6 +147,14 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                 let mut new_elements = arr.elements.clone();
                 new_elements.push(args[1].clone());
                 return Object::Arr(Array::new(new_elements));
+            },
+        }),
+        "puts" => Some(BuiltinObj {
+            function: |args: &[Object]| {
+                for arg in args {
+                    println!("{}", arg.inspect());
+                }
+                NULL
             },
         }),
         _ => None,
