@@ -169,11 +169,10 @@ impl LetStatement {
     pub fn token_literal(&self) -> String {
         self.token.literal.clone()
     }
-    // used in tests
     pub fn name_value(&self) -> String {
         self.name.value.clone()
     }
-    // used in tests
+    #[cfg(test)]
     pub fn name_token_literal(&self) -> String {
         self.name.token_literal()
     }

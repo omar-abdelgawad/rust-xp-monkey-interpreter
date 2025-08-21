@@ -36,6 +36,18 @@ or if you don't have it you can just use `cargo`
 ```bash
 cargo run -q
 ```
+finally you can try doing something cool with arrays and hashes like
+
+```bash
+>> let people = [{"name": "Omar", "age": 22}, {"name": "Ahmed", "age": 44}];
+null
+>> people[0]["name"];
+"Omar"
+>> let getName = fn(person) { person["name"]; };
+null
+>> getName(people[0]);
+"Omar"
+```
 
 ## 🧪 Running Tests
 
