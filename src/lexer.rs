@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use crate::token::{Token, TokenType};
 
-#[allow(clippy::all)]
 pub struct Lexer {
     input: String,
     position: i32,

@@ -1,5 +1,4 @@
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Default)]
-#[allow(clippy::all)]
 pub enum TokenType {
     ILLEGAL,
     #[default]
@@ -39,7 +38,6 @@ pub enum TokenType {
     RBRACKET, // ] for arrays
     COLON,    // : for hash literals
 }
-#[allow(clippy::all)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Token {
     pub ttype: TokenType,
