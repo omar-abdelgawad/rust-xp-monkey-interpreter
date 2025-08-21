@@ -1,5 +1,7 @@
 pub mod environment;
-use std::fmt::Display;
+use fnv::FnvHasher;
+use std::hash::Hasher;
+use std::{collections::HashMap, fmt::Display};
 
 use environment::Environment;
 use std::cell::RefCell;
@@ -23,7 +25,7 @@ pub fn native_bool_to_boolean_object(input: bool) -> Object {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum ObjectType {
     Integer_OBJ,
     BOOLEAN_OBJ,
@@ -34,6 +36,7 @@ pub enum ObjectType {
     String_OBJ,
     BuiltinFunction,
     ARRAY_OBJ, // arrays are immutable in monkey
+    Hash_OBJ,
 }
 impl Display for ObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -48,6 +51,7 @@ impl Display for ObjectType {
             ObjT::String_OBJ => "STRING",
             ObjT::BuiltinFunction => "builtin function",
             ObjT::ARRAY_OBJ => "ARRAY",
+            ObjT::Hash_OBJ => "HASH",
         };
         write!(f, "{}", to_write)
     }
@@ -56,6 +60,21 @@ impl Display for ObjectType {
 pub trait ObjectTrait {
     fn r#type(&self) -> ObjectType;
     fn inspect(&self) -> String;
+}
+
+pub trait Hashable {
+    fn hash_key(&self) -> HashKey;
+}
+
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+pub struct HashKey {
+    pub obj_type: ObjectType,
+    pub value: u64,
+}
+impl HashKey {
+    pub fn new(obj_type: ObjectType, value: u64) -> Self {
+        Self { obj_type, value }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -69,11 +88,16 @@ pub enum Object {
     String(StringObj),
     Builtin(BuiltinObj),
     Arr(Array), // arrays are immutable in monkey
+    Hash(HashObj),
 }
 impl Object {
     pub fn new_int_var(value: i64) -> Object {
         Object::Integer(Integer::new(value))
     }
+    pub fn new_str_var(value: &str) -> Object {
+        Object::String(StringObj::new(value))
+    }
+
     pub fn new_ret_var(value: Object) -> Object {
         Object::Ret(ReturnValue::new(Box::new(value)))
     }
@@ -90,6 +114,7 @@ impl ObjectTrait for Object {
             Object::String(s) => s.r#type(),
             Object::Builtin(s) => s.r#type(),
             Object::Arr(s) => s.r#type(),
+            Object::Hash(s) => s.r#type(),
         }
     }
     fn inspect(&self) -> String {
@@ -103,6 +128,17 @@ impl ObjectTrait for Object {
             Object::String(s) => s.inspect(),
             Object::Builtin(s) => s.inspect(),
             Object::Arr(s) => s.inspect(),
+            Object::Hash(s) => s.inspect(),
+        }
+    }
+}
+impl Hashable for Object {
+    fn hash_key(&self) -> HashKey {
+        match self {
+            Object::Boolean(b) => b.hash_key(),
+            Object::Integer(i) => i.hash_key(),
+            Object::String(s) => s.hash_key(),
+            _ => panic!("not a hashable object"),
         }
     }
 }
@@ -135,6 +171,12 @@ impl ObjectTrait for Integer {
     }
 }
 
+impl Hashable for Integer {
+    fn hash_key(&self) -> HashKey {
+        HashKey::new(ObjectType::Integer_OBJ, self.value as u64)
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Boolean {
     pub value: bool,
@@ -150,6 +192,16 @@ impl ObjectTrait for Boolean {
     }
     fn inspect(&self) -> String {
         format!("{}", self.value)
+    }
+}
+
+impl Hashable for Boolean {
+    fn hash_key(&self) -> HashKey {
+        let val = match self.value {
+            true => 1,
+            false => 0,
+        };
+        HashKey::new(ObjectType::BOOLEAN_OBJ, val)
     }
 }
 
@@ -262,6 +314,16 @@ impl ObjectTrait for StringObj {
     }
 }
 
+impl Hashable for StringObj {
+    fn hash_key(&self) -> HashKey {
+        let mut hasher = FnvHasher::default();
+        hasher.write(self.value.as_bytes()); // self.value is String
+        let hash = hasher.finish();
+
+        HashKey::new(ObjectType::String_OBJ, hash)
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct BuiltinObj {
     pub function: BuiltinFunction,
@@ -298,5 +360,105 @@ impl ObjectTrait for Array {
     fn inspect(&self) -> String {
         let elems: Vec<String> = self.elements.iter().map(|p| p.inspect()).collect();
         format!("[{}]", elems.join(", "))
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct HashPair {
+    pub key: Object,
+    pub val: Object,
+}
+impl HashPair {
+    pub fn new(key: Object, val: Object) -> Self {
+        Self { key, val }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct HashObj {
+    pub pairs: HashMap<HashKey, HashPair>,
+}
+impl HashObj {
+    pub fn new(pairs: HashMap<HashKey, HashPair>) -> Self {
+        Self { pairs }
+    }
+}
+
+impl ObjectTrait for HashObj {
+    fn r#type(&self) -> ObjectType {
+        ObjectType::Hash_OBJ
+    }
+    fn inspect(&self) -> String {
+        let mut pairs_str = Vec::new();
+
+        for pair in self.pairs.values() {
+            pairs_str.push(format!("{}: {}", pair.key.inspect(), pair.val.inspect()));
+        }
+
+        format!("{{{}}}", pairs_str.join(", "))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_string_hash_key() {
+        let hello_1 = Object::new_str_var("Hello World");
+        let hello_2 = Object::new_str_var("Hello World");
+        let diff1 = Object::new_str_var("My name is johnny");
+        let diff2 = Object::new_str_var("My name is johnny");
+
+        if hello_1.hash_key() != hello_2.hash_key() {
+            panic!("strings with the same content have different hash keys");
+        }
+
+        if diff1.hash_key() != diff2.hash_key() {
+            panic!("strings with the same content have different hash keys");
+        }
+
+        if hello_1.hash_key() == diff1.hash_key() {
+            panic!("strings with different content have same hash keys");
+        }
+    }
+
+    #[test]
+    fn test_int_hash_key() {
+        let hello_1 = Object::new_int_var(2);
+        let hello_2 = Object::new_int_var(2);
+        let diff1 = Object::new_int_var(5);
+        let diff2 = Object::new_int_var(5);
+
+        if hello_1.hash_key() != hello_2.hash_key() {
+            panic!("integers with the same content have different hash keys");
+        }
+
+        if diff1.hash_key() != diff2.hash_key() {
+            panic!("integers with the same content have different hash keys");
+        }
+
+        if hello_1.hash_key() == diff1.hash_key() {
+            panic!("integers with different content have same hash keys");
+        }
+    }
+
+    #[test]
+    fn test_bool_hash_key() {
+        let hello_1 = Object::Boolean(Boolean::new(true));
+        let hello_2 = Object::Boolean(Boolean::new(true));
+        let diff1 = Object::Boolean(Boolean::new(false));
+        let diff2 = Object::Boolean(Boolean::new(false));
+
+        if hello_1.hash_key() != hello_2.hash_key() {
+            panic!("bools with the same content have different hash keys");
+        }
+
+        if diff1.hash_key() != diff2.hash_key() {
+            panic!("bools with the same content have different hash keys");
+        }
+
+        if hello_1.hash_key() == diff1.hash_key() {
+            panic!("bools with different content have same hash keys");
+        }
     }
 }

@@ -21,7 +21,7 @@ impl Display for Node {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -57,11 +57,18 @@ pub enum Expression {
 
 impl Hash for Expression {
     fn hash<H: Hasher>(&self, state: &mut H) {
+        // intentionally left things that can't evaluate to str, int oro bool
         match self {
             Expression::Integer(i) => i.hash(state),
             Expression::Boolean(b) => b.hash(state),
             Expression::Str(s) => s.hash(state),
-            _ => panic!("tried to hash something not a str or int or bool"),
+            Expression::Identifier(ident) => ident.hash(state),
+            Expression::Infix(inf) => inf.hash(state),
+            Expression::Prefix(pre) => pre.hash(state),
+            Expression::If(if_exp) => if_exp.hash(state),
+            Expression::Call(call_exp) => call_exp.hash(state),
+            Expression::Ind(ind_exp) => ind_exp.hash(state),
+            def => panic!("rust tried to hash something not a str or int or bool (not hashing inside the language): {}", def),
         }
     }
 }
@@ -149,7 +156,7 @@ impl Program {
         }
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct LetStatement {
     token: Token, // the token.let token
     name: Identifier,
@@ -184,7 +191,7 @@ impl Display for LetStatement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Identifier {
     token: Token, // the token.IDENT token
     pub value: String,
@@ -227,7 +234,7 @@ impl Display for Boolean {
         write!(f, "{}", self.value)
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct ReturnStatement {
     token: Token, // the 'return' token
     pub return_value: Box<Expression>,
@@ -248,7 +255,7 @@ impl Display for ReturnStatement {
         write!(f, "{} {};", self.token_literal(), self.return_value)
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct ExpressionStatement {
     token: Token, // the first token of the Expression
     pub expression: Box<Expression>,
@@ -284,7 +291,7 @@ impl Display for IntegerLiteral {
         write!(f, "{}", self.token.literal)
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct PrefixExpression {
     pub token: Token, // the prefix token
     pub operator: String,
@@ -307,7 +314,7 @@ impl Display for PrefixExpression {
         write!(f, "({}{})", self.operator, self.right)
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct InfixExpression {
     token: Token, // the operator token
     pub left: Box<Expression>,
@@ -337,7 +344,7 @@ impl Display for InfixExpression {
         write!(f, "({} {} {})", self.left, self.operator, self.right)
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct IfExpression {
     token: Token, // the 'if' token
     pub condition: Box<Expression>,
@@ -372,7 +379,7 @@ impl Display for IfExpression {
         Ok(())
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct BlockStatement {
     token: Token, // the { token
     pub statements: Vec<Statement>,
@@ -430,7 +437,7 @@ impl Display for FunctionLiteral {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct CallExpression {
     token: Token, // the '(' token
     pub function: Box<Expression>,
@@ -499,7 +506,7 @@ impl Display for ArrayLiteral {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IndexExpression {
     token: Token, // the [ token
     pub left: Box<Expression>,

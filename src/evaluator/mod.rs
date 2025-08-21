@@ -1,17 +1,19 @@
 use builtins::builtins;
 
 use crate::ast::{
-    self, Expression, ExpressionStatement, IfExpression, IntegerLiteral, Node, Program, Statement,
+    self, Expression, ExpressionStatement, HashLiteral, IfExpression, IntegerLiteral, Node,
+    Program, Statement,
 };
 use crate::object::environment::Environment;
 use crate::object::{
-    native_bool_to_boolean_object, Array, Error, Function, ObjectTrait, ObjectType, ReturnValue,
-    StringObj,
+    native_bool_to_boolean_object, Array, Error, Function, HashObj, HashPair, Hashable,
+    ObjectTrait, ObjectType, ReturnValue, StringObj,
 };
 use crate::object::{Boolean, Integer, Null, Object};
 use crate::object::{FALSE, NULL, TRUE};
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 mod builtins;
 
@@ -105,6 +107,7 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
                 }
                 eval_index_expression(left, ind)
             }
+            Exp::Hash(hash_lit) => eval_hash_litral(hash_lit, Rc::clone(&env)),
             unknown_exp_node => {
                 unreachable!(
                     "you have reached an unhandled Expression node: {:?}",
@@ -348,10 +351,36 @@ fn eval_array_index_expresssion(arr: Array, index: Integer) -> Object {
     arr.elements[idx].clone()
 }
 
+fn eval_hash_litral(node: HashLiteral, env: Rc<RefCell<Environment>>) -> Object {
+    let mut pairs = HashMap::new();
+    for (key_node, value_node) in node.pairs {
+        let key = eval(Node::Expression(key_node), Rc::clone(&env));
+        if is_error(&key) {
+            return key;
+        }
+        match key {
+            Object::Boolean(_) | Object::Integer(_) | Object::String(_) => {}
+            _ => return new_error(format!("unusable as hash key: {}", key.r#type())),
+        }
+
+        let value = eval(Node::Expression(value_node), Rc::clone(&env));
+        if is_error(&value) {
+            return value;
+        }
+        let hashed = key.hash_key();
+        pairs.insert(hashed, HashPair::new(key, value));
+    }
+    Object::Hash(HashObj::new(pairs))
+}
+
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::lexer::Lexer;
+    use crate::object::HashKey;
+    use crate::object::Hashable;
     use crate::object::Integer;
     use crate::object::Object;
     use crate::parser::Parser;
@@ -839,5 +868,43 @@ map(a, double);";
 ";
         let evaluated = test_eval(input);
         assert!(test_integer_object(&evaluated, 15));
+    }
+
+    #[test]
+    fn test_hash_literals() {
+        let input = "let two = \"two\";
+            {
+                \"one\": 10 - 9,
+                two: 1 + 1,
+                \"thr\" + \"ee\": 6 / 2,
+                4: 4,
+                true: 5,
+                false: 6,
+            }";
+        let evaluated = test_eval(input);
+        let Object::Hash(hash_obj) = evaluated else {
+            panic!("object is not Hash. got={:?}", evaluated);
+        };
+        let mut expected: HashMap<HashKey, i64> = HashMap::new();
+        expected.insert(Object::new_str_var("one").hash_key(), 1);
+        expected.insert(Object::new_str_var("two").hash_key(), 2);
+        expected.insert(Object::new_str_var("three").hash_key(), 3);
+        expected.insert(Object::new_int_var(4).hash_key(), 4);
+        expected.insert(TRUE.hash_key(), 5);
+        expected.insert(FALSE.hash_key(), 6);
+
+        assert_eq!(
+            hash_obj.pairs.len(),
+            expected.len(),
+            "Hash has wrong num of pairs. got={}",
+            hash_obj.pairs.len()
+        );
+        for (expected_key, expected_val) in expected {
+            let pair = hash_obj.pairs.get(&expected_key);
+            match pair {
+                None => panic!("no pair for given key in pairs"),
+                Some(hash_pair) => test_integer_object(&hash_pair.val, expected_val),
+            };
+        }
     }
 }
