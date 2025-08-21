@@ -382,6 +382,15 @@ impl HashObj {
     pub fn new(pairs: HashMap<HashKey, HashPair>) -> Self {
         Self { pairs }
     }
+
+    // FIX: this should return a reference but for now we just clone.
+    pub fn get(&self, index: &Object) -> Object {
+        let pair = self.pairs.get(&index.hash_key());
+        match pair {
+            None => NULL,
+            Some(p) => p.val.clone(), // should be a reference
+        }
+    }
 }
 
 impl ObjectTrait for HashObj {

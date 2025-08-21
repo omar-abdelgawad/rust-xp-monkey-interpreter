@@ -337,6 +337,7 @@ fn unwrap_return_value(obj: Object) -> Object {
 fn eval_index_expression(left: Object, index: Object) -> Object {
     match (left, index) {
         (Object::Arr(arr), Object::Integer(ind)) => eval_array_index_expresssion(arr, ind),
+        (Object::Hash(hash_obj), right_obj) => eval_hash_index_expression(&hash_obj, right_obj),
         (left, _) => new_error(format!("index operator not supported: {}", left.r#type())),
     }
 }
@@ -349,6 +350,14 @@ fn eval_array_index_expresssion(arr: Array, index: Integer) -> Object {
     // FIX: this should be a reference but for now eval doesn't
     // return references to Object so we are stuck cloning
     arr.elements[idx].clone()
+}
+
+fn eval_hash_index_expression(hash: &HashObj, index: Object) -> Object {
+    match index {
+        Object::Boolean(_) | Object::Integer(_) | Object::String(_) => {}
+        _ => return new_error(format!("unusable as hash key: {}", index.r#type())),
+    }
+    hash.get(&index)
 }
 
 fn eval_hash_litral(node: HashLiteral, env: Rc<RefCell<Environment>>) -> Object {
@@ -582,6 +591,10 @@ mod test {
             ),
             ("foobar", "identifier not found: foobar"),
             ("\"Hello\" - \"World\"", "unknown operator: STRING - STRING"),
+            (
+                "{\"name\": \"Monkey\"}[fn(x) {x}];",
+                "unusable as hash key: FUNCTION",
+            ),
         ];
         let mut errors = vec![];
         for (input, expected_message) in tests {
@@ -903,8 +916,28 @@ map(a, double);";
             let pair = hash_obj.pairs.get(&expected_key);
             match pair {
                 None => panic!("no pair for given key in pairs"),
-                Some(hash_pair) => test_integer_object(&hash_pair.val, expected_val),
+                Some(hash_pair) => assert!(test_integer_object(&hash_pair.val, expected_val)),
             };
+        }
+    }
+
+    #[test]
+    fn test_hash_index_expressions() {
+        let tests = vec![
+            ("{\"foo\": 5}[\"foo\"]", Some(5)),
+            ("{\"foo\": 5}[\"bar\"]", None),
+            ("let key = \"foo\"; {\"foo\": 5}[key]", Some(5)),
+            ("{}[\"foo\"]", None),
+            ("{5: 5}[5]", Some(5)),
+            ("{true: 5}[true]", Some(5)),
+            ("{false: 5}[false]", Some(5)),
+        ];
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            assert!(match expected {
+                None => test_null_object(&evaluated),
+                Some(i) => test_integer_object(&evaluated, i),
+            });
         }
     }
 }
