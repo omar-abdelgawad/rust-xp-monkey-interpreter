@@ -32,6 +32,7 @@ pub enum TokenType {
     IF,
     ELSE,
     RETURN,
+    WHILE,
     //extended
     STRING,
     LBRACKET, // [ for arrays

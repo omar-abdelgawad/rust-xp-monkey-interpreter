@@ -3,7 +3,7 @@ use crate::{
         self, ArrayLiteral, BlockStatement, Boolean, CallExpression, Expression,
         ExpressionStatement, FunctionLiteral, HashLiteral, Identifier, IfExpression,
         IndexExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression,
-        ReturnStatement, Statement, StringLiteral,
+        ReturnStatement, Statement, StringLiteral, WhileExpression,
     },
     lexer,
     token::{self, TokenType},
@@ -60,6 +60,7 @@ impl Parser {
         parser.register_prefix(TokenType::STRING, Parser::parse_string_literal);
         parser.register_prefix(TokenType::LBRACKET, Parser::parse_array_literal);
         parser.register_prefix(TokenType::LBRACE, Parser::parse_hash_literal);
+        parser.register_prefix(TokenType::WHILE, Parser::parse_while_expression);
         parser.register_infix(TokenType::PLUS, Parser::parse_infix_expression);
         parser.register_infix(TokenType::MINUS, Parser::parse_infix_expression);
         parser.register_infix(TokenType::SLASH, Parser::parse_infix_expression);
@@ -72,6 +73,24 @@ impl Parser {
         parser.register_infix(TokenType::LBRACKET, Parser::parse_index_expression);
 
         parser
+    }
+
+    fn parse_while_expression(&mut self) -> Option<Box<Expression>> {
+        let cur_token_tmp = self.cur_token.clone();
+        if !self.expect_peek(TokenType::LPAREN) {
+            return None;
+        }
+        self.next_token();
+        let cond_tmp = self.parse_expression(Precedence::LOWEST).unwrap();
+        if !self.expect_peek(TokenType::RPAREN) {
+            return None;
+        }
+        if !self.expect_peek(TokenType::LBRACE) {
+            return None;
+        }
+        let loop_body = self.parse_block_statement().unwrap();
+        let exp = WhileExpression::new(cur_token_tmp, cond_tmp, loop_body);
+        Some(Box::new(Expression::While(exp)))
     }
 
     fn parse_hash_literal(&mut self) -> Option<Box<Expression>> {
@@ -1378,6 +1397,54 @@ mod test {
             };
 
             test_fn(val_exp);
+        }
+    }
+
+    #[test]
+    fn test_while_expression() {
+        let input = "while (x < y) { x }";
+        let l = Lexer::new(input);
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        check_parser_errors(p);
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "program.Body does not contain {}, statements. got={}",
+            1,
+            program.statements.len()
+        );
+        let Statement::Expression(express_stmt) = &program.statements[0] else {
+            panic!(
+                "program.statements[0] is not ast::ExpressionStatement. got={:?}",
+                program.statements[0]
+            );
+        };
+        let Expression::While(exp) = &*express_stmt.expression else {
+            panic!(
+                "exp not ast::WhileExprssion. got={:?}",
+                express_stmt.expression
+            );
+        };
+        if !test_infix_expression(&exp.condition, &"x", "<", &"y") {
+            panic!()
+        }
+        assert_eq!(
+            exp.loop_body.statements.len(),
+            1,
+            "loop_body is not 1 statements. got={}",
+            exp.loop_body.statements.len()
+        );
+
+        let Statement::Expression(loop_body) = &exp.loop_body.statements[0] else {
+            panic!(
+                "statements[0] is not ast::ExpressionStatement. got={:?}",
+                exp.loop_body.statements[0]
+            );
+        };
+
+        if !test_identifier(&loop_body.expression, "x") {
+            panic!()
         }
     }
 }

@@ -2,7 +2,7 @@ use builtins::builtins;
 
 use crate::ast::{
     self, Expression, ExpressionStatement, HashLiteral, IfExpression, IntegerLiteral, Node,
-    Program, Statement,
+    Program, Statement, WhileExpression,
 };
 use crate::object::environment::Environment;
 use crate::object::{
@@ -108,6 +108,7 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
                 eval_index_expression(left, ind)
             }
             Exp::Hash(hash_lit) => eval_hash_litral(hash_lit, Rc::clone(&env)),
+            Exp::While(while_exp) => eval_while_exp(while_exp, Rc::clone(&env)),
             unknown_exp_node => {
                 unreachable!(
                     "you have reached an unhandled Expression node: {:?}",
@@ -251,6 +252,24 @@ fn eval_if_exp(ie: IfExpression, env: Rc<RefCell<Environment>>) -> Object {
     } else {
         NULL
     }
+}
+
+fn eval_while_exp(ie: WhileExpression, env: Rc<RefCell<Environment>>) -> Object {
+    let mut cond = eval(Node::Expression(*ie.condition.clone()), Rc::clone(&env));
+    if is_error(&cond) {
+        return cond;
+    }
+    while is_truthy(cond) {
+        let _ = eval(
+            Node::Statement(Statement::Block(*ie.loop_body.clone())),
+            env.clone(),
+        );
+        cond = eval(Node::Expression(*ie.condition.clone()), Rc::clone(&env));
+        if is_error(&cond) {
+            return cond;
+        }
+    }
+    NULL
 }
 
 fn is_truthy(obj: Object) -> bool {
@@ -526,6 +545,25 @@ mod test {
             ("if (1 > 2) { 10 }", None),
             ("if (1 > 2) { 10 } else { 20 }", Some(20)),
             ("if (1 < 2) { 10 } else { 20 }", Some(10)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            match expected {
+                Some(expected) => assert!(test_integer_object(&evaluated, expected)),
+                None => assert!(test_null_object(&evaluated)),
+            };
+        }
+    }
+
+    #[test]
+    fn test_while_expressions() {
+        let tests: Vec<(&str, Option<i64>)> = vec![
+            ("let x = true; while (x) { let x = false; }; 10", Some(10)),
+            ("let x = 3; while (x>0) { let x = x-1; }; x", Some(0)),
+            ("let x = 0; while (x < 3) { let x = x+1 }; x", Some(3)),
+            ("while (2 < 1) { 10 }", None),
+            ("let x = true; while (x) { let x = false; };", None),
         ];
 
         for (input, expected) in tests {

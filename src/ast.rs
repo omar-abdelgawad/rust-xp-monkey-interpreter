@@ -53,6 +53,7 @@ pub enum Expression {
     Arr(ArrayLiteral),
     Ind(IndexExpression),
     Hash(HashLiteral),
+    While(WhileExpression), // always returns NULL
 }
 
 impl Hash for Expression {
@@ -89,6 +90,7 @@ impl Display for Expression {
             Exp::Arr(s) => write!(f, "{}", s),
             Exp::Ind(s) => write!(f, "{}", s),
             Exp::Hash(s) => write!(f, "{}", s),
+            Exp::While(s) => write!(f, "{}", s),
         }
     }
 }
@@ -128,6 +130,7 @@ impl Expression {
             Expression::Arr(e) => e.token_literal(),
             Expression::Ind(e) => e.token_literal(),
             Expression::Hash(e) => e.token_literal(),
+            Expression::While(e) => e.token_literal(),
         }
     }
 }
@@ -551,6 +554,32 @@ impl Display for HashLiteral {
         write!(f, "{{{}}}", pairs.join(", "))
     }
 }
+
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+pub struct WhileExpression {
+    token: Token, // the 'while' token
+    pub condition: Box<Expression>,
+    pub loop_body: Box<BlockStatement>,
+}
+impl WhileExpression {
+    pub fn new(token: Token, condition: Box<Expression>, loop_body: Box<BlockStatement>) -> Self {
+        Self {
+            token,
+            condition,
+            loop_body,
+        }
+    }
+    pub fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+}
+impl Display for WhileExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "if ")?;
+        write!(f, "{} {}", self.condition, self.loop_body)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

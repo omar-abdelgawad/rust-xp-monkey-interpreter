@@ -11,14 +11,7 @@ pub struct Lexer {
 }
 impl Lexer {
     pub fn new(input: impl Into<String>) -> Self {
-        let mut keywords = HashMap::new();
-        keywords.insert("fn".to_string(), TokenType::FUNCTION);
-        keywords.insert("let".to_string(), TokenType::LET);
-        keywords.insert("true".to_string(), TokenType::TRUE);
-        keywords.insert("false".to_string(), TokenType::FALSE);
-        keywords.insert("if".to_string(), TokenType::IF);
-        keywords.insert("else".to_string(), TokenType::ELSE);
-        keywords.insert("return".to_string(), TokenType::RETURN);
+        let mut keywords = Self::get_keywords_hashmap();
         let mut l = Lexer {
             input: input.into(),
             position: 0,
@@ -28,6 +21,18 @@ impl Lexer {
         };
         l.read_char();
         l
+    }
+    fn get_keywords_hashmap() -> HashMap<String, TokenType> {
+        let mut keywords = HashMap::new();
+        keywords.insert("fn".to_string(), TokenType::FUNCTION);
+        keywords.insert("let".to_string(), TokenType::LET);
+        keywords.insert("true".to_string(), TokenType::TRUE);
+        keywords.insert("false".to_string(), TokenType::FALSE);
+        keywords.insert("if".to_string(), TokenType::IF);
+        keywords.insert("else".to_string(), TokenType::ELSE);
+        keywords.insert("return".to_string(), TokenType::RETURN);
+        keywords.insert("while".to_string(), TokenType::WHILE);
+        keywords
     }
     fn skip_white_space(&mut self) {
         while self.ch.is_ascii_whitespace() || self.ch == b'\t' || self.ch == b'\r' {
@@ -205,6 +210,7 @@ if (5 < 10) {
 \"foo bar\"
 [1, 2];
 {\"foo\": \"bar\"}
+while
 ";
         let tests = [
             Token::new(TokenType::LET, "let"),
@@ -293,6 +299,7 @@ if (5 < 10) {
             Token::new(TokenType::COLON, ":"),
             Token::new(TokenType::STRING, "bar"),
             Token::new(TokenType::RBRACE, "}"),
+            Token::new(TokenType::WHILE, "while"),
             Token::new(TokenType::EOF, ""),
         ];
         let mut lexer = Lexer::new(input);
