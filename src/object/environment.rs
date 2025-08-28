@@ -31,7 +31,7 @@ impl Environment {
         }
         obj
     }
-    /// returns NULL if not found in local store
+    /// Always returns NULL
     pub fn set(&mut self, name: String, val: Object) -> Object {
         let _old_val = self.store.insert(name, val);
         NULL

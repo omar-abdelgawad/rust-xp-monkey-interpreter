@@ -43,6 +43,7 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                 match &args[0] {
                     Object::String(str_obj) => Object::new_int_var(str_obj.value.len() as i64),
                     Object::Arr(arr_obj) => Object::new_int_var(arr_obj.elements.len() as i64),
+                    Object::Hash(hash_obj) => Object::new_int_var(hash_obj.pairs.len() as i64),
                     def_obj => new_error(format!(
                         "argument to \"len\" not supported, got {}",
                         def_obj.r#type()

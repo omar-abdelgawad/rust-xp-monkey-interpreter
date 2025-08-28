@@ -52,6 +52,7 @@ impl Parser {
         parser.register_prefix(TokenType::INT, Parser::parse_integer_literal);
         parser.register_prefix(TokenType::BANG, Parser::parse_prefix_expression);
         parser.register_prefix(TokenType::MINUS, Parser::parse_prefix_expression);
+        parser.register_prefix(TokenType::PLUS, Parser::parse_prefix_expression);
         parser.register_prefix(TokenType::TRUE, Parser::parse_boolean);
         parser.register_prefix(TokenType::FALSE, Parser::parse_boolean);
         parser.register_prefix(TokenType::FUNCTION, Parser::parse_function_literal);
@@ -691,6 +692,7 @@ mod test {
             ("!true;", "!", &true),
             ("!false;", "!", &false),
             ("!false", "!", &false), // TODO: why does this also work?
+            ("+15;", "+", &15i64),
         ];
         for (input, operator, integer_value) in prefix_tests {
             let l = lexer::Lexer::new(input);

@@ -147,6 +147,7 @@ fn eval_prefix_expression(operator: &str, right: Object) -> Object {
     match operator {
         "!" => eval_bang_operator_expression(right),
         "-" => eval_minus_prefix_operator_exprssion(right),
+        "+" => eval_plus_prefix_operator_exprssion(right),
         _ => new_error(format!("unknown operator: {}{}", operator, right.r#type(),)),
     }
 }
@@ -165,6 +166,14 @@ fn eval_bang_operator_expression(right: Object) -> Object {
 fn eval_minus_prefix_operator_exprssion(right: Object) -> Object {
     match right {
         Object::Integer(integer) => Object::new_int_var(-integer.value),
+        // I REALLY HATE THIS
+        _ => new_error(format!("unknown operator: -{}", right.r#type())),
+    }
+}
+
+fn eval_plus_prefix_operator_exprssion(right: Object) -> Object {
+    match right {
+        Object::Integer(integer) => Object::new_int_var(integer.value),
         // I REALLY HATE THIS
         _ => new_error(format!("unknown operator: -{}", right.r#type())),
     }
@@ -420,6 +429,9 @@ mod test {
             ("10", 10),
             ("-5", -5),
             ("-10", -10),
+            ("+4", 4),
+            ("+-5", -5),
+            ("-+6", -6),
             ("5 + 5 + 5 + 5 - 10", 10),
             ("2 * 2 * 2 * 2 * 2", 32),
             ("-50 + 100 + -50", 0),
@@ -772,6 +784,9 @@ addTwo(2);";
                 Expec::Mess("wrong number of arguments. got=2, want=1"),
             ),
             ("len([0,1,2])", Expec::Val(3)),
+            ("len({})", Expec::Val(0)),
+            ("len({\"hello\":true})", Expec::Val(1)),
+            ("len({1:true, 34:false})", Expec::Val(2)),
             // first function
             ("first([])", Expec::NULL),
             ("first([1,2])", Expec::Val(1)),
