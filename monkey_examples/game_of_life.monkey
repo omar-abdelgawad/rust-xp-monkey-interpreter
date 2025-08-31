@@ -9,7 +9,8 @@
 let rows = fn(g) { len(g) };
 
 let cols = fn(g) {
-    if (len(g) == 0) { 0 } else { len(first(g)) }
+    # assume first element exists
+    len(first(g))
 };
 
 # Safe cell access: returns 0 when (r,c) is out of bounds
@@ -98,26 +99,11 @@ let print_grid = fn(g) {
         puts(row_to_string(g[r]));
         let r = r + 1;
     };
-    null
 };
 
 ############################################################
 # Demo: run a few generations of a glider on a 10x10 board
 ############################################################
-
-# 10x10 empty grid helper
-let empty10 = [
-    [0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0]
-];
 
 # Place a small "glider" in the top-left
 let seed = [
@@ -136,19 +122,15 @@ let seed = [
 # Run N generations, printing each
 let run = fn(g, gens) {
     let i = 0;
-    while (i < gens) {
+    while (i < gens+1) {
         puts("Generation " + i);
         print_grid(g);
         puts("");  # blank line
         let g = evolve(g);
         let i = i + 1;
     };
-    # print final generation
-    puts("Generation " + i);
-    print_grid(g);
-    null
 };
 
 # --- Execute demo (change gens to taste) ---
 puts("starting");
-run(seed, 5);
+run(seed, 31);
