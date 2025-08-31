@@ -160,6 +160,7 @@ let x = "this is X";
 [true, 2+4, "STRING HERE"];
 let x = [1,false, "third element",["another array"]];
 x[0];
+x[-1];
 x[2-1];
 x[3][0];
 ```

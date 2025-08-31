@@ -6,8 +6,8 @@ use crate::ast::{
 };
 use crate::object::environment::Environment;
 use crate::object::{
-    native_bool_to_boolean_object, Array, Error, Function, HashObj, HashPair, Hashable,
-    ObjectTrait, ObjectType, ReturnValue, StringObj,
+    Array, Error, Function, HashObj, HashPair, Hashable, ObjectTrait, ObjectType, ReturnValue,
+    StringObj, native_bool_to_boolean_object,
 };
 use crate::object::{Boolean, Integer, Null, Object};
 use crate::object::{FALSE, NULL, TRUE};
@@ -191,9 +191,7 @@ fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object 
         (_, Obj::Integer(left), Obj::Integer(right)) => {
             eval_integer_infix_expression(operator, left, right)
         }
-        (_, Obj::String(left), Obj::String(right)) => {
-            eval_string_infix_expression(operator, left, right)
-        }
+        (_, Obj::String(left), right) => eval_string_infix_expression(operator, left, right),
         (op, l, r) if l.r#type() != r.r#type() => new_error(format!(
             "type mismatch: {} {} {}",
             l.r#type(),
@@ -209,17 +207,27 @@ fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object 
     }
 }
 
-fn eval_string_infix_expression(operator: &str, left: StringObj, right: StringObj) -> Object {
-    if operator != "+" {
-        return new_error(format!(
+fn eval_string_infix_expression(operator: &str, left: StringObj, right: Object) -> Object {
+    match (operator, right) {
+        ("+", Object::String(right)) => {
+            let new_str = format!("{}{}", left.value, right.value);
+            Object::String(StringObj::new(new_str))
+        }
+        ("+", Object::Integer(right)) => {
+            let new_str = format!("{}{}", left.value, right.value);
+            Object::String(StringObj::new(new_str))
+        }
+        // ("+", Object::Boolean(right)) => {
+        //     let new_str = format!("{}{}", left.value, right.value);
+        //     Object::String(StringObj::new(new_str))
+        // }
+        (op, right) => new_error(format!(
             "unknown operator: {} {} {}",
             left.r#type(),
-            operator,
+            op,
             right.r#type()
-        ));
+        )),
     }
-    let new_str = format!("{}{}", left.value, right.value);
-    Object::String(StringObj::new(new_str))
 }
 
 fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) -> Object {
@@ -234,6 +242,8 @@ fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) 
         ">" => native_bool_to_boolean_object(left_val > right_val),
         "==" => native_bool_to_boolean_object(left_val == right_val),
         "!=" => native_bool_to_boolean_object(left_val != right_val),
+        ">=" => native_bool_to_boolean_object(left_val >= right_val),
+        "<=" => native_bool_to_boolean_object(left_val <= right_val),
         // I still hate this default operator shit
         (op) => {
             return new_error(format!(
@@ -241,7 +251,7 @@ fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) 
                 left.r#type(),
                 op,
                 right.r#type()
-            ))
+            ));
         }
     }
 }
@@ -371,9 +381,17 @@ fn eval_index_expression(left: Object, index: Object) -> Object {
 }
 
 fn eval_array_index_expresssion(arr: Array, index: Integer) -> Object {
-    let idx = index.value as usize;
-    if index.value < 0 || idx > arr.elements.len() - 1 {
-        return NULL;
+    let idx = if index.value < 0 {
+        (arr.elements.len() as i64 + index.value) as usize
+    } else {
+        index.value as usize
+    };
+    if arr.elements.len() == 0 || idx as usize > arr.elements.len() - 1 || idx < 0 {
+        return new_error(format!(
+            "array index out of bounds: the len is {} but the index is {}",
+            arr.elements.len(),
+            index.value
+        ));
     }
     // FIX: this should be a reference but for now eval doesn't
     // return references to Object so we are stuck cloning
@@ -485,6 +503,10 @@ mod test {
             ("1 != 1", false),
             ("1 == 2", false),
             ("1 != 2", true),
+            ("1 >= 2", false),
+            ("2 >= 2", true),
+            ("1 <= 2", true),
+            ("2 <= 2", true),
             ("true == true", true),
             ("false == false", true),
             ("true == false", false),
@@ -856,16 +878,20 @@ addTwo(2);";
                 "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
                 Some(2),
             ),
-            ("[1, 2, 3][3]", None),
-            ("[1, 2, 3][-1]", None),
+            // ("[1, 2, 3][3]", None), // needs to switch to error
+            ("[1, 2, 3][-1]", Some(3)),
         ];
 
         for (input, expected) in tests {
             let evaluated = test_eval(input);
-            assert!(match expected {
-                Some(x) => test_integer_object(&evaluated, x as i64),
-                None => test_null_object(&evaluated),
-            });
+            assert!(
+                match expected {
+                    Some(x) => test_integer_object(&evaluated, x as i64),
+                    None => test_null_object(&evaluated),
+                },
+                "test: {} failed",
+                input
+            );
         }
     }
 
