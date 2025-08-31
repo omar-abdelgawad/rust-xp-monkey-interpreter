@@ -8,3 +8,6 @@ pub mod token;
 // Evaluation mods
 pub mod evaluator;
 pub mod object;
+
+// cli
+pub mod cli;

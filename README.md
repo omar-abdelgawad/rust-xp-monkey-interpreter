@@ -18,25 +18,36 @@ It supports:
 
 ## 🚀 Getting Started
 
-download the repo
+Download the repo:
 
 ```bash
 git clone https://github.com/omar-abdelgawad/rust-xp-monkey-interpreter.git monkey-rs
 cd monkey-rs
 ```
 
-and then if you have [just](https://just.systems/) (the command runner) you can run the REPL with it
+If you have [just](https://just.systems/) (the command runner), you can:
 
-```bash
-just run
-```
+- Run the REPL:
+  ```bash
+  just run
+  ```
+- Run a Monkey script file:
+  ```bash
+  just run path/to/script.monkey
+  ```
 
-or if you don't have it you can just use `cargo`
+Or, if you don't have `just`, you can use `cargo` directly:
 
-```bash
-cargo run -q
-```
-finally you can try doing something cool with arrays and hashes like
+- Run the REPL:
+  ```bash
+  cargo run -q
+  ```
+- Run a Monkey script file:
+  ```bash
+  cargo run -- path/to/script.monkey
+  ```
+
+Finally, you can try doing something cool with arrays and hashes like
 
 ```bash
 >> let people = [{"name": "Omar", "age": 22}, {"name": "Ahmed", "age": 44}];
