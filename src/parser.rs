@@ -70,6 +70,8 @@ impl Parser {
         parser.register_infix(TokenType::NOT_EQ, Parser::parse_infix_expression);
         parser.register_infix(TokenType::LT, Parser::parse_infix_expression);
         parser.register_infix(TokenType::GT, Parser::parse_infix_expression);
+        parser.register_infix(TokenType::GT_OR_EQ, Parser::parse_infix_expression);
+        parser.register_infix(TokenType::LT_OR_EQ, Parser::parse_infix_expression);
         parser.register_infix(TokenType::LPAREN, Parser::parse_call_expression);
         parser.register_infix(TokenType::LBRACKET, Parser::parse_index_expression);
 
@@ -330,8 +332,12 @@ impl Parser {
         match self.cur_token.ttype {
             TokenType::LET => self.parse_let_statement(),
             TokenType::RETURN => self.parse_return_statement(),
+            TokenType::HASH_COMMENT => self.parse_comment_statement(),
             _ => self.parse_expression_statement(),
         }
+    }
+    fn parse_comment_statement(&mut self) -> Option<Box<Statement>> {
+        None
     }
     fn parse_expression_statement(&mut self) -> Option<Box<Statement>> {
         let cur_token_tmp = self.cur_token.clone();
@@ -446,6 +452,8 @@ impl Parser {
             TokenType::NOT_EQ => Precedence::EQUALS,
             TokenType::LT => Precedence::LESSGREATER,
             TokenType::GT => Precedence::LESSGREATER,
+            TokenType::LT_OR_EQ => Precedence::LESSGREATER,
+            TokenType::GT_OR_EQ => Precedence::LESSGREATER,
             TokenType::PLUS => Precedence::SUM,
             TokenType::MINUS => Precedence::SUM,
             TokenType::SLASH => Precedence::PRODUCT,
@@ -756,6 +764,8 @@ mod test {
             ("5 < 5;", &5i64, "<", &5i64),
             ("5 == 5;", &5i64, "==", &5i64),
             ("5 != 5;", &5i64, "!=", &5i64),
+            ("5 >= 6;", &5i64, ">=", &6i64),
+            ("5 <= 6;", &5i64, "<=", &6i64),
             ("true == true", &true, "==", &true),
             ("true != false", &true, "!=", &false),
             ("false == false", &false, "==", &false),
@@ -1448,5 +1458,54 @@ mod test {
         if !test_identifier(&loop_body.expression, "x") {
             panic!()
         }
+    }
+    #[test]
+    fn test_comments_are_ignored() {
+        let input = r#"
+            # this is a comment
+            let x = 5; # another comment
+            let y = 10;
+            # let z = 99;
+            y # trailing comment
+        "#;
+
+        let l = lexer::Lexer::new(input);
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        check_parser_errors(p);
+
+        // Should only parse two let statements and one expression statement
+        assert_eq!(
+            program.statements.len(),
+            3,
+            "Expected 3 statements (2 lets, 1 expr), got {}",
+            program.statements.len()
+        );
+
+        // First let statement: let x = 5;
+        let stmt = &program.statements[0];
+        let Statement::Let(let_stmt) = stmt else {
+            panic!("First statement is not a LetStatement. got={:?}", stmt);
+        };
+        assert_eq!(let_stmt.name_value(), "x");
+        assert!(test_literal_expression(&let_stmt.value, &5));
+
+        // Second let statement: let y = 10;
+        let stmt = &program.statements[1];
+        let Statement::Let(let_stmt) = stmt else {
+            panic!("Second statement is not a LetStatement. got={:?}", stmt);
+        };
+        assert_eq!(let_stmt.name_value(), "y");
+        assert!(test_literal_expression(&let_stmt.value, &10));
+
+        // Third statement: y (expression statement)
+        let stmt = &program.statements[2];
+        let Statement::Expression(expr_stmt) = stmt else {
+            panic!(
+                "Third statement is not an ExpressionStatement. got={:?}",
+                stmt
+            );
+        };
+        assert!(test_identifier(&expr_stmt.expression, "y"));
     }
 }

@@ -72,7 +72,7 @@ impl Lexer {
     }
     fn read_identifier(&mut self) -> Token {
         let position = self.position as usize;
-        while is_letter(self.ch) {
+        while self.ch.is_ascii_alphanumeric() || self.ch == b'_' {
             self.read_char();
         }
         let ident_slice = &self.input[position..self.position as usize];
@@ -84,6 +84,16 @@ impl Lexer {
         loop {
             self.read_char();
             if self.ch == b'"' || self.ch == 0 {
+                break;
+            }
+        }
+        self.input[position..self.position as usize].to_owned()
+    }
+    fn read_comment(&mut self) -> String {
+        let position: usize = (self.position + 1) as usize;
+        loop {
+            self.read_char();
+            if self.ch == b'\n' || self.ch == 0 {
                 break;
             }
         }
@@ -102,6 +112,30 @@ impl Lexer {
                     Token::new(TokenType::ASSIGN, self.ch as char)
                 }
             }
+            b'<' => {
+                if self.peak_char() == b'=' {
+                    let ch = self.ch;
+                    self.read_char();
+                    Token::new(
+                        TokenType::LT_OR_EQ,
+                        format!("{}{}", ch as char, self.ch as char),
+                    )
+                } else {
+                    Token::new(TokenType::LT, self.ch as char)
+                }
+            }
+            b'>' => {
+                if self.peak_char() == b'=' {
+                    let ch = self.ch;
+                    self.read_char();
+                    Token::new(
+                        TokenType::GT_OR_EQ,
+                        format!("{}{}", ch as char, self.ch as char),
+                    )
+                } else {
+                    Token::new(TokenType::GT, self.ch as char)
+                }
+            }
             b'+' => Token::new(TokenType::PLUS, self.ch as char),
             b'-' => Token::new(TokenType::MINUS, self.ch as char),
             b'!' => {
@@ -118,8 +152,6 @@ impl Lexer {
             }
             b'/' => Token::new(TokenType::SLASH, self.ch as char),
             b'*' => Token::new(TokenType::ASTERISK, self.ch as char),
-            b'<' => Token::new(TokenType::LT, self.ch as char),
-            b'>' => Token::new(TokenType::GT, self.ch as char),
             b';' => Token::new(TokenType::SEMICOLON, self.ch as char),
             b'(' => Token::new(TokenType::LPAREN, self.ch as char),
             b')' => Token::new(TokenType::RPAREN, self.ch as char),
@@ -130,6 +162,7 @@ impl Lexer {
             b'[' => Token::new(TokenType::LBRACKET, self.ch as char),
             b']' => Token::new(TokenType::RBRACKET, self.ch as char),
             b':' => Token::new(TokenType::COLON, self.ch as char),
+            b'#' => Token::new(TokenType::HASH_COMMENT, self.read_comment()),
             0 => Token::new(TokenType::EOF, ""),
             _ => {
                 if is_letter(self.ch) {
@@ -211,6 +244,9 @@ if (5 < 10) {
 [1, 2];
 {\"foo\": \"bar\"}
 while
+#This is a comment
+###
+>=<= #comment
 ";
         let tests = [
             Token::new(TokenType::LET, "let"),
@@ -300,6 +336,11 @@ while
             Token::new(TokenType::STRING, "bar"),
             Token::new(TokenType::RBRACE, "}"),
             Token::new(TokenType::WHILE, "while"),
+            Token::new(TokenType::HASH_COMMENT, "This is a comment"),
+            Token::new(TokenType::HASH_COMMENT, "##"),
+            Token::new(TokenType::GT_OR_EQ, ">="),
+            Token::new(TokenType::LT_OR_EQ, "<="),
+            Token::new(TokenType::HASH_COMMENT, "comment"),
             Token::new(TokenType::EOF, ""),
         ];
         let mut lexer = Lexer::new(input);

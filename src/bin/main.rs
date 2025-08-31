@@ -1,5 +1,5 @@
 use clap::Parser;
-use monkey_rs::repl::start;
+use monkey_rs::repl::{execute_file, start};
 use std::env;
 use std::fs::File;
 use std::io::{self, BufReader};
@@ -13,7 +13,7 @@ fn main() {
             Ok(file) => {
                 let reader = BufReader::new(file);
                 let stdout = io::stdout();
-                start(reader, stdout);
+                execute_file(reader, stdout);
             }
             Err(e) => {
                 eprintln!("Could not open file '{}': {}", filename, e);

@@ -13,10 +13,12 @@ pub enum TokenType {
     ASTERISK, // *
     SLASH,    // /
 
-    LT,     // <
-    GT,     // >
-    EQ,     // ==
-    NOT_EQ, // !=
+    LT,       // <
+    GT,       // >
+    EQ,       // ==
+    NOT_EQ,   // !=
+    GT_OR_EQ, // >=
+    LT_OR_EQ, // <=
 
     COMMA,
     SEMICOLON,
@@ -35,9 +37,10 @@ pub enum TokenType {
     WHILE,
     //extended
     STRING,
-    LBRACKET, // [ for arrays
-    RBRACKET, // ] for arrays
-    COLON,    // : for hash literals
+    LBRACKET,     // [ for arrays
+    RBRACKET,     // ] for arrays
+    COLON,        // : for hash literals
+    HASH_COMMENT, // # for comments
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Token {

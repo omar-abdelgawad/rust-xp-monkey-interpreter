@@ -1,6 +1,6 @@
 use crate::ast::Node;
-use crate::object::environment::Environment;
 use crate::object::ObjectTrait;
+use crate::object::environment::Environment;
 use crate::parser::Parser;
 use crate::token::TokenType;
 use crate::{evaluator, lexer::Lexer};
@@ -55,6 +55,23 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
         //}
     }
 }
+pub fn execute_file(mut input: impl BufRead, mut output: impl Write) {
+    let mut file = String::new();
+    input
+        .read_to_string(&mut file)
+        .expect("Failed to read whole file");
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let l = Lexer::new(file);
+    let mut p = Parser::new(l);
+    let program = p.parse_program();
+    if !p.errors().is_empty() {
+        print_parser_errors(&mut output, p.errors());
+        return;
+    }
+    let evaluated = evaluator::eval(Node::Program(program), env.clone());
+    writeln!(output, "{}", evaluated.inspect());
+}
+
 fn print_parser_errors(mut output: impl Write, errors: &[String]) {
     write!(output, "{}", MONKEY_FACE);
     write!(output, "Woops! We ran into some monkey business here!\n");
