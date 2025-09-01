@@ -1,8 +1,9 @@
-use wasm_bindgen::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
+use wasm_bindgen::prelude::*;
 
 use crate::ast::Node;
+use crate::ast::Program;
 use crate::evaluator;
 use crate::lexer::Lexer;
 use crate::object::environment::Environment;
@@ -32,13 +33,10 @@ pub fn stream_output(text: &str) {
     });
 }
 
-
-
-
-
 #[wasm_bindgen]
 pub struct MonkeyInterpreter {
     env: Rc<RefCell<Environment>>,
+    prog: Option<Program>,
 }
 
 #[wasm_bindgen]
@@ -47,9 +45,15 @@ impl MonkeyInterpreter {
     pub fn new() -> MonkeyInterpreter {
         MonkeyInterpreter {
             env: Rc::new(RefCell::new(Environment::new())),
+            prog: None,
         }
     }
 
+    // FIXME: DOM can't render while wasm is executing because call stack has to be empty
+    // so even though I can call JS from inside wasm as already done using OUTPUT_CALLBACK
+    // that is only good enough if we will use console.log as it doesn't need DOM rendering.
+    // to show the output through manipulating the DOM we need to yield control back
+    // which can be done by evaluating the program statement by statement.
     #[wasm_bindgen]
     pub fn evaluate(&mut self, code: &str) -> String {
         let lexer = Lexer::new(code);
@@ -67,16 +71,42 @@ impl MonkeyInterpreter {
         let result = evaluator::eval(Node::Program(program), Rc::clone(&self.env));
         result.inspect()
     }
+    #[wasm_bindgen]
+    pub fn set_program(&mut self, code: &str) {
+        let lexer = Lexer::new(code);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
 
+        if !parser.errors().is_empty() {
+            let mut error_msg = String::from("Parser errors:\n");
+            for error in parser.errors() {
+                error_msg.push_str(&format!("  {}\n", error));
+            }
+            self.prog = None;
+            stream_output(&error_msg);
+            return;
+        }
+        self.prog = Some(program);
+    }
 
+    #[wasm_bindgen]
+    pub fn evaluate_statement(&mut self) -> String {
+        if let Some(ref mut prog) = self.prog {
+            if prog.statements.is_empty() {
+                return String::from("Program completed");
+            }
+            let stmt = prog.statements.remove(0);
+            let result = evaluator::eval(Node::Statement(stmt), Rc::clone(&self.env));
+            return result.inspect();
+        }
+        String::from("No program set")
+    }
 
     #[wasm_bindgen]
     pub fn reset(&mut self) {
         self.env = Rc::new(RefCell::new(Environment::new()));
     }
 }
-
-
 
 // Function to get example code
 #[wasm_bindgen]
@@ -89,7 +119,8 @@ pub fn get_example_code(example_name: &str) -> String {
 let i = 1000000; # 1 million
 while (i > 0) {
     let i = i - 1;
-}"#.to_string(),
+}"#
+        .to_string(),
         "game_of_life" => {
             let mut code = String::new();
             code.push_str("############################################################\n");
@@ -215,7 +246,7 @@ while (i > 0) {
             code.push_str("puts(\"starting\");\n");
             code.push_str("run(seed, 5);");
             code
-        },
+        }
         _ => "puts(\"Unknown example\")".to_string(),
     }
 }
@@ -227,5 +258,6 @@ pub fn get_available_examples() -> String {
         ["hello_world", "Hello World"],
         ["while_loop", "While Loop Demo"],
         ["game_of_life", "Conway's Game of Life"]
-    ]"#.to_string()
+    ]"#
+    .to_string()
 }

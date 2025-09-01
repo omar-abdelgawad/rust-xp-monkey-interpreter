@@ -18,5 +18,6 @@ run-file FILE:
 record:
   @script -c "just run" run.log
 
+[working-directory: 'website']
 serve:
   @python -m http.server 8000
