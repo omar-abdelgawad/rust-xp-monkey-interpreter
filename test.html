@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Monkey WASM Test</title>
+</head>
+<body>
+    <h1>Monkey WebAssembly Test</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        import init, { MonkeyInterpreter, get_example_code } from './monkey_rs.js';
+        
+        async function test() {
+            try {
+                await init();
+                console.log('WebAssembly module initialized');
+                
+                const interpreter = new MonkeyInterpreter();
+                
+                // Test simple code
+                const result1 = interpreter.evaluate('puts("Hello from Monkey!");');
+                console.log('Test 1 result:', result1);
+                
+                // Test arithmetic
+                const result2 = interpreter.evaluate('let x = 5 + 3; puts(x);');
+                console.log('Test 2 result:', result2);
+                
+                // Test example code
+                const exampleCode = get_example_code('hello_world');
+                const result3 = interpreter.evaluate(exampleCode);
+                console.log('Test 3 result:', result3);
+                
+                document.getElementById('output').innerHTML = `
+                    <h2>Test Results:</h2>
+                    <p><strong>Test 1:</strong> ${result1}</p>
+                    <p><strong>Test 2:</strong> ${result2}</p>
+                    <p><strong>Test 3:</strong> ${result3}</p>
+                    <p style="color: green;"> All tests completed successfully!</p>
+                `;
+                
+            } catch (error) {
+                console.error('Test failed:', error);
+                document.getElementById('output').innerHTML = `
+                    <p style="color: red;">❌ Test failed: ${error.message}</p>
+                `;
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>
