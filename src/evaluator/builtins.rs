@@ -153,7 +153,21 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
         "puts" => Some(BuiltinObj {
             function: |args: &[Object]| {
                 for arg in args {
-                    println!("{}", arg.inspect());
+                    let output = arg.inspect();
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        // For WebAssembly, use streaming output
+                        crate::wasm::stream_output(&output);
+                        // Ensure each puts call ends with a newline
+                        if !output.ends_with('\n') {
+                            crate::wasm::stream_output("\n");
+                        }
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        // For native compilation, use standard println
+                        println!("{}", output);
+                    }
                 }
                 NULL
             },

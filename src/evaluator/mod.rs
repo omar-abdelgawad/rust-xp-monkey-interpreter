@@ -312,10 +312,13 @@ fn eval_identifier(ident: ast::Identifier, env: Rc<RefCell<Environment>>) -> Obj
     if let Some(obj) = val {
         return obj;
     }
+    
+    // Use builtins (which now handle WebAssembly vs native compilation internally)
     let val = builtins(&ident.value);
     if let Some(built_obj) = val {
         return Object::Builtin(built_obj);
     }
+    
     new_error(format!("identifier not found: {}", ident.value))
 }
 

@@ -1,4 +1,4 @@
-import init, { MonkeyInterpreter, get_example_code, get_available_examples } from './monkey_rs.js';
+import init, { MonkeyInterpreter, get_example_code, get_available_examples, set_output_callback } from './monkey_rs.js';
 
 class MonkeyWebApp {
     constructor() {
@@ -11,6 +11,9 @@ class MonkeyWebApp {
         try {
             // Initialize the WebAssembly module
             await init();
+            
+            // Set up the output callback for real-time streaming
+            this.setupOutputCallback();
             
             // Create a new interpreter instance
             this.interpreter = new MonkeyInterpreter();
@@ -25,6 +28,20 @@ class MonkeyWebApp {
             console.error('Failed to initialize WebAssembly module:', error);
             this.showError('Failed to initialize the Monkey interpreter. Please refresh the page.');
         }
+    }
+
+    setupOutputCallback() {
+        // Create a callback function that will be called from WebAssembly
+        const outputCallback = (text) => {
+            // Use requestAnimationFrame to ensure the callback is processed asynchronously
+            // and doesn't block the WebAssembly execution
+            requestAnimationFrame(() => {
+                this.appendToOutput(text);
+            });
+        };
+        
+        // Set the callback in the WebAssembly module
+        set_output_callback(outputCallback);
     }
 
     setupEventListeners() {
@@ -121,17 +138,36 @@ class MonkeyWebApp {
         // Show loading state
         runButton.disabled = true;
         runButton.textContent = 'Running...';
-        output.innerHTML = '<div class="output-placeholder">Executing code...</div>';
+        this.clearOutput();
+        this.appendToOutput('Executing code...\n');
 
         try {
-            // Execute the code
+            // Execute the code with streaming output using async execution
             const startTime = performance.now();
-            const result = this.interpreter.evaluate(code);
+            
+            // Use a Promise with setTimeout to make the execution async
+            const result = await new Promise((resolve, reject) => {
+                // Use setTimeout to yield control to the event loop
+                setTimeout(() => {
+                    try {
+                        const result = this.interpreter.evaluate(code);
+                        resolve(result);
+                    } catch (error) {
+                        reject(error);
+                    }
+                }, 0);
+            });
+            
             const endTime = performance.now();
             const executionTime = (endTime - startTime).toFixed(2);
 
-            // Display the result
-            this.showOutput(result, executionTime);
+            // Display the final result if there's any
+            if (result && result !== 'null') {
+                this.appendToOutput(`\nResult: ${result}`);
+            }
+            
+            // Show execution time with proper spacing
+            this.appendToOutput(`\n✓ Execution completed in ${executionTime}ms`);
         } catch (error) {
             console.error('Error executing code:', error);
             this.showError(`Execution error: ${error.message}`);
@@ -166,6 +202,34 @@ class MonkeyWebApp {
     clearOutput() {
         const output = document.getElementById('output');
         output.innerHTML = '<div class="output-placeholder">Click "Run Code" to execute your Monkey program</div>';
+    }
+
+    appendToOutput(text) {
+        const output = document.getElementById('output');
+        
+        // Remove placeholder if it exists
+        const placeholder = output.querySelector('.output-placeholder');
+        if (placeholder) {
+            placeholder.remove();
+        }
+        
+        // Create or get the output content div
+        let contentDiv = output.querySelector('.output-content');
+        if (!contentDiv) {
+            contentDiv = document.createElement('div');
+            contentDiv.className = 'output-content';
+            contentDiv.style.fontFamily = 'JetBrains Mono, Fira Code, Consolas, monospace';
+            contentDiv.style.fontSize = '14px';
+            contentDiv.style.lineHeight = '1.5';
+            contentDiv.style.whiteSpace = 'pre-wrap';
+            output.appendChild(contentDiv);
+        }
+        
+        // Append the text as-is (newlines are handled by WebAssembly)
+        contentDiv.textContent += text;
+        
+        // Scroll to bottom
+        output.scrollTop = output.scrollHeight;
     }
 
     escapeHtml(text) {

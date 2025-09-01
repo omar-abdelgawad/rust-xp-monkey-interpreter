@@ -1,5 +1,4 @@
 use wasm_bindgen::prelude::*;
-use web_sys::console;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -10,22 +9,32 @@ use crate::object::environment::Environment;
 use crate::object::ObjectTrait;
 use crate::parser::Parser;
 
-// Import the `console.log` function from the `console` module
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
-
-// Define a macro to call the console.log function
-macro_rules! console_log {
-    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
-}
-
-// A global environment for the interpreter
+// Thread-local storage for output callback
 thread_local! {
-    static ENV: RefCell<Rc<RefCell<Environment>>> = RefCell::new(Rc::new(RefCell::new(Environment::new())));
+    static OUTPUT_CALLBACK: RefCell<Option<js_sys::Function>> = RefCell::new(None);
 }
+
+// Function to set the output callback
+#[wasm_bindgen]
+pub fn set_output_callback(callback: js_sys::Function) {
+    OUTPUT_CALLBACK.with(|cb| {
+        *cb.borrow_mut() = Some(callback);
+    });
+}
+
+// Function to stream output in real-time
+pub fn stream_output(text: &str) {
+    OUTPUT_CALLBACK.with(|cb| {
+        if let Some(ref callback) = *cb.borrow() {
+            let text_js = JsValue::from_str(text);
+            let _ = callback.call1(&JsValue::NULL, &text_js);
+        }
+    });
+}
+
+
+
+
 
 #[wasm_bindgen]
 pub struct MonkeyInterpreter {
@@ -59,18 +68,15 @@ impl MonkeyInterpreter {
         result.inspect()
     }
 
+
+
     #[wasm_bindgen]
     pub fn reset(&mut self) {
         self.env = Rc::new(RefCell::new(Environment::new()));
     }
 }
 
-// Convenience function for one-off evaluations
-#[wasm_bindgen]
-pub fn evaluate_monkey_code(code: &str) -> String {
-    let mut interpreter = MonkeyInterpreter::new();
-    interpreter.evaluate(code)
-}
+
 
 // Function to get example code
 #[wasm_bindgen]
