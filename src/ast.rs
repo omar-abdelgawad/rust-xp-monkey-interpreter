@@ -69,7 +69,10 @@ impl Hash for Expression {
             Expression::If(if_exp) => if_exp.hash(state),
             Expression::Call(call_exp) => call_exp.hash(state),
             Expression::Ind(ind_exp) => ind_exp.hash(state),
-            def => panic!("rust tried to hash something not a str or int or bool (not hashing inside the language): {}", def),
+            def => panic!(
+                "rust tried to hash something not a str or int or bool (not hashing inside the language): {}",
+                def
+            ),
         }
     }
 }

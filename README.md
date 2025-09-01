@@ -25,6 +25,15 @@ git clone https://github.com/omar-abdelgawad/rust-xp-monkey-interpreter.git monk
 cd monkey-rs
 ```
 
+## 🌐 Web Interface
+
+This project includes a web-based Monkey interpreter powered by WebAssembly! 
+
+- **Live Demo**: [GitHub Pages](https://your-username.github.io/rust-xp-monkey-interpreter)
+- **Local Testing**: Run `./build.sh` then open `website/index.html` in your browser
+
+See `website/README.md` for web interface details.
+
 If you have [just](https://just.systems/) (the command runner), you can:
 
 - Run the REPL:

@@ -12,8 +12,11 @@ run:
 
 # run a Monkey script file
 run-file FILE:
-  @cargo run -- {{FILE}}
+  @cargo run -q -- {{FILE}}
 
 # records an interactive shells
 record:
   @script -c "just run" run.log
+
+serve:
+  @python -m http.server 8000

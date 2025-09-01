@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monkey Interpreter - WebAssembly</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐒 Monkey Interpreter</h1>
+            <p>Run Monkey code in your browser using WebAssembly</p>
+        </header>
+
+        <div class="main-content">
+            <div class="editor-section">
+                <div class="editor-header">
+                    <h2>Code Editor</h2>
+                    <div class="controls">
+                        <select id="example-selector">
+                            <option value="">Choose an example...</option>
+                        </select>
+                        <button id="load-example" class="btn btn-secondary">Load Example</button>
+                        <button id="clear-editor" class="btn btn-secondary">Clear</button>
+                    </div>
+                </div>
+                <textarea id="code-editor" placeholder="Enter your Monkey code here..."></textarea>
+            </div>
+
+            <div class="output-section">
+                <div class="output-header">
+                    <h2>Output</h2>
+                    <button id="run-code" class="btn btn-primary">▶ Run Code</button>
+                </div>
+                <div id="output" class="output-container">
+                    <div class="output-placeholder">
+                        Click "Run Code" to execute your Monkey program
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h3>About Monkey</h3>
+            <p>Monkey is a small, educational programming language that supports:</p>
+            <ul>
+                <li>Integers, booleans, and strings</li>
+                <li>Arithmetic and boolean expressions</li>
+                <li>Variable bindings with <code>let</code></li>
+                <li>First-class functions and closures</li>
+                <li>Conditionals and loops</li>
+                <li>Arrays and hashes</li>
+                <li>Built-in functions like <code>puts</code>, <code>len</code>, <code>first</code>, <code>last</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/@wasm-tool/wasm-pack-plugin@1.6.0/wasm-pack-plugin.js"></script>
+    <script type="module" src="main.js"></script>
+</body>
+</html>

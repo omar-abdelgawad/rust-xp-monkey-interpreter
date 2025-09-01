@@ -1,0 +1,59 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        components: rustfmt, clippy
+        
+    - name: Install wasm-pack
+      run: cargo install wasm-pack
+      
+    - name: Cache wasm-pack
+      uses: actions/cache@v3
+      with:
+        path: ~/.wasm-pack
+        key: ${{ runner.os }}-wasm-pack-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-wasm-pack-
+          
+    - name: Build WebAssembly module
+      run: |
+        wasm-pack build --target web --out-dir pkg --release
+        
+    - name: Copy files for GitHub Pages
+      run: |
+        cp pkg/*.js website/
+        cp pkg/*.wasm website/
+        
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./website
+        exclude_assets: |
+          target/
+          pkg/
+          .github/
+          *.rs
+          Cargo.toml
+          Cargo.lock
+          justfile
+          build.sh
+          README.md
+          monkey_examples/
