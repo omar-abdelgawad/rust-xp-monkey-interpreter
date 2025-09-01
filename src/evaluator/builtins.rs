@@ -152,26 +152,61 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
         }),
         "puts" => Some(BuiltinObj {
             function: |args: &[Object]| {
-                for arg in args {
-                    let output = arg.inspect();
-                    #[cfg(target_arch = "wasm32")]
-                    {
-                        // For WebAssembly, use streaming output
-                        crate::wasm::stream_output(&output);
-                        // Ensure each puts call ends with a newline
-                        if !output.ends_with('\n') {
-                            crate::wasm::stream_output("\n");
+                #[cfg(target_arch = "wasm32")]
+                {
+                    use wasm_bindgen_futures::spawn_local;
+
+                    let args_cloned = args.to_vec();
+                    spawn_local(async move {
+                        for arg in args_cloned {
+                            let output = arg.inspect();
+                            // For WebAssembly, use streaming output
+                            crate::wasm::stream_output(&output);
+                            // Ensure each puts call ends with a newline
+                            if !output.ends_with('\n') {
+                                crate::wasm::stream_output("\n");
+                            }
+                            yield_to_paint().await;
+                        }
+                    });
+                    return NULL;
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    for arg in args {
+                        let output = arg.inspect();
+                        #[cfg(not(target_arch = "wasm32"))]
+                        {
+                            // For native compilation, use standard println
+                            println!("{}", output);
                         }
                     }
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        // For native compilation, use standard println
-                        println!("{}", output);
-                    }
+                    return NULL;
                 }
-                NULL
             },
         }),
         _ => None,
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn yield_to_paint() {
+    use futures_channel::oneshot;
+    use wasm_bindgen::closure::Closure;
+    use wasm_bindgen::prelude::*;
+    use wasm_bindgen::JsCast;
+    use web_sys::window;
+    let (tx, rx) = oneshot::channel();
+
+    let cb = Closure::once_into_js(move || {
+        let _ = tx.send(());
+    });
+
+    window()
+        .unwrap()
+        .request_animation_frame(cb.as_ref().unchecked_ref())
+        .unwrap();
+
+    // Wait until the callback fires on next paint
+    rx.await.unwrap();
 }

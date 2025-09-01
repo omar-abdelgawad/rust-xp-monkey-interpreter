@@ -146,22 +146,24 @@ class MonkeyWebApp {
             // Set the program in the interpreter
             this.interpreter.set_program(code);
 
-            // Step through statements asynchronously
+            // Step through statements in batches asynchronously
+            const BATCH_SIZE = 5;
             const step = async () => {
-                // Evaluate one statement
-                const result = this.interpreter.evaluate_statement();
-                if (result === 'Program completed' || result === 'No program set') {
-                    // Done
-                    const endTime = performance.now();
-                    const executionTime = (endTime - startTime).toFixed(2);
-                    this.appendToOutput(`\n✓ Execution completed in ${executionTime}ms\n`);
-                    runButton.disabled = false;
-                    runButton.textContent = '▶ Run Code';
-                    return;
+                for (let i = 0; i < BATCH_SIZE; i++) {
+                    const result = this.interpreter.evaluate_statement();
+                    if (result === 'Program completed' || result === 'No program set') {
+                        // Done
+                        const endTime = performance.now();
+                        const executionTime = (endTime - startTime).toFixed(2);
+                        this.appendToOutput(`\n✓ Execution completed in ${executionTime}ms\n`);
+                        runButton.disabled = false;
+                        runButton.textContent = '▶ Run Code';
+                        return;
+                    }
                 }
                 // Yield to the event loop to allow DOM updates
                 await new Promise(resolve => setTimeout(resolve, 0));
-                // Continue to next statement
+                // Continue to next batch
                 step();
             };
             // Start stepping

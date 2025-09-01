@@ -89,6 +89,8 @@ impl MonkeyInterpreter {
         self.prog = Some(program);
     }
 
+    // this still doesn't work because the 1 function call is 1 statement
+    // but it can basically be the whole program like main() or run()
     #[wasm_bindgen]
     pub fn evaluate_statement(&mut self) -> String {
         if let Some(ref mut prog) = self.prog {
