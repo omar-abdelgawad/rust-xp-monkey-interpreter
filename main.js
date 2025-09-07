@@ -46,14 +46,12 @@ class MonkeyWebApp {
 
     setupEventListeners() {
         const runButton = document.getElementById('run-code');
-        const loadExampleButton = document.getElementById('load-example');
         const clearButton = document.getElementById('clear-editor');
         const exampleSelector = document.getElementById('example-selector');
 
         runButton.addEventListener('click', () => this.runCode());
-        loadExampleButton.addEventListener('click', () => this.loadExample());
         clearButton.addEventListener('click', () => this.clearEditor());
-        exampleSelector.addEventListener('change', () => this.onExampleSelect());
+        exampleSelector.addEventListener('change', () => this.loadExample());
 
         // Allow running code with Ctrl+Enter
         const codeEditor = document.getElementById('code-editor');
@@ -84,38 +82,27 @@ class MonkeyWebApp {
         });
     }
 
-    onExampleSelect() {
-        const selector = document.getElementById('example-selector');
-        if (selector.value) {
-            const loadButton = document.getElementById('load-example');
-            loadButton.textContent = `Load ${selector.options[selector.selectedIndex].text}`;
-        } else {
-            const loadButton = document.getElementById('load-example');
-            loadButton.textContent = 'Load Example';
-        }
-    }
+
 
     loadExample() {
         const selector = document.getElementById('example-selector');
         if (!selector.value) {
-            this.showError('Please select an example first.');
             return;
         }
-
         const code = get_example_code(selector.value);
         const editor = document.getElementById('code-editor');
         editor.value = code;
-
-        // Clear the selector
-        selector.value = '';
-        const loadButton = document.getElementById('load-example');
-        loadButton.textContent = 'Load Example';
     }
 
     clearEditor() {
         const editor = document.getElementById('code-editor');
         editor.value = '';
         this.clearOutput();
+        // Reset the example selector to default (no example chosen)
+        const exampleSelector = document.getElementById('example-selector');
+        if (exampleSelector) {
+            exampleSelector.value = '';
+        }
     }
 
     async runCode() {
