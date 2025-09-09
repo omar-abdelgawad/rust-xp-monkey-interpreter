@@ -35,15 +35,19 @@ class MonkeyWebApp {
         const outputCallback = (text) => {
             // Use requestAnimationFr   ame to ensure the callback is processed asynchronously
             // and doesn't block the WebAssembly execution
-            requestAnimationFrame(() => {
+            // requestAnimationFrame(() => {
             // console.log("hello there");
             this.appendToOutput(text);
             // requestAnimationFrame(()=>{});
-            });
+            // });
         };
 
         // Set the callback in the WebAssembly module
         set_output_callback(outputCallback);
+        // set_output_callback(function (text) {
+        //   console.log("STREAM:", text);
+        //   // document.getElementById("output").textContent += text;
+        // });
     }
 
     setupEventListeners() {
@@ -140,7 +144,7 @@ class MonkeyWebApp {
             const step = async () => {
                 for (let i = 0; i < BATCH_SIZE; i++) {
                     const result = this.interpreter.evaluate_statement();
-                    if (result === 'Program completed' || result === 'No program set') {
+                    if (result === "Program completed" || result === 'No program set') {
                         // Done
                         const endTime = performance.now();
                         const executionTime = (endTime - startTime).toFixed(2);
@@ -200,6 +204,7 @@ class MonkeyWebApp {
 
         // Append the text as-is (newlines are handled by WebAssembly)
         contentDiv.textContent += text;
+        console.log("text:"+text);
 
         // Scroll to bottom
         output.scrollTop = output.scrollHeight;
