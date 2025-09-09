@@ -1,3 +1,4 @@
+mod builtins;
 use builtins::builtins;
 
 use crate::ast::{
@@ -15,8 +16,10 @@ use crate::object::{FALSE, NULL, TRUE};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-mod builtins;
 
+// TODO: in order to return Objects from the environment without cloning it we should
+// maybe return Cow<'a,Object> or Rc<RefCell<Object>> but that changes all function signatures
+// and some of the logic as well and it seems ugly unfortunately.
 pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
     use Expression as Exp;
     use Statement as St;

@@ -49,7 +49,7 @@ impl MonkeyInterpreter {
         }
     }
 
-    // FIXME: DOM can't render while wasm is executing because call stack has to be empty
+    // FIX: DOM can't render while wasm is executing because call stack has to be empty
     // so even though I can call JS from inside wasm as already done using OUTPUT_CALLBACK
     // that is only good enough if we will use console.log as it doesn't need DOM rendering.
     // to show the output through manipulating the DOM we need to yield control back

@@ -35,9 +35,11 @@ class MonkeyWebApp {
         const outputCallback = (text) => {
             // Use requestAnimationFr   ame to ensure the callback is processed asynchronously
             // and doesn't block the WebAssembly execution
-            // requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+            // console.log("hello there");
             this.appendToOutput(text);
-            // });
+            // requestAnimationFrame(()=>{});
+            });
         };
 
         // Set the callback in the WebAssembly module
