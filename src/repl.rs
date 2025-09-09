@@ -1,6 +1,6 @@
 use crate::ast::Node;
-use crate::object::ObjectTrait;
 use crate::object::environment::Environment;
+use crate::object::ObjectTrait;
 use crate::parser::Parser;
 use crate::token::TokenType;
 use crate::{evaluator, lexer::Lexer};

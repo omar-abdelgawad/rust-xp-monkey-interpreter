@@ -18,7 +18,11 @@ pub const NULL: Object = Object::Null(Null::new());
 type BuiltinFunction = fn(args: &[Object]) -> Object;
 
 pub fn native_bool_to_boolean_object(input: bool) -> Object {
-    if input { TRUE } else { FALSE }
+    if input {
+        TRUE
+    } else {
+        FALSE
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]

@@ -19,7 +19,7 @@ rm -rf target/
 
 # Build the WebAssembly module
 echo "🔨 Building WebAssembly module..."
-wasm-pack build --target web --out-dir pkg --dev
+wasm-pack build --target web --out-dir pkg --dev --no-typescript
 
 # Copy the generated files to the website directory for GitHub Pages
 echo "📁 Copying files to website directory..."
@@ -30,7 +30,6 @@ echo "✅ Build completed successfully!"
 echo "📦 Generated files:"
 echo "   - monkey_rs.js (JavaScript bindings)"
 echo "   - monkey_rs_bg.wasm (WebAssembly binary)"
-echo "   - monkey_rs.d.ts (TypeScript definitions)"
 
 echo ""
 echo "🚀 You can now open website/index.html in your browser to test the interpreter!"

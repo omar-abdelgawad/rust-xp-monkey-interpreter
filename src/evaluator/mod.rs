@@ -6,8 +6,8 @@ use crate::ast::{
 };
 use crate::object::environment::Environment;
 use crate::object::{
-    Array, Error, Function, HashObj, HashPair, Hashable, ObjectTrait, ObjectType, ReturnValue,
-    StringObj, native_bool_to_boolean_object,
+    native_bool_to_boolean_object, Array, Error, Function, HashObj, HashPair, Hashable,
+    ObjectTrait, ObjectType, ReturnValue, StringObj,
 };
 use crate::object::{Boolean, Integer, Null, Object};
 use crate::object::{FALSE, NULL, TRUE};
@@ -312,13 +312,13 @@ fn eval_identifier(ident: ast::Identifier, env: Rc<RefCell<Environment>>) -> Obj
     if let Some(obj) = val {
         return obj;
     }
-    
+
     // Use builtins (which now handle WebAssembly vs native compilation internally)
     let val = builtins(&ident.value);
     if let Some(built_obj) = val {
         return Object::Builtin(built_obj);
     }
-    
+
     new_error(format!("identifier not found: {}", ident.value))
 }
 
@@ -389,7 +389,10 @@ fn eval_array_index_expresssion(arr: Array, index: Integer) -> Object {
     } else {
         index.value as usize
     };
-    if arr.elements.len() == 0 || idx as usize > arr.elements.len() - 1 || idx < 0 {
+    if arr.elements.len() == 0
+        || idx > arr.elements.len() - 1
+        || index.value < -(arr.elements.len() as i64)
+    {
         return new_error(format!(
             "array index out of bounds: the len is {} but the index is {}",
             arr.elements.len(),
@@ -621,6 +624,17 @@ mod test {
             }
         }
     }
+
+    fn test_err_object(obj: &Object) -> bool {
+        match obj {
+            Object::Err(_) => true,
+            _ => {
+                eprintln!("object is not Err. got={:?} ({:?})", obj, obj);
+                false
+            }
+        }
+    }
+
     #[test]
     fn test_return_statements() {
         let tests = vec![
@@ -669,6 +683,14 @@ mod test {
             (
                 "{\"name\": \"Monkey\"}[fn(x) {x}];",
                 "unusable as hash key: FUNCTION",
+            ),
+            (
+                "[1, 2, 3][3]",
+                "array index out of bounds: the len is 3 but the index is 3",
+            ),
+            (
+                "[1, 2, 3][-4]",
+                "array index out of bounds: the len is 3 but the index is -4",
             ),
         ];
         let mut errors = vec![];
@@ -881,8 +903,10 @@ addTwo(2);";
                 "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
                 Some(2),
             ),
-            // ("[1, 2, 3][3]", None), // needs to switch to error
             ("[1, 2, 3][-1]", Some(3)),
+            ("[1, 2, 3][-3]", Some(1)),
+            ("[1, 2, 3][-4]", None),
+            ("[1, 2, 3][3]", None),
         ];
 
         for (input, expected) in tests {
@@ -890,7 +914,7 @@ addTwo(2);";
             assert!(
                 match expected {
                     Some(x) => test_integer_object(&evaluated, x as i64),
-                    None => test_null_object(&evaluated),
+                    None => test_err_object(&evaluated),
                 },
                 "test: {} failed",
                 input
