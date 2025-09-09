@@ -154,22 +154,42 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
             function: |args: &[Object]| {
                 #[cfg(target_arch = "wasm32")]
                 {
-                    use wasm_bindgen_futures::spawn_local;
-
                     let args_cloned = args.to_vec();
-                    spawn_local(async move {
-                        for arg in args_cloned {
-                            let output = arg.inspect();
-                            // For WebAssembly, use streaming output
-                            crate::wasm::stream_output(&output);
-                            // Ensure each puts call ends with a newline
-                            if !output.ends_with('\n') {
-                                crate::wasm::stream_output("\n");
-                            }
-                            yield_to_paint().await;
+                    fn step(mut args: Vec<Object>) {
+                        if args.is_empty() {
+                            return;
                         }
-                    });
+
+                        let arg = args.remove(0);
+                        let output = arg.inspect();
+
+                        // Streaming output
+                        crate::wasm::stream_output(&output);
+                        if !output.ends_with('\n') {
+                            crate::wasm::stream_output("\n");
+                        }
+
+                        // Schedule the next step to let the DOM paint
+                        if !args.is_empty() {
+                            yield_to_paint(move || step(args));
+                        }
+                    }
+
+                    step(args_cloned);
                     return NULL;
+                    //use wasm_bindgen_futures::spawn_local;
+                    //spawn_local(async move {
+                    //    for arg in args_cloned {
+                    //        let output = arg.inspect();
+                    //        // For WebAssembly, use streaming output
+                    //        crate::wasm::stream_output(&output);
+                    //        // Ensure each puts call ends with a newline
+                    //        if !output.ends_with('\n') {
+                    //            crate::wasm::stream_output("\n");
+                    //        }
+                    //        yield_to_paint().await;
+                    //    }
+                    //});
                 }
                 #[cfg(not(target_arch = "wasm32"))]
                 {
@@ -190,23 +210,41 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
 }
 
 #[cfg(target_arch = "wasm32")]
-async fn yield_to_paint() {
-    use futures_channel::oneshot;
+pub fn yield_to_paint<F>(f: F)
+where
+    F: 'static + FnOnce(),
+{
     use wasm_bindgen::closure::Closure;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsCast;
     use web_sys::window;
-    let (tx, rx) = oneshot::channel();
 
-    let cb = Closure::once_into_js(move || {
-        let _ = tx.send(());
-    });
-
+    let closure = Closure::once_into_js(f);
     window()
         .unwrap()
-        .request_animation_frame(cb.as_ref().unchecked_ref())
+        .request_animation_frame(closure.as_ref().unchecked_ref())
         .unwrap();
-
-    // Wait until the callback fires on next paint
-    rx.await.unwrap();
+    // closure consumed by once_into_js, no need to forget
 }
+
+//#[cfg(target_arch = "wasm32")]
+//async fn yield_to_paint() {
+//    use futures_channel::oneshot;
+//    use wasm_bindgen::closure::Closure;
+//    use wasm_bindgen::prelude::*;
+//    use wasm_bindgen::JsCast;
+//    use web_sys::window;
+//    let (tx, rx) = oneshot::channel();
+//
+//    let cb = Closure::once_into_js(move || {
+//        let _ = tx.send(());
+//    });
+//
+//    window()
+//        .unwrap()
+//        .request_animation_frame(cb.as_ref().unchecked_ref())
+//        .unwrap();
+//
+//    // Wait until the callback fires on next paint
+//    rx.await.unwrap();
+//}

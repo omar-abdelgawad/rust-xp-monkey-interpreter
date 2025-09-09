@@ -29,6 +29,8 @@ pub fn stream_output(text: &str) {
         if let Some(ref callback) = *cb.borrow() {
             let text_js = JsValue::from_str(text);
             let _ = callback.call1(&JsValue::NULL, &text_js);
+        } else {
+            panic!("didn't find callback");
         }
     });
 }
@@ -53,7 +55,9 @@ impl MonkeyInterpreter {
     // so even though I can call JS from inside wasm as already done using OUTPUT_CALLBACK
     // that is only good enough if we will use console.log as it doesn't need DOM rendering.
     // to show the output through manipulating the DOM we need to yield control back
-    // which can be done by evaluating the program statement by statement.
+    // which can be done by evaluating the program statement by statement. but turns out
+    // that doesn't work because I need to render even inside a single statement such as
+    // a function call that starts the program like main() or run()
     #[wasm_bindgen]
     pub fn evaluate(&mut self, code: &str) -> String {
         let lexer = Lexer::new(code);
@@ -71,6 +75,7 @@ impl MonkeyInterpreter {
         let result = evaluator::eval(Node::Program(program), Rc::clone(&self.env));
         result.inspect()
     }
+
     #[wasm_bindgen]
     pub fn set_program(&mut self, code: &str) {
         let lexer = Lexer::new(code);
@@ -91,6 +96,9 @@ impl MonkeyInterpreter {
 
     // this still doesn't work because the 1 function call is 1 statement
     // but it can basically be the whole program like main() or run()
+    // maybe we can make it async but that requires a lot more changes so
+    // everything until reaching the puts function would be async and that
+    // sucks hard
     #[wasm_bindgen]
     pub fn evaluate_statement(&mut self) -> String {
         if let Some(ref mut prog) = self.prog {
@@ -98,6 +106,9 @@ impl MonkeyInterpreter {
                 return String::from("Program completed");
             }
             let stmt = prog.statements.remove(0);
+            if prog.statements.is_empty() {
+                self.prog = None;
+            }
             let result = evaluator::eval(Node::Statement(stmt), Rc::clone(&self.env));
             return result.inspect();
         }
