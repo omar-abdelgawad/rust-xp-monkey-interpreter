@@ -240,7 +240,7 @@ export function get_available_examples() {
 }
 
 function __wbg_adapter_18(arg0, arg1) {
-    wasm._dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__hdcb6faa0881621ba(arg0, arg1);
+    wasm._dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h3ee237d692c4ba39(arg0, arg1);
 }
 
 const MonkeyInterpreterFinalization = (typeof FinalizationRegistry === 'undefined')
