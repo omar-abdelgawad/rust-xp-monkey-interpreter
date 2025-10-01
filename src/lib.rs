@@ -16,7 +16,5 @@ pub mod cli;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 
-use wasm_bindgen::prelude::*;
-
-#[cfg(target_arch = "wasm32")]
-pub use wasm::*;
+// --------mods after reading compiler book--------
+pub mod code;
