@@ -1,13 +1,15 @@
 # Monkey-rs
 
-This is an implementation of the monkey programming language from the book  [*Writing an Interpreter in Go* by Thorsten Ball](https://interpreterbook.com/) in rust. please don't ask why I did it in rust. I learned a lot of stuff though.
+This is an implementation of the monkey programming language from the book [*Writing an Interpreter in Go* by Thorsten Ball](https://interpreterbook.com/) in Rust. Please don't ask why I did it in Rust. I learned a lot of stuff though.
 
-I am currently reading [*Writing a Compiler in Go* by Thorsten Ball](https://compilerbook.com/) and stopped at the start of page 28 in chapter 2.
+I am also working on implementing a VM (Virtual Machine) and compiler for Monkey from the second book [*Writing a Compiler in Go* by Thorsten Ball](https://compilerbook.com/), but of course in Rust. Currently, I'm at the start of page 28 in chapter 2.
 
 ## 📖 About
 
-Monkey is a small, educational programming language designed to teach interpreter concepts.  
-It supports:
+Monkey is a small, educational programming language designed to teach interpreter and compiler concepts.  
+This project currently includes a **tree-walking interpreter** with plans to add a **bytecode VM and compiler** in the future.
+
+The interpreter supports:
 
 - Integers and booleans  
 - Arithmetic and boolean expressions  
