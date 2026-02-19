@@ -198,6 +198,22 @@ function getDataViewMemory0() {
     return cachedDataViewMemory0;
 }
 /**
+ * @returns {string}
+ */
+export function get_available_examples() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.get_available_examples();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
  * @param {Function} callback
  */
 export function set_output_callback(callback) {
@@ -223,24 +239,8 @@ export function get_example_code(example_name) {
     }
 }
 
-/**
- * @returns {string}
- */
-export function get_available_examples() {
-    let deferred1_0;
-    let deferred1_1;
-    try {
-        const ret = wasm.get_available_examples();
-        deferred1_0 = ret[0];
-        deferred1_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
-    }
-}
-
 function __wbg_adapter_18(arg0, arg1) {
-    wasm._dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h3ee237d692c4ba39(arg0, arg1);
+    wasm._dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h580cca849fad41e6(arg0, arg1);
 }
 
 const MonkeyInterpreterFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -259,30 +259,6 @@ export class MonkeyInterpreter {
     free() {
         const ptr = this.__destroy_into_raw();
         wasm.__wbg_monkeyinterpreter_free(ptr, 0);
-    }
-    constructor() {
-        const ret = wasm.monkeyinterpreter_new();
-        this.__wbg_ptr = ret >>> 0;
-        MonkeyInterpreterFinalization.register(this, this.__wbg_ptr, this);
-        return this;
-    }
-    /**
-     * @param {string} code
-     * @returns {string}
-     */
-    evaluate(code) {
-        let deferred2_0;
-        let deferred2_1;
-        try {
-            const ptr0 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-            const len0 = WASM_VECTOR_LEN;
-            const ret = wasm.monkeyinterpreter_evaluate(this.__wbg_ptr, ptr0, len0);
-            deferred2_0 = ret[0];
-            deferred2_1 = ret[1];
-            return getStringFromWasm0(ret[0], ret[1]);
-        } finally {
-            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
-        }
     }
     /**
      * @param {string} code
@@ -307,8 +283,32 @@ export class MonkeyInterpreter {
             wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
         }
     }
+    constructor() {
+        const ret = wasm.monkeyinterpreter_new();
+        this.__wbg_ptr = ret >>> 0;
+        MonkeyInterpreterFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
     reset() {
         wasm.monkeyinterpreter_reset(this.__wbg_ptr);
+    }
+    /**
+     * @param {string} code
+     * @returns {string}
+     */
+    evaluate(code) {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ptr0 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.monkeyinterpreter_evaluate(this.__wbg_ptr, ptr0, len0);
+            deferred2_0 = ret[0];
+            deferred2_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
     }
 }
 
@@ -397,8 +397,8 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper184 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 57, __wbg_adapter_18);
+    imports.wbg.__wbindgen_closure_wrapper156 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 56, __wbg_adapter_18);
         return ret;
     };
     imports.wbg.__wbindgen_debug_string = function(arg0, arg1) {
