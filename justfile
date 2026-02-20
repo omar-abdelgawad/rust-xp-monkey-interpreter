@@ -23,5 +23,9 @@ record:
 serve:
   @python -m http.server 8000
 
+# running script for building website
 build_website:
   ./scripts/build.sh
+
+git_clean_dry_run:
+  git clean -fxfd --dry-run

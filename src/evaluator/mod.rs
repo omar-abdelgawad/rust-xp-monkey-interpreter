@@ -438,7 +438,7 @@ fn eval_hash_litral(node: HashLiteral, env: Rc<RefCell<Environment>>) -> Object 
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use std::collections::HashMap;
 
     use super::*;
@@ -483,7 +483,7 @@ mod test {
         let mut env = Environment::new();
         eval(Node::Program(program), Rc::new(RefCell::new(env)))
     }
-    fn test_integer_object(obj: &Object, expected: i64) -> bool {
+    pub fn test_integer_object(obj: &Object, expected: i64) -> bool {
         if let Object::Integer(result) = obj {
             if result.value != expected {
                 eprintln!(
