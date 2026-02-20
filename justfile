@@ -24,4 +24,4 @@ serve:
   @python -m http.server 8000
 
 build_website:
-  ./build.sh
+  ./scripts/build.sh
