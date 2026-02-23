@@ -19,3 +19,4 @@ mod wasm;
 // --------mods after reading compiler book--------
 pub mod code;
 pub mod compiler;
+pub mod vm;

@@ -421,7 +421,7 @@ fn eval_hash_litral(node: HashLiteral, env: Rc<RefCell<Environment>>) -> Object 
 }
 
 #[cfg(test)]
-pub mod test {
+pub mod tests {
     use std::collections::HashMap;
 
     use super::*;

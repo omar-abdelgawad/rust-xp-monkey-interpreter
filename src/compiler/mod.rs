@@ -5,12 +5,16 @@ use crate::{
 };
 
 #[derive(Debug, Default)]
-struct Compiler {
+pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
 }
 
 impl Compiler {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn compile(&mut self, node: ast::Node) -> Result<(), ()> {
         use crate::ast::Expression as Exp;
         use crate::ast::Node;
@@ -92,12 +96,12 @@ impl Bytecode {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::any::Any;
 
     use crate::{
         code::{make, Opcode as Op},
-        evaluator::test::test_integer_object,
+        evaluator::tests::test_integer_object,
         lexer::Lexer,
         parser::Parser,
     };
