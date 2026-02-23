@@ -15,7 +15,7 @@ impl Compiler {
         Self::default()
     }
 
-    pub fn compile(&mut self, node: ast::Node) -> Result<(), ()> {
+    pub fn compile(&mut self, node: ast::Node) -> Result<(), String> {
         use crate::ast::Expression as Exp;
         use crate::ast::Node;
         use crate::ast::Statement as St;
@@ -34,7 +34,11 @@ impl Compiler {
             Node::Expression(exp) => match exp {
                 Exp::Infix(infix_exp) => {
                     self.compile(Node::Expression(*infix_exp.left))?;
-                    self.compile(Node::Expression(*infix_exp.right))?
+                    self.compile(Node::Expression(*infix_exp.right))?;
+                    match infix_exp.operator.as_str() {
+                        "+" => self.emit(Opcode::Add, &[]),
+                        _ => return Err(format!("unknown operator {}", infix_exp.operator)),
+                    };
                 }
                 Exp::Identifier(identifier) => todo!(),
                 Exp::Boolean(boolean) => todo!(),
@@ -134,6 +138,7 @@ mod tests {
             vec![
                 Instructions::new(make(Op::Constant, &[0])),
                 Instructions::new(make(Op::Constant, &[1])),
+                Instructions::new(make(Op::Add, &[])),
             ],
         )];
         run_compiler_tests(tests);
@@ -168,8 +173,9 @@ mod tests {
         let concatted = concat_instructions(expected);
         if actual.len() != concatted.len() {
             return Err(format!(
-                "wrong instructions length.\n want={}\n got={}",
-                concatted, actual
+                "wrong instructions length.\n want={:?}\n got ={:?}",
+                concatted.to_string(),
+                actual.to_string()
             ));
         }
         for (i, ins) in concatted.iter().enumerate() {

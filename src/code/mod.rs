@@ -39,6 +39,7 @@ impl Instructions {
             );
         }
         match operand_count {
+            0 => format!("{}", def.name),
             1 => format!("{} {}", def.name, operands[0]),
             _ => format!("ERROR: unhandled operand_count for {\n}", def.name),
         }
@@ -174,13 +175,13 @@ mod test {
     #[test]
     fn test_instructions_string() {
         let instructions = vec![
-            make(Op::Constant, &[1]),
+            make(Op::Add, &[]),
             make(Op::Constant, &[2]),
             make(Op::Constant, &[65535]),
         ];
-        let expected = r#"0000 OpConstant 1
-0003 OpConstant 2
-0006 OpConstant 65535
+        let expected = r#"0000 OpAdd
+0001 OpConstant 2
+0004 OpConstant 65535
 "#;
         let mut concatted = Instructions::default();
         for ins in instructions {

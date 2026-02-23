@@ -38,6 +38,11 @@ impl VM {
             Some(self.stack[self.sp - 1].clone())
         }
     }
+    pub fn pop(&mut self) -> Object {
+        let o = self.stack[self.sp - 1].clone();
+        self.sp -= 1;
+        o
+    }
     pub fn run(&mut self) -> Result<(), String> {
         let mut ip = 0;
         while ip < self.instructions.len() {
@@ -47,6 +52,18 @@ impl VM {
                     let const_ind = read_u16(&self.instructions[ip + 1..ip + 3]);
                     ip += 2;
                     self.push(self.constants[const_ind as usize].clone())?;
+                }
+                Opcode::Add => {
+                    let right = self.pop();
+                    let left = self.pop();
+                    let result = match (left, right) {
+                        (Object::Integer(left_val), Object::Integer(right_val)) => {
+                            left_val.value + right_val.value
+                        }
+
+                        _ => todo!("this add is not yet supported"),
+                    };
+                    self.push(Object::new_int_var(result))?
                 }
                 _ => panic!("unknown instruction"),
             }
@@ -115,7 +132,7 @@ mod tests {
         let tests = vec![
             VmTestCase::new("1", Box::new(1i64)),
             VmTestCase::new("2", Box::new(2i64)),
-            VmTestCase::new("1 + 2", Box::new(2i64)), // FIXME
+            VmTestCase::new("1 + 2", Box::new(3i64)),
         ];
         run_vm_tests(tests);
     }
