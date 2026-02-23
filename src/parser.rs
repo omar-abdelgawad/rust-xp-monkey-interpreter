@@ -446,7 +446,7 @@ impl Parser {
     fn cur_precedence(&self) -> Precedence {
         Parser::precedences(&self.cur_token.ttype)
     }
-    pub fn precedences(token: &TokenType) -> Precedence {
+    fn precedences(token: &TokenType) -> Precedence {
         match token {
             TokenType::EQ => Precedence::EQUALS,
             TokenType::NOT_EQ => Precedence::EQUALS,
@@ -466,19 +466,11 @@ impl Parser {
 }
 #[cfg(test)]
 mod test {
-    use std::collections::hash_map::Values;
+    use super::*;
 
-    use crate::ast::Boolean;
-    use crate::ast::CallExpression;
-    use crate::ast::ExpressionStatement;
-    use crate::ast::FunctionLiteral;
-    use crate::ast::LetStatement;
-    use crate::ast::Node;
-    use crate::ast::ReturnStatement;
     use crate::ast::Statement;
     use crate::lexer::Lexer;
-
-    use super::*;
+    use std::any::Any;
 
     #[test]
     fn test_let_statements() {
@@ -679,8 +671,8 @@ mod test {
         let Expression::Boolean(literal) = &*express_stmt.expression else {
             panic!("exp not ast::Boolean. got={:?}", express_stmt.expression);
         };
-        assert_eq!(
-            literal.value, true,
+        assert!(
+            literal.value,
             "literal.value not {}. got={:?}",
             true, literal.value
         );
@@ -799,6 +791,7 @@ mod test {
                 "exp.operator is not {}. got={}",
                 op, exp.operator
             );
+            assert!(test_literal_expression(&exp.left, left_val));
             assert!(test_literal_expression(&exp.right, right_val));
         }
     }
@@ -879,7 +872,6 @@ mod test {
         }
         true
     }
-    use std::any::Any;
     fn test_literal_expression(exp: &Expression, expected: &dyn Any) -> bool {
         if let Some(&int_val) = expected.downcast_ref::<i64>() {
             return test_integer_literal(exp, int_val);
@@ -991,10 +983,7 @@ mod test {
             panic!()
         }
         if let Some(alt) = &exp.alternative {
-            panic!(
-                "exp.alternative.statements was not None. got={:?}",
-                exp.alternative
-            )
+            panic!("exp.alternative.statements was not None. got={:?}", alt)
         }
     }
     #[test]
@@ -1378,7 +1367,8 @@ mod test {
         );
 
         // Expected mapping from key -> test function
-        let mut tests: HashMap<&str, Box<dyn Fn(&Expression)>> = HashMap::new();
+        type BoxedClosure = Box<dyn Fn(&Expression)>;
+        let mut tests: HashMap<&str, BoxedClosure> = HashMap::new();
         tests.insert(
             "one",
             Box::new(|e: &Expression| {

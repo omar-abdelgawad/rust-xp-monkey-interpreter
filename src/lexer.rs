@@ -5,17 +5,17 @@ use crate::token::{Token, TokenType};
 pub struct Lexer {
     input: String,
     position: i32,
-    readPosition: i32,
+    read_position: i32,
     ch: u8,
     keywords: HashMap<String, TokenType>,
 }
 impl Lexer {
     pub fn new(input: impl Into<String>) -> Self {
-        let mut keywords = Self::get_keywords_hashmap();
+        let keywords = Self::get_keywords_hashmap();
         let mut l = Lexer {
             input: input.into(),
             position: 0,
-            readPosition: 0,
+            read_position: 0,
             ch: 0,
             keywords,
         };
@@ -40,19 +40,19 @@ impl Lexer {
         }
     }
     fn read_char(&mut self) {
-        if self.readPosition >= self.input.len() as i32 {
+        if self.read_position >= self.input.len() as i32 {
             self.ch = 0;
         } else {
-            self.ch = self.input.as_bytes()[self.readPosition as usize];
+            self.ch = self.input.as_bytes()[self.read_position as usize];
         }
-        self.position = self.readPosition;
-        self.readPosition += 1;
+        self.position = self.read_position;
+        self.read_position += 1;
     }
     fn peak_char(&self) -> u8 {
-        if self.readPosition as usize >= self.input.len() {
+        if self.read_position as usize >= self.input.len() {
             0
         } else {
-            self.input.as_bytes()[self.readPosition as usize]
+            self.input.as_bytes()[self.read_position as usize]
         }
     }
     fn lookup_ident(&self, ident: &str) -> TokenType {

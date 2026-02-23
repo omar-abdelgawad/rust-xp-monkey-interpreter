@@ -2,7 +2,7 @@
 
 This is an implementation of the monkey programming language from the book  [*Writing an Interpreter in Go* by Thorsten Ball](https://interpreterbook.com/) in rust. please don't ask why I did it in rust. I learned a lot of stuff though.
 
-I am currently reading [*Writing a Compiler in Go* by Thorsten Ball](https://compilerbook.com/) and stopped at the start of page 32 in chapter 2.
+I am currently reading [*Writing a Compiler in Go* by Thorsten Ball](https://compilerbook.com/) and stopped at the start of page 43 in chapter 2.
 
 ## 📖 About
 

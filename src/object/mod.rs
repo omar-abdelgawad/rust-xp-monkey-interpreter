@@ -25,6 +25,7 @@ pub fn native_bool_to_boolean_object(input: bool) -> Object {
     }
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum ObjectType {
     Integer_OBJ,
@@ -41,7 +42,7 @@ pub enum ObjectType {
 impl Display for ObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ObjectType as ObjT;
-        let mut to_write = match self {
+        let to_write = match self {
             ObjT::Integer_OBJ => "INTEGER",
             ObjT::BOOLEAN_OBJ => "BOOLEAN",
             ObjT::NULL_OBJ => "NULL",
@@ -205,11 +206,11 @@ impl Hashable for Boolean {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct Null;
 impl Null {
     pub const fn new() -> Self {
-        Null
+        Self
     }
 }
 impl ObjectTrait for Null {
@@ -339,7 +340,7 @@ impl ObjectTrait for BuiltinObj {
         ObjectType::BuiltinFunction
     }
     fn inspect(&self) -> String {
-        format!("builting function")
+        "builting function".to_string()
     }
 }
 

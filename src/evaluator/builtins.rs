@@ -1,5 +1,4 @@
 //use lazy_static::lazy_static;
-use std::collections::HashMap;
 
 use crate::object::{Array, BuiltinObj, Object, ObjectTrait, ObjectType, NULL};
 
@@ -68,7 +67,7 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                 let Object::Arr(arr) = &args[0] else {
                     panic!();
                 };
-                if arr.elements.len() > 0 {
+                if !arr.elements.is_empty() {
                     arr.elements[0].clone()
                 } else {
                     NULL
@@ -142,12 +141,13 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                     ));
                 }
                 let Object::Arr(arr) = &args[0] else {
-                    panic!();
+                    panic!("first argument has to be an array object.");
                 };
-                let length = arr.elements.len();
+                //let length = arr.elements.len();
                 let mut new_elements = arr.elements.clone();
                 new_elements.push(args[1].clone());
-                return Object::Arr(Array::new(new_elements));
+
+                Object::Arr(Array::new(new_elements))
             },
         }),
         "puts" => Some(BuiltinObj {
@@ -188,7 +188,8 @@ pub fn builtins(arg: &str) -> Option<BuiltinObj> {
                             println!("{}", output);
                         }
                     }
-                    return NULL;
+
+                    NULL
                 }
             },
         }),

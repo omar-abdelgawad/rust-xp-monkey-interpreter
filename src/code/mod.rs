@@ -1,6 +1,6 @@
-use std::{collections::HashMap, fmt::Display, ops::Deref};
+use std::{fmt::Display, ops::Deref};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Instructions(pub Vec<u8>);
 
 impl Display for Instructions {
@@ -11,16 +11,10 @@ impl Display for Instructions {
             // TODO: the fact that Instructions type ownes its data kind of makes it hard to write
             // a good api for the functions without cloning everything or changing the type
             let (operands, read) = read_operands(&def, &self[i + 1..]);
-            write!(f, "{:04} {}\n", i, self.fmt_instruction(&def, &operands))?;
+            writeln!(f, "{:04} {}", i, self.fmt_instruction(&def, &operands))?;
             i += 1 + read as usize;
         }
         Ok(())
-    }
-}
-
-impl Default for Instructions {
-    fn default() -> Self {
-        Self(Default::default())
     }
 }
 
@@ -36,7 +30,7 @@ impl Instructions {
         Self(instructions)
     }
     pub fn fmt_instruction(&self, def: &Definition, operands: &[i64]) -> String {
-        let mut operand_count = def.operand_widths.len();
+        let operand_count = def.operand_widths.len();
         if operands.len() != operand_count {
             return format!(
                 "ERROR: operand len {} doesn't match defined {}\n",
@@ -96,7 +90,7 @@ pub fn make(op: Op, operands: &[i64]) -> Vec<u8> {
         }
         offset += width as usize;
     }
-    return instruction;
+    instruction
 }
 
 // for debugging purposes

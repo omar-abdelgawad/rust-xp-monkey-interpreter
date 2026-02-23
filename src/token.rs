@@ -1,3 +1,4 @@
+#[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Default)]
 pub enum TokenType {
     ILLEGAL,
@@ -42,11 +43,13 @@ pub enum TokenType {
     COLON,        // : for hash literals
     HASH_COMMENT, // # for comments
 }
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Token {
     pub ttype: TokenType,
     pub literal: String,
 }
+
 impl Token {
     pub fn new(ttype: TokenType, literal: impl Into<String>) -> Self {
         Token {

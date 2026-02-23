@@ -1,5 +1,4 @@
 use crate::token::Token;
-use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Display;

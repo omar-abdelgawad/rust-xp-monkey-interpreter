@@ -1,27 +1,77 @@
-use crate::{ast, code::Instructions, object::Object};
+use crate::{
+    ast,
+    code::{make, Instructions, Opcode},
+    object::Object,
+};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
 }
 
-impl Default for Compiler {
-    fn default() -> Self {
-        Self {
-            instructions: Instructions::default(),
-            constants: Default::default(),
-        }
-    }
-}
-
 impl Compiler {
     pub fn compile(&mut self, node: ast::Node) -> Result<(), ()> {
-        todo!();
+        use crate::ast::Expression as Exp;
+        use crate::ast::Node;
+        use crate::ast::Statement as St;
+        match node {
+            Node::Program(program) => {
+                for s in program.statements {
+                    self.compile(Node::Statement(s))?
+                }
+            }
+            Node::Statement(stmt) => match stmt {
+                St::Expression(exp_stmt) => self.compile(Node::Expression(*exp_stmt.expression))?,
+                St::Let(let_statement) => todo!(),
+                St::Return(return_statement) => todo!(),
+                St::Block(block_statement) => todo!(),
+            },
+            Node::Expression(exp) => match exp {
+                Exp::Infix(infix_exp) => {
+                    self.compile(Node::Expression(*infix_exp.left))?;
+                    self.compile(Node::Expression(*infix_exp.right))?
+                }
+                Exp::Identifier(identifier) => todo!(),
+                Exp::Boolean(boolean) => todo!(),
+                Exp::Integer(int_lit) => {
+                    let int_val = Object::new_int_var(int_lit.value);
+                    let const_id = self.add_constant(int_val);
+                    self.emit(Opcode::Constant, &[const_id as i64]);
+                }
+                Exp::Prefix(prefix_expression) => todo!(),
+                Exp::If(if_expression) => todo!(),
+                Exp::Function(function_literal) => todo!(),
+                Exp::Call(call_expression) => todo!(),
+                Exp::Str(string_literal) => todo!(),
+                Exp::Arr(array_literal) => todo!(),
+                Exp::Ind(index_expression) => todo!(),
+                Exp::Hash(hash_literal) => todo!(),
+                Exp::While(while_expression) => todo!(),
+            },
+        }
+        Ok(())
     }
+
     pub fn bytecode(&self) -> Bytecode {
         // should I clone here? I still am not sure
         Bytecode::new(self.instructions.clone(), self.constants.clone())
+    }
+
+    fn add_constant(&mut self, obj: Object) -> usize {
+        self.constants.push(obj);
+        self.constants.len() - 1
+    }
+
+    fn emit(&mut self, op: Opcode, operands: &[i64]) -> usize {
+        let ins = make(op, operands);
+        self.add_instruction(&ins)
+    }
+
+    fn add_instruction(&mut self, ins: &[u8]) -> usize {
+        let pos_new_instruction = self.instructions.len();
+        self.instructions.0.extend(ins);
+        pos_new_instruction
     }
 }
 
@@ -76,7 +126,7 @@ mod test {
     fn test_integer_arithmetic() {
         let tests: Vec<CompilerTestCase> = vec![CompilerTestCase::new(
             "1 + 2",
-            vec![Box::new(1), Box::new(2)],
+            vec![Box::new(1i64), Box::new(2i64)],
             vec![
                 Instructions::new(make(Op::Constant, &[0])),
                 Instructions::new(make(Op::Constant, &[1])),
@@ -100,8 +150,9 @@ mod test {
             let bytecode = compiler.bytecode();
 
             test_instructions(expected_instructions, bytecode.instructions)
-                .expect("test instructions failed");
-            test_constants(expected_constants, bytecode.constants).expect("test constants failed");
+                .unwrap_or_else(|e| panic!("test instructions failed: {e}"));
+            test_constants(expected_constants, bytecode.constants)
+                .unwrap_or_else(|e| panic!("test constants failed: {e}"));
         }
     }
     fn parse(input: String) -> ast::Program {
@@ -113,15 +164,14 @@ mod test {
         let concatted = concat_instructions(expected);
         if actual.len() != concatted.len() {
             return Err(format!(
-                "wrong instructions length.\n want={}, got={}",
-                concatted.len(),
-                actual.len()
+                "wrong instructions length.\n want={}\n got={}",
+                concatted, actual
             ));
         }
         for (i, ins) in concatted.iter().enumerate() {
             if actual[i] != *ins {
                 return Err(format!(
-                    "wrong instruction at {i}.\n want={:?}, got={:?}",
+                    "wrong instruction at {i}.\n want={:?}\n got={:?}",
                     concatted, actual
                 ));
             }
@@ -146,7 +196,7 @@ mod test {
                     return Err(format!("constant {} - test_integer_object failed", i));
                 }
             } else {
-                return Err(format!("unknown dyn object"));
+                return Err(format!("unknown dyn object: {:?}", constant));
             }
         }
         Ok(())

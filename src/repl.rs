@@ -2,7 +2,6 @@ use crate::ast::Node;
 use crate::object::environment::Environment;
 use crate::object::ObjectTrait;
 use crate::parser::Parser;
-use crate::token::TokenType;
 use crate::{evaluator, lexer::Lexer};
 use std::cell::RefCell;
 use std::io::{BufRead, Write};
@@ -24,7 +23,7 @@ const MONKEY_FACE: &str = r#"            __,__
 
 pub fn start(mut input: impl BufRead, mut output: impl Write) {
     let mut line = String::new();
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let env = Rc::new(RefCell::new(Environment::new()));
 
     loop {
         // Print prompt
@@ -48,10 +47,10 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
             continue;
         }
         //writeln!(output, "debug: {:#?}", program);
-        writeln!(output, "prog exp: {}", program);
+        writeln!(output, "prog exp: {}", program).unwrap();
         let evaluated = evaluator::eval(Node::Program(program), env.clone());
         //if evaluated.is_some() {
-        writeln!(output, "{}", evaluated.inspect());
+        writeln!(output, "{}", evaluated.inspect()).unwrap();
         //}
     }
 }
@@ -60,7 +59,7 @@ pub fn execute_file(mut input: impl BufRead, mut output: impl Write) {
     input
         .read_to_string(&mut file)
         .expect("Failed to read whole file");
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let env = Rc::new(RefCell::new(Environment::new()));
     let l = Lexer::new(file);
     let mut p = Parser::new(l);
     let program = p.parse_program();
@@ -69,14 +68,14 @@ pub fn execute_file(mut input: impl BufRead, mut output: impl Write) {
         return;
     }
     let evaluated = evaluator::eval(Node::Program(program), env.clone());
-    writeln!(output, "{}", evaluated.inspect());
+    writeln!(output, "{}", evaluated.inspect()).unwrap();
 }
 
 fn print_parser_errors(mut output: impl Write, errors: &[String]) {
-    write!(output, "{}", MONKEY_FACE);
-    write!(output, "Woops! We ran into some monkey business here!\n");
-    write!(output, " parser errors:\n");
+    write!(output, "{}", MONKEY_FACE).unwrap();
+    writeln!(output, "Woops! We ran into some monkey business here!").unwrap();
+    writeln!(output, " parser errors:").unwrap();
     for msg in errors {
-        write!(output, "\t{}\n", msg);
+        writeln!(output, "\t{}", msg).unwrap();
     }
 }

@@ -1,16 +1,13 @@
 mod builtins;
 use builtins::builtins;
 
-use crate::ast::{
-    self, Expression, ExpressionStatement, HashLiteral, IfExpression, IntegerLiteral, Node,
-    Program, Statement, WhileExpression,
-};
+use crate::ast::{self, Expression, HashLiteral, IfExpression, Node, Statement, WhileExpression};
 use crate::object::environment::Environment;
 use crate::object::{
     native_bool_to_boolean_object, Array, Error, Function, HashObj, HashPair, Hashable,
-    ObjectTrait, ObjectType, ReturnValue, StringObj,
+    ObjectTrait, ObjectType, StringObj,
 };
-use crate::object::{Boolean, Integer, Null, Object};
+use crate::object::{Integer, Object};
 use crate::object::{FALSE, NULL, TRUE};
 
 use std::cell::RefCell;
@@ -44,12 +41,6 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
                     return val;
                 }
                 env.borrow_mut().set(tmp_name_value, val)
-            }
-            unknown_st_node => {
-                unreachable!(
-                    "you have reached an unhandled Statement node: {:?}",
-                    unknown_st_node
-                )
             }
         },
         Node::Expression(exp) => match exp {
@@ -112,12 +103,6 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
             }
             Exp::Hash(hash_lit) => eval_hash_litral(hash_lit, Rc::clone(&env)),
             Exp::While(while_exp) => eval_while_exp(while_exp, Rc::clone(&env)),
-            unknown_exp_node => {
-                unreachable!(
-                    "you have reached an unhandled Expression node: {:?}",
-                    unknown_exp_node
-                )
-            }
         },
     }
 }
@@ -127,7 +112,7 @@ fn eval_program(stmts: Vec<Statement>, env: Rc<RefCell<Environment>>) -> Object 
         result = eval(Node::Statement(statement), Rc::clone(&env));
         match result {
             Object::Ret(ret_obj) => return *ret_obj.value,
-            Object::Err(ref err_obj) => return result,
+            Object::Err(ref _err_obj) => return result,
             _ => {}
         }
     }
@@ -248,14 +233,12 @@ fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) 
         ">=" => native_bool_to_boolean_object(left_val >= right_val),
         "<=" => native_bool_to_boolean_object(left_val <= right_val),
         // I still hate this default operator shit
-        (op) => {
-            return new_error(format!(
-                "unknown operator: {} {} {}",
-                left.r#type(),
-                op,
-                right.r#type()
-            ));
-        }
+        op => new_error(format!(
+            "unknown operator: {} {} {}",
+            left.r#type(),
+            op,
+            right.r#type()
+        )),
     }
 }
 
@@ -265,12 +248,12 @@ fn eval_if_exp(ie: IfExpression, env: Rc<RefCell<Environment>>) -> Object {
         return cond;
     }
     if is_truthy(cond) {
-        return eval(Node::Statement(Statement::Block(*ie.consequence)), env);
+        eval(Node::Statement(Statement::Block(*ie.consequence)), env)
     } else if ie.alternative.is_some() {
-        return eval(
+        eval(
             Node::Statement(Statement::Block(*ie.alternative.unwrap())),
             env,
-        );
+        )
     } else {
         NULL
     }
@@ -347,7 +330,7 @@ fn apply_function(fn_obj: &Object, args: &[Object]) -> Object {
                     args.len()
                 ));
             }
-            let mut extended_env = extend_function_env(fn_obj, args);
+            let extended_env = extend_function_env(fn_obj, args);
             let evaluated = eval(
                 Node::Statement(Statement::Block(fn_obj.body.clone())),
                 Rc::new(RefCell::new(extended_env)),
@@ -375,7 +358,7 @@ fn unwrap_return_value(obj: Object) -> Object {
     if let Object::Ret(ret_obj) = obj {
         return *ret_obj.value;
     }
-    return obj;
+    obj
 }
 
 fn eval_index_expression(left: Object, index: Object) -> Object {
@@ -392,7 +375,7 @@ fn eval_array_index_expresssion(arr: Array, index: Integer) -> Object {
     } else {
         index.value as usize
     };
-    if arr.elements.len() == 0
+    if arr.elements.is_empty()
         || idx > arr.elements.len() - 1
         || index.value < -(arr.elements.len() as i64)
     {
@@ -445,7 +428,6 @@ pub mod test {
     use crate::lexer::Lexer;
     use crate::object::HashKey;
     use crate::object::Hashable;
-    use crate::object::Integer;
     use crate::object::Object;
     use crate::parser::Parser;
 
@@ -480,7 +462,7 @@ pub mod test {
         let l = Lexer::new(input);
         let mut p = Parser::new(l);
         let program = p.parse_program();
-        let mut env = Environment::new();
+        let env = Environment::new();
         eval(Node::Program(program), Rc::new(RefCell::new(env)))
     }
     pub fn test_integer_object(obj: &Object, expected: i64) -> bool {
@@ -751,11 +733,7 @@ pub mod test {
         }
         let expected_body = "(x + 2)";
         if func_obj.body.to_string() != expected_body {
-            panic!(
-                "body is not {}. got={}",
-                expected_body,
-                func_obj.body.to_string()
-            )
+            panic!("body is not {}. got={}", expected_body, func_obj.body)
         }
     }
     #[test]
@@ -818,7 +796,7 @@ addTwo(2);";
         enum Expec<'a> {
             Val(i64),
             Mess(&'a str),
-            NULL,
+            Null,
         }
         let tests = vec![
             // len function
@@ -838,24 +816,24 @@ addTwo(2);";
             ("len({\"hello\":true})", Expec::Val(1)),
             ("len({1:true, 34:false})", Expec::Val(2)),
             // first function
-            ("first([])", Expec::NULL),
+            ("first([])", Expec::Null),
             ("first([1,2])", Expec::Val(1)),
             ("first(first([[2,4],3]))", Expec::Val(2)),
             // last function
-            ("last([])", Expec::NULL),
+            ("last([])", Expec::Null),
             ("last([1,2,3])", Expec::Val(3)),
             ("last(last([1,2,[3,4]]))", Expec::Val(4)),
             // rest function
-            ("rest([])", Expec::NULL),
+            ("rest([])", Expec::Null),
             ("first(rest([1,2,3,4]))", Expec::Val(2)),
             ("first(rest(rest([1,2,3,4])))", Expec::Val(3)),
             ("first(rest(rest(rest([1,2,3,4]))))", Expec::Val(4)),
-            ("first(rest(rest(rest(rest([1,2,3,4]))))", Expec::NULL),
+            ("first(rest(rest(rest(rest([1,2,3,4]))))", Expec::Null),
         ];
         for (input, expected) in tests {
             let evaluated = test_eval(input);
             match expected {
-                Expec::NULL => assert!(test_null_object(&evaluated)),
+                Expec::Null => assert!(test_null_object(&evaluated)),
                 Expec::Val(val) => assert!(test_integer_object(&evaluated, val)),
                 Expec::Mess(mess) => {
                     let Object::Err(err_obj) = evaluated else {
