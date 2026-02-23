@@ -8,7 +8,7 @@ use crate::parser::Parser;
 const STACKSIZE: usize = 2048;
 
 #[derive(Debug)]
-struct VM {
+pub struct VM {
     constants: Vec<Object>,
     instructions: Instructions,
     stack: Vec<Object>,

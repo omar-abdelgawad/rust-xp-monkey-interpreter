@@ -1,8 +1,10 @@
 use crate::ast::Node;
+use crate::compiler::Compiler;
+use crate::lexer::Lexer;
 use crate::object::environment::Environment;
 use crate::object::ObjectTrait;
 use crate::parser::Parser;
-use crate::{evaluator, lexer::Lexer};
+use crate::vm::VM;
 use std::cell::RefCell;
 use std::io::{BufRead, Write};
 use std::rc::Rc;
@@ -23,14 +25,14 @@ const MONKEY_FACE: &str = r#"            __,__
 
 pub fn start(mut input: impl BufRead, mut output: impl Write) {
     let mut line = String::new();
-    let env = Rc::new(RefCell::new(Environment::new()));
+    let _env = Rc::new(RefCell::new(Environment::new()));
 
     loop {
         // Print prompt
         write!(output, "{}", PROMPT).unwrap();
         output.flush().unwrap();
 
-        // Read user input
+        //// Read user input
         line.clear();
         let bytes_read = input.read_line(&mut line).unwrap();
         if bytes_read == 0 {
@@ -38,6 +40,7 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
             writeln!(output).unwrap();
             break;
         }
+        //// End Read user input
 
         let l = Lexer::new(line.trim());
         let mut p = Parser::new(l);
@@ -48,10 +51,21 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
         }
         //writeln!(output, "debug: {:#?}", program);
         writeln!(output, "prog exp: {}", program).unwrap();
-        let evaluated = evaluator::eval(Node::Program(program), env.clone());
-        //if evaluated.is_some() {
-        writeln!(output, "{}", evaluated.inspect()).unwrap();
-        //}
+
+        let mut comp = Compiler::new();
+        if let Err(err) = comp.compile(Node::Program(program)) {
+            writeln!(output, "Woops! Compilation failed:\n {err}\n");
+            continue;
+        }
+        let mut machine = VM::new(comp.bytecode());
+        if let Err(err) = machine.run() {
+            writeln!(output, "Woops! Executing bytecode failed:\n {err}\n");
+            continue;
+        }
+        let stacktop = machine
+            .stack_top()
+            .expect("stack must contain a value, right???");
+        writeln!(output, "{}", stacktop.inspect()).unwrap();
     }
 }
 pub fn execute_file(mut input: impl BufRead, mut output: impl Write) {
@@ -67,6 +81,7 @@ pub fn execute_file(mut input: impl BufRead, mut output: impl Write) {
         print_parser_errors(&mut output, p.errors());
         return;
     }
+    use crate::evaluator;
     let evaluated = evaluator::eval(Node::Program(program), env.clone());
     writeln!(output, "{}", evaluated.inspect()).unwrap();
 }
