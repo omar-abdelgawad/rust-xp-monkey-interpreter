@@ -51,6 +51,10 @@ impl Instructions {
 pub enum Opcode {
     Constant = 0x00,
     Add = 0x01,
+    Pop = 0x02,
+    Sub = 0x03,
+    Mul = 0x04,
+    Div = 0x05,
 }
 use Opcode as Op;
 
@@ -61,6 +65,10 @@ impl TryFrom<u8> for Op {
         match value {
             val if val == Op::Constant as u8 => Ok(Op::Constant),
             val if val == Op::Add as u8 => Ok(Op::Add),
+            val if val == Op::Pop as u8 => Ok(Op::Pop),
+            val if val == Op::Sub as u8 => Ok(Op::Sub),
+            val if val == Op::Mul as u8 => Ok(Op::Mul),
+            val if val == Op::Div as u8 => Ok(Op::Div),
             _ => Err(format!("unknown opcode {value}")),
         }
     }
@@ -115,6 +123,10 @@ pub fn lookup(opcode: u8) -> Definition {
     match Op::try_from(opcode) {
         Ok(Op::Constant) => Definition::new("OpConstant".into(), vec![2]),
         Ok(Op::Add) => Definition::new("OpAdd".into(), vec![]),
+        Ok(Op::Pop) => Definition::new("OpPop".into(), vec![]),
+        Ok(Op::Sub) => Definition::new("OpSub".into(), vec![]),
+        Ok(Op::Mul) => Definition::new("OpMul".into(), vec![]),
+        Ok(Op::Div) => Definition::new("OpDiv".into(), vec![]),
         Err(op) => panic!("opcode {op:?} undefined"),
     }
 }

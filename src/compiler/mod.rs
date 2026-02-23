@@ -26,7 +26,10 @@ impl Compiler {
                 }
             }
             Node::Statement(stmt) => match stmt {
-                St::Expression(exp_stmt) => self.compile(Node::Expression(*exp_stmt.expression))?,
+                St::Expression(exp_stmt) => {
+                    self.compile(Node::Expression(*exp_stmt.expression))?;
+                    self.emit(Opcode::Pop, &[]);
+                }
                 St::Let(let_statement) => todo!(),
                 St::Return(return_statement) => todo!(),
                 St::Block(block_statement) => todo!(),
@@ -37,6 +40,9 @@ impl Compiler {
                     self.compile(Node::Expression(*infix_exp.right))?;
                     match infix_exp.operator.as_str() {
                         "+" => self.emit(Opcode::Add, &[]),
+                        "-" => self.emit(Opcode::Sub, &[]),
+                        "*" => self.emit(Opcode::Mul, &[]),
+                        "/" => self.emit(Opcode::Div, &[]),
                         _ => return Err(format!("unknown operator {}", infix_exp.operator)),
                     };
                 }
@@ -132,15 +138,58 @@ mod tests {
 
     #[test]
     fn test_integer_arithmetic() {
-        let tests: Vec<CompilerTestCase> = vec![CompilerTestCase::new(
-            "1 + 2",
-            vec![Box::new(1i64), Box::new(2i64)],
-            vec![
-                Instructions::new(make(Op::Constant, &[0])),
-                Instructions::new(make(Op::Constant, &[1])),
-                Instructions::new(make(Op::Add, &[])),
-            ],
-        )];
+        let tests: Vec<CompilerTestCase> = vec![
+            CompilerTestCase::new(
+                "1 + 2",
+                vec![Box::new(1i64), Box::new(2i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Add, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "1; 2",
+                vec![Box::new(1i64), Box::new(2i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Pop, &[])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "1 - 2",
+                vec![Box::new(1i64), Box::new(2i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Sub, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "1 * 2",
+                vec![Box::new(1i64), Box::new(2i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Mul, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "2 / 1",
+                vec![Box::new(2i64), Box::new(1i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Div, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
         run_compiler_tests(tests);
     }
 

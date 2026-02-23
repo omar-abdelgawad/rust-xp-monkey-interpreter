@@ -62,10 +62,8 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
             writeln!(output, "Woops! Executing bytecode failed:\n {err}\n");
             continue;
         }
-        let stacktop = machine
-            .stack_top()
-            .expect("stack must contain a value, right???");
-        writeln!(output, "{}", stacktop.inspect()).unwrap();
+        let last_popped = machine.last_popped_stack_elem();
+        writeln!(output, "{}", last_popped.inspect()).unwrap();
     }
 }
 pub fn execute_file(mut input: impl BufRead, mut output: impl Write) {

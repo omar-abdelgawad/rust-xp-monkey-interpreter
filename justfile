@@ -20,7 +20,7 @@ record:
 
 # for testing wasm
 [working-directory: 'website']
-serve:
+serve: build_website
   @python -m http.server 8000
 
 # running script for building website
