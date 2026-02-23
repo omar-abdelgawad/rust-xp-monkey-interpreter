@@ -49,6 +49,7 @@ impl Instructions {
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum Opcode {
     Constant = 0x00,
+    Add = 0x01,
 }
 use Opcode as Op;
 
@@ -58,6 +59,7 @@ impl TryFrom<u8> for Op {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             val if val == Op::Constant as u8 => Ok(Op::Constant),
+            val if val == Op::Add as u8 => Ok(Op::Add),
             _ => Err(format!("unknown opcode {value}")),
         }
     }
@@ -111,6 +113,7 @@ pub fn lookup(opcode: u8) -> Definition {
     //let opcode: Op = unsafe { std::mem::transmute(opcode) };
     match Op::try_from(opcode) {
         Ok(Op::Constant) => Definition::new("OpConstant".into(), vec![2]),
+        Ok(Op::Add) => Definition::new("OpAdd".into(), vec![]),
         Err(op) => panic!("opcode {op:?} undefined"),
     }
 }
@@ -128,7 +131,7 @@ pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<i64>, i64) {
     (operands, offset as i64)
 }
 
-fn read_u16(x: &[u8]) -> u16 {
+pub fn read_u16(x: &[u8]) -> u16 {
     u16::from_be_bytes([x[0], x[1]])
 }
 
@@ -137,11 +140,14 @@ mod test {
     use super::*;
     #[test]
     fn test_make() {
-        let tests = vec![(
-            Op::Constant,
-            vec![65534], // 0xfffe in big endian
-            vec![Op::Constant as u8, 255, 254],
-        )];
+        let tests = vec![
+            (
+                Op::Constant,
+                vec![65534], // 0xfffe in big endian
+                vec![Op::Constant as u8, 255, 254],
+            ),
+            (Op::Add, vec![], vec![Op::Add as u8]),
+        ];
         let mut errors = Vec::new();
         for (op, operands, expected) in tests {
             let instruction = make(op, &operands);

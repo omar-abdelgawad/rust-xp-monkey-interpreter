@@ -82,8 +82,8 @@ impl Compiler {
 /// The final output of the Compiler
 #[derive(Debug)]
 pub struct Bytecode {
-    instructions: Instructions,
-    constants: Vec<Object>,
+    pub instructions: Instructions,
+    pub constants: Vec<Object>,
 }
 
 impl Bytecode {

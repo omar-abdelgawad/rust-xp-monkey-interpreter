@@ -1,7 +1,70 @@
 use crate::ast;
+use crate::code::{read_u16, Instructions, Opcode};
+use crate::compiler::Bytecode;
 use crate::lexer::Lexer;
-use crate::object::Object;
+use crate::object::{Null, Object};
 use crate::parser::Parser;
+
+const STACKSIZE: usize = 2048;
+
+#[derive(Debug)]
+struct VM {
+    constants: Vec<Object>,
+    instructions: Instructions,
+    stack: Vec<Object>,
+    sp: usize, // always points to next value. top of stack is stack[sp -1]
+}
+
+impl VM {
+    pub fn new(
+        Bytecode {
+            constants,
+            instructions,
+        }: Bytecode,
+    ) -> Self {
+        Self {
+            constants,
+            instructions,
+            stack: vec![Object::Null(Null); STACKSIZE],
+            sp: 0,
+        }
+    }
+
+    pub fn stack_top(&self) -> Option<Object> {
+        if self.sp == 0 {
+            None
+        } else {
+            // TODO: does this have to be clone? probably not
+            Some(self.stack[self.sp - 1].clone())
+        }
+    }
+    pub fn run(&mut self) -> Result<(), String> {
+        let mut ip = 0;
+        while ip < self.instructions.len() {
+            let op: Opcode = TryFrom::try_from(self.instructions[ip])?;
+            match op {
+                Opcode::Constant => {
+                    let const_ind = read_u16(&self.instructions[ip + 1..ip + 3]);
+                    ip += 2;
+                    self.push(self.constants[const_ind as usize].clone())?;
+                }
+                _ => panic!("unknown instruction"),
+            }
+            ip += 1;
+        }
+        Ok(())
+    }
+
+    pub fn push(&mut self, o: Object) -> Result<(), String> {
+        if self.sp >= STACKSIZE {
+            Err("stack overflow".to_string())
+        } else {
+            self.stack[self.sp] = o;
+            self.sp += 1;
+            Ok(())
+        }
+    }
+}
 
 // TODO: remove this copied function
 fn parse(input: String) -> ast::Program {
@@ -40,19 +103,19 @@ mod tests {
     }
 
     impl VmTestCase {
-        fn new(input: impl Into<String>, expected: impl Any + 'static) -> Self {
+        fn new(input: impl Into<String>, expected: Box<dyn Any>) -> Self {
             Self {
                 input: input.into(),
-                expected: Box::new(expected),
+                expected,
             }
         }
     }
     #[test]
     fn test_integer_arithmetic() {
         let tests = vec![
-            VmTestCase::new("1", 1i64),
-            VmTestCase::new("2", 2i64),
-            VmTestCase::new("1 + 2", 2i64), // FIXME
+            VmTestCase::new("1", Box::new(1i64)),
+            VmTestCase::new("2", Box::new(2i64)),
+            VmTestCase::new("1 + 2", Box::new(2i64)), // FIXME
         ];
         run_vm_tests(tests);
     }
@@ -62,11 +125,10 @@ mod tests {
             let mut comp = Compiler::new();
             comp.compile(ast::Node::Program(program))
                 .unwrap_or_else(|e| panic!("compiler error: {e:?}"));
-            todo!();
-            //let mut vm = VM::new();
-            //vm.run().unwrap_or_else(|e| panic!("vm error: {e}"));
-            //let stack_elm = vm.stack_top();
-            //test_expected_object(expected, stack_elm);
+            let mut vm = VM::new(comp.bytecode());
+            vm.run().unwrap_or_else(|e| panic!("vm error: {e}"));
+            let stack_elm = vm.stack_top().expect("stack shouldn't be empty");
+            test_expected_object(expected.as_ref(), &stack_elm);
         }
     }
 
