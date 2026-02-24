@@ -4,15 +4,42 @@ use crate::{
     object::Object,
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
+    // FIX: these probably should be optional
+    last_instruction: EmittedInstruction,
+    previous_instruction: EmittedInstruction,
+}
+
+#[derive(Debug, Clone)]
+struct EmittedInstruction {
+    opcode: Opcode,
+    position: usize,
+}
+impl EmittedInstruction {
+    pub fn new(opcode: Opcode, position: usize) -> Self {
+        Self { opcode, position }
+    }
+}
+impl Default for EmittedInstruction {
+    fn default() -> Self {
+        Self {
+            opcode: Opcode::Pop,
+            position: Default::default(),
+        }
+    }
 }
 
 impl Compiler {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            instructions: Default::default(),
+            constants: vec![],
+            last_instruction: Default::default(),
+            previous_instruction: Default::default(),
+        }
     }
 
     pub fn compile(&mut self, node: ast::Node) -> Result<(), String> {
@@ -32,7 +59,15 @@ impl Compiler {
                 }
                 St::Let(let_statement) => todo!(),
                 St::Return(return_statement) => todo!(),
-                St::Block(block_statement) => todo!(),
+                St::Block(block_stmt) => {
+                    // I added the following if to avoid panicking on empty blocks
+                    if block_stmt.statements.is_empty() {
+                        self.emit(Opcode::Null, &[]);
+                    }
+                    for s in block_stmt.statements {
+                        self.compile(Node::Statement(s))?;
+                    }
+                }
             },
             Node::Expression(exp) => match exp {
                 Exp::Infix(infix_exp) => {
@@ -77,7 +112,34 @@ impl Compiler {
                         _ => return Err(format!("unknown operator {}", pre_exp.operator)),
                     };
                 }
-                Exp::If(if_expression) => todo!(),
+                Exp::If(if_exp) => {
+                    self.compile(Node::Expression(*if_exp.condition))?;
+                    let jump_not_truthy_pos = self.emit(Opcode::JumpNotTruthy, &[9999]); // emit with bogus value
+                    self.compile(Node::Statement(St::Block(*if_exp.consequence)))?;
+                    // keep the last evaluated expression because if itself is an expression
+                    if self.last_instruction_is_pop() {
+                        self.remove_last_pop();
+                    }
+                    let jump_pos = self.emit(Opcode::Jump, &[9999]);
+                    let after_consequence_pos = self.instructions.len();
+                    self.change_operand(
+                        jump_not_truthy_pos,
+                        after_consequence_pos.try_into().unwrap(),
+                    );
+                    match if_exp.alternative {
+                        None => {
+                            self.emit(Opcode::Null, &[]);
+                        }
+                        Some(alt_exp) => {
+                            self.compile(Node::Statement(St::Block(*alt_exp)))?;
+                            if self.last_instruction_is_pop() {
+                                self.remove_last_pop();
+                            }
+                        }
+                    };
+                    let after_alternative_pos = self.instructions.len();
+                    self.change_operand(jump_pos, after_alternative_pos.try_into().unwrap());
+                }
                 Exp::Function(function_literal) => todo!(),
                 Exp::Call(call_expression) => todo!(),
                 Exp::Str(string_literal) => todo!(),
@@ -100,15 +162,44 @@ impl Compiler {
         self.constants.len() - 1
     }
 
+    // writes an instruction and returns its pos
     fn emit(&mut self, op: Opcode, operands: &[i64]) -> usize {
         let ins = make(op, operands);
-        self.add_instruction(&ins)
+        let pos = self.add_instruction(&ins);
+        self.set_last_instruction(op, pos);
+        pos
+    }
+
+    fn set_last_instruction(&mut self, op: Opcode, pos: usize) {
+        std::mem::swap(&mut self.previous_instruction, &mut self.last_instruction);
+        self.last_instruction = EmittedInstruction::new(op, pos);
     }
 
     fn add_instruction(&mut self, ins: &[u8]) -> usize {
         let pos_new_instruction = self.instructions.len();
         self.instructions.0.extend(ins);
         pos_new_instruction
+    }
+
+    fn last_instruction_is_pop(&self) -> bool {
+        self.last_instruction.opcode == Opcode::Pop
+    }
+
+    fn remove_last_pop(&mut self) {
+        self.instructions.0.truncate(self.last_instruction.position);
+        self.last_instruction = self.previous_instruction.clone();
+    }
+
+    fn change_operand(&mut self, op_pos: usize, operand: i64) {
+        let op: Opcode = TryFrom::try_from(self.instructions[op_pos]).unwrap();
+        let new_instruction = make(op, &[operand]);
+
+        self.replace_instruction(op_pos, &new_instruction);
+    }
+
+    fn replace_instruction(&mut self, pos: usize, new_instruction: &[u8]) {
+        let end = pos + new_instruction.len();
+        self.instructions.0[pos..end].copy_from_slice(new_instruction);
     }
 }
 
@@ -324,7 +415,7 @@ mod tests {
         } in tests
         {
             let program = parse(input);
-            let mut compiler = Compiler::default();
+            let mut compiler = Compiler::new();
             compiler
                 .compile(ast::Node::Program(program))
                 .expect("compiler error");
@@ -353,8 +444,9 @@ mod tests {
         for (i, ins) in concatted.iter().enumerate() {
             if actual[i] != *ins {
                 return Err(format!(
-                    "wrong instruction at {i}.\n want={:?}\n got={:?}",
-                    concatted, actual
+                    "wrong instruction at {i}.\n want={:?}\n got ={:?}",
+                    concatted.to_string(),
+                    actual.to_string()
                 ));
             }
         }
@@ -382,5 +474,98 @@ mod tests {
             }
         }
         Ok(())
+    }
+    #[test]
+    fn test_conditionals() {
+        let tests = vec![
+            CompilerTestCase::new(
+                "if (true) { 10 }; 3333;",
+                vec![Box::new(10i64), Box::new(3333i64)],
+                vec![
+                    // 0000 1 byte
+                    Instructions::new(make(Op::True, &[])),
+                    // 0001 3 bytes
+                    Instructions::new(make(Op::JumpNotTruthy, &[10])),
+                    // 0004 3 bytes
+                    Instructions::new(make(Op::Constant, &[0])),
+                    // 0007 3 bytes
+                    Instructions::new(make(Op::Jump, &[11])),
+                    // 0010 1 byte
+                    Instructions::new(make(Op::Null, &[])),
+                    // 0011 1 byte
+                    Instructions::new(make(Op::Pop, &[])),
+                    // 0012 3 bytes
+                    Instructions::new(make(Op::Constant, &[1])),
+                    // 0015 1 byte
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "if (true) { 10 } else { 20 }; 3333;",
+                vec![Box::new(10i64), Box::new(20i64), Box::new(3333i64)],
+                vec![
+                    // 0000 1 byte
+                    Instructions::new(make(Op::True, &[])),
+                    // 0001 3 bytes
+                    Instructions::new(make(Op::JumpNotTruthy, &[10])),
+                    // 0004 3 bytes
+                    Instructions::new(make(Op::Constant, &[0])),
+                    // 0007 3 bytes
+                    Instructions::new(make(Op::Jump, &[13])),
+                    // 0010 3 bytes
+                    Instructions::new(make(Op::Constant, &[1])),
+                    // 0013 1 byte
+                    Instructions::new(make(Op::Pop, &[])),
+                    // 0014 3 bytes
+                    Instructions::new(make(Op::Constant, &[2])),
+                    // 0017 1 byte
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_custom_empty_block_returns_null() {
+        let tests = vec![
+            CompilerTestCase::new(
+                "if (false) { 10 } else { };",
+                vec![Box::new(10i64)],
+                vec![
+                    // 0000 1 byte
+                    Instructions::new(make(Op::False, &[])),
+                    // 0001 3 bytes
+                    Instructions::new(make(Op::JumpNotTruthy, &[10])),
+                    // 0004 3 bytes
+                    Instructions::new(make(Op::Constant, &[0])),
+                    // 0007 3 bytes
+                    Instructions::new(make(Op::Jump, &[11])),
+                    // 0010 1 bytes
+                    Instructions::new(make(Op::Null, &[])),
+                    // 0011 1 byte
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "if (false) {}",
+                vec![],
+                vec![
+                    // 0000 1 byte
+                    Instructions::new(make(Op::False, &[])),
+                    // 0001 3 bytes
+                    Instructions::new(make(Op::JumpNotTruthy, &[8])),
+                    // 0004 1 bytes
+                    Instructions::new(make(Op::Null, &[])),
+                    // 0005 3 bytes
+                    Instructions::new(make(Op::Jump, &[9])),
+                    // 0008 1 bytes
+                    Instructions::new(make(Op::Null, &[])),
+                    // 0009 1 byte
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
     }
 }

@@ -62,6 +62,9 @@ pub enum Opcode {
     GreaterThan = 0x0a,
     Minus = 0x0b,
     Bang = 0x0c,
+    JumpNotTruthy = 0x0d,
+    Jump = 0x0e,
+    Null = 0x0f,
 }
 use Opcode as Op;
 
@@ -84,6 +87,9 @@ impl TryFrom<u8> for Op {
             val if val == Op::GreaterThan as u8 => Ok(Op::GreaterThan),
             val if val == Op::Minus as u8 => Ok(Op::Minus),
             val if val == Op::Bang as u8 => Ok(Op::Bang),
+            val if val == Op::JumpNotTruthy as u8 => Ok(Op::JumpNotTruthy),
+            val if val == Op::Jump as u8 => Ok(Op::Jump),
+            val if val == Op::Null as u8 => Ok(Op::Null),
             _ => Err(format!("unknown opcode {value}")),
         }
     }
@@ -149,6 +155,9 @@ pub fn lookup(opcode: u8) -> Definition {
         Ok(Op::GreaterThan) => Definition::new("OpGreaterThan".into(), vec![]),
         Ok(Op::Minus) => Definition::new("OpMinus".into(), vec![]),
         Ok(Op::Bang) => Definition::new("OpBang".into(), vec![]),
+        Ok(Op::JumpNotTruthy) => Definition::new("OpJumpNotTruthy".into(), vec![2]),
+        Ok(Op::Jump) => Definition::new("OpJump".into(), vec![2]),
+        Ok(Op::Null) => Definition::new("OpNull".into(), vec![]),
         Err(op) => panic!("opcode {op:?} undefined"),
     }
 }

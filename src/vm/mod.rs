@@ -2,7 +2,7 @@ use crate::ast;
 use crate::code::{read_u16, Instructions, Opcode};
 use crate::compiler::Bytecode;
 use crate::lexer::Lexer;
-use crate::object::{native_bool_to_boolean_object, Null, Object, ObjectTrait, FALSE, TRUE};
+use crate::object::{native_bool_to_boolean_object, Null, Object, ObjectTrait, FALSE, NULL, TRUE};
 use crate::parser::Parser;
 
 const STACKSIZE: usize = 2048;
@@ -25,7 +25,7 @@ impl VM {
         Self {
             constants,
             instructions,
-            stack: vec![Object::Null(Null); STACKSIZE],
+            stack: vec![TRUE; STACKSIZE], // initialized garbage value to true to ease debugging
             sp: 0,
         }
     }
@@ -124,8 +124,8 @@ impl VM {
         match (right) {
             TRUE => self.push(FALSE),
             FALSE => self.push(TRUE),
-            _ => self.push(FALSE), // anything other than false is "truthy"
-                                   //_ => todo!("unsupported type for bang operation: {}", right.r#type()),
+            NULL => self.push(TRUE), // negation of NULL is true now even though it is still truthy
+            _ => self.push(FALSE),   // anything other than false is "truthy"
         }
     }
     fn execute_minus_operator(&mut self) -> Result<(), String> {
@@ -136,7 +136,9 @@ impl VM {
         }
     }
     pub fn run(&mut self) -> Result<(), String> {
-        let mut ip = 0;
+        // TODO: rename ip to pc and make it a struct field in order to make the step function for
+        // the VM
+        let mut ip = 0; // the instruction pointer is not fancy in this vm
         while ip < self.instructions.len() {
             let op: Opcode = TryFrom::try_from(self.instructions[ip])?;
             match op {
@@ -158,6 +160,19 @@ impl VM {
                 }
                 Opcode::Bang => self.execute_bang_operator()?,
                 Opcode::Minus => self.execute_minus_operator()?,
+                Opcode::Jump => {
+                    let pos = read_u16(&self.instructions[ip + 1..ip + 3]) as usize;
+                    ip = pos - 1; // minus 1 is because counter is always incremented
+                }
+                Opcode::JumpNotTruthy => {
+                    let pos = read_u16(&self.instructions[ip + 1..ip + 3]) as usize;
+                    ip += 2;
+                    let condition = self.pop();
+                    if !condition.is_truthy() {
+                        ip = pos - 1;
+                    }
+                }
+                Opcode::Null => self.push(NULL)?,
                 _ => panic!("unknown instruction"),
             }
             ip += 1;
@@ -232,6 +247,7 @@ mod tests {
             VmTestCase::new("!!true", Box::new(true)),
             VmTestCase::new("!!false", Box::new(false)),
             VmTestCase::new("!!5", Box::new(true)),
+            VmTestCase::new("!(if (false) { 5; })", Box::new(true)),
         ];
         run_vm_tests(tests);
     }
@@ -272,12 +288,13 @@ mod tests {
 
     fn test_expected_object(expected: &dyn Any, actual: &Object) {
         if let Some(expec) = expected.downcast_ref::<i64>() {
-            return test_integer_object(*expec, actual)
+            test_integer_object(*expec, actual)
                 .unwrap_or_else(|e| panic!("test_integer_object failed: {e}"));
-        }
-        if let Some(expec) = expected.downcast_ref::<bool>() {
-            return test_boolean_object(*expec, actual)
+        } else if let Some(expec) = expected.downcast_ref::<bool>() {
+            test_boolean_object(*expec, actual)
                 .unwrap_or_else(|e| panic!("test_boolean_object failed: {e}"));
+        } else if let Some(expec) = expected.downcast_ref::<Null>() {
+            test_null_object(actual).unwrap_or_else(|e| panic!("test_null_object failed: {e}"));
         } else {
             panic!("unknown dyn object: {:?}", expected);
         }
@@ -310,5 +327,33 @@ mod tests {
         } else {
             Err(format!("object is not Boolean. got=({:?})", actual))
         }
+    }
+    pub fn test_null_object(actual: &Object) -> Result<(), String> {
+        if let Object::Null(result) = actual {
+            Ok(())
+        } else {
+            Err(format!("object is not Null. got=({:?})", actual))
+        }
+    }
+
+    #[test]
+    fn test_conditionals() {
+        let tests = vec![
+            VmTestCase::new("1 > 1", Box::new(false)),
+            VmTestCase::new("if (true) { 10 }", Box::new(10i64)),
+            VmTestCase::new("if (true) { 10 } else { 20 }", Box::new(10i64)),
+            VmTestCase::new("if (false) { 10 } else { 20 } ", Box::new(20i64)),
+            VmTestCase::new("if (1) { 10 }", Box::new(10i64)),
+            VmTestCase::new("if (1 < 2) { 10 }", Box::new(10i64)),
+            VmTestCase::new("if (1 < 2) { 10 } else { 20 }", Box::new(10i64)),
+            VmTestCase::new("if (1 > 2) { 10 } else { 20 }", Box::new(20i64)),
+            VmTestCase::new("if (1 > 2) { 10 }", Box::new(Null)),
+            VmTestCase::new("if (false) { 10 }", Box::new(Null)),
+            VmTestCase::new(
+                "if ((if (false) { 10 })) { 10 } else { 20 }",
+                Box::new(20i64),
+            ),
+        ];
+        run_vm_tests(tests);
     }
 }

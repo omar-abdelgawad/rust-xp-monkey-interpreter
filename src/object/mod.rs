@@ -82,7 +82,7 @@ impl HashKey {
 pub enum Object {
     Integer(Integer),
     Boolean(Boolean),
-    Null(Null),
+    Null(Null), // TODO: maybe remove this null unit struct
     Ret(ReturnValue),
     Err(Error),
     Func(Function),
@@ -101,6 +101,13 @@ impl Object {
 
     pub fn new_ret_var(value: Object) -> Object {
         Object::Ret(ReturnValue::new(Box::new(value)))
+    }
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Object::Boolean(bool_struct) => bool_struct.value,
+            Object::Null(Null) => false,
+            _ => true,
+        }
     }
 }
 impl ObjectTrait for Object {
