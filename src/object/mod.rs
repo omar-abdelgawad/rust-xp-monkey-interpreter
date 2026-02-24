@@ -14,6 +14,7 @@ use crate::ast::{BlockStatement, Identifier};
 pub const TRUE: Object = Object::Boolean(Boolean::new(true));
 pub const FALSE: Object = Object::Boolean(Boolean::new(false));
 pub const NULL: Object = Object::Null(Null::new());
+pub const GARBAGEVALOBJ: Object = TRUE;
 
 type BuiltinFunction = fn(args: &[Object]) -> Object;
 

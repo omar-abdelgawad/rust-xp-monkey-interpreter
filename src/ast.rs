@@ -164,7 +164,7 @@ impl Program {
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct LetStatement {
     token: Token, // the token.let token
-    name: Identifier,
+    pub name: Identifier,
     pub value: Box<Expression>,
 }
 impl LetStatement {

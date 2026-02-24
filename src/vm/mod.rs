@@ -2,10 +2,14 @@ use crate::ast;
 use crate::code::{read_u16, Instructions, Opcode};
 use crate::compiler::Bytecode;
 use crate::lexer::Lexer;
-use crate::object::{native_bool_to_boolean_object, Null, Object, ObjectTrait, FALSE, NULL, TRUE};
+use crate::object::{
+    native_bool_to_boolean_object, Null, Object, ObjectTrait, FALSE, GARBAGEVALOBJ, NULL, TRUE,
+};
 use crate::parser::Parser;
+use std::array;
 
 const STACKSIZE: usize = 2048;
+pub const GLOBALSSIZE: usize = 65536;
 
 #[derive(Debug)]
 pub struct VM {
@@ -13,9 +17,17 @@ pub struct VM {
     instructions: Instructions,
     stack: Vec<Object>,
     sp: usize, // always points to next value. top of stack is stack[sp -1]
+    //pc: usize // TODO: implement in future
+    // TODO: so I should probably use Rc<Refcell<Object>> more often becaue I am just cloning
+    // everything a lot but I am too lazy. I had to use it here since I need a pointer with small
+    // size to be stored on the stack and object is on the heap from what I understand
+    globals: Vec<Object>,
 }
 
 impl VM {
+    pub fn globals(&self) -> Vec<Object> {
+        self.globals.clone()
+    }
     pub fn new(
         Bytecode {
             constants,
@@ -25,8 +37,9 @@ impl VM {
         Self {
             constants,
             instructions,
-            stack: vec![TRUE; STACKSIZE], // initialized garbage value to true to ease debugging
+            stack: vec![GARBAGEVALOBJ; STACKSIZE],
             sp: 0,
+            globals: vec![GARBAGEVALOBJ; GLOBALSSIZE],
         }
     }
 
@@ -173,6 +186,18 @@ impl VM {
                     }
                 }
                 Opcode::Null => self.push(NULL)?,
+                Opcode::SetGlobal => {
+                    let glob_ind = read_u16(&self.instructions[ip + 1..ip + 3]) as usize;
+                    ip += 2;
+                    self.globals[glob_ind] = self.pop();
+                }
+                Opcode::GetGlobal => {
+                    let glob_ind = read_u16(&self.instructions[ip + 1..ip + 3]) as usize;
+                    ip += 2;
+
+                    self.push(self.globals[glob_ind].clone())?;
+                }
+
                 _ => panic!("unknown instruction"),
             }
             ip += 1;
@@ -182,12 +207,17 @@ impl VM {
 
     pub fn push(&mut self, o: Object) -> Result<(), String> {
         if self.sp >= STACKSIZE {
-            Err("stack overflow".to_string())
+            Err("woops! stack overflow".to_string())
         } else {
             self.stack[self.sp] = o;
             self.sp += 1;
             Ok(())
         }
+    }
+    pub fn new_with_globals_store(bytecode: Bytecode, s: Vec<Object>) -> Self {
+        let mut vm = VM::new(bytecode);
+        vm.globals = s;
+        vm
     }
 }
 
@@ -354,6 +384,20 @@ mod tests {
                 Box::new(20i64),
             ),
         ];
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_global_let_statements() {
+        let tests = vec![
+            VmTestCase::new("let one = 1; one", Box::new(1i64)),
+            VmTestCase::new("let one = 1; let two = 2; one + two", Box::new(3i64)),
+            VmTestCase::new(
+                "let one = 1; let two = one + one; one + two",
+                Box::new(3i64),
+            ),
+        ];
+        //dbg!(std::mem::size_of::<Object>()); // 88 bytes
+        //dbg!(std::mem::size_of::<Rc<RefCell<Object>>>()); /8 bytes
         run_vm_tests(tests);
     }
 }

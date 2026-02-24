@@ -1,8 +1,10 @@
 use crate::{
-    ast,
+    ast::{self, LetStatement},
     code::{make, Instructions, Opcode},
+    compiler::symbol_table::SymbolTable,
     object::Object,
 };
+pub mod symbol_table;
 
 #[derive(Debug)]
 pub struct Compiler {
@@ -11,6 +13,7 @@ pub struct Compiler {
     // FIX: these probably should be optional
     last_instruction: EmittedInstruction,
     previous_instruction: EmittedInstruction,
+    symbol_table: SymbolTable,
 }
 
 #[derive(Debug, Clone)]
@@ -33,12 +36,17 @@ impl Default for EmittedInstruction {
 }
 
 impl Compiler {
+    // should remove this function but need it for now
+    pub fn symbol_table(&self) -> SymbolTable {
+        self.symbol_table.clone()
+    }
     pub fn new() -> Self {
         Self {
             instructions: Default::default(),
             constants: vec![],
             last_instruction: Default::default(),
             previous_instruction: Default::default(),
+            symbol_table: SymbolTable::new(),
         }
     }
 
@@ -57,7 +65,12 @@ impl Compiler {
                     self.compile(Node::Expression(*exp_stmt.expression))?;
                     self.emit(Opcode::Pop, &[]);
                 }
-                St::Let(let_statement) => todo!(),
+                St::Let(let_stmt) => {
+                    let LetStatement { name, value, .. } = let_stmt;
+                    self.compile(Node::Expression(*value))?;
+                    let symbol = self.symbol_table.define(name.value);
+                    self.emit(Opcode::SetGlobal, &[symbol.index as i64]);
+                }
                 St::Return(return_statement) => todo!(),
                 St::Block(block_stmt) => {
                     // I added the following if to avoid panicking on empty blocks
@@ -92,7 +105,13 @@ impl Compiler {
                         _ => return Err(format!("unknown operator {}", infix_exp.operator)),
                     };
                 }
-                Exp::Identifier(identifier) => todo!(),
+                Exp::Identifier(ident) => {
+                    let symbol = self
+                        .symbol_table
+                        .resolve(&ident.value)
+                        .ok_or(format!("undefined variable {}", ident.value))?;
+                    self.emit(Opcode::GetGlobal, &[symbol.index as i64]);
+                }
                 Exp::Boolean(bool_lit) => {
                     match bool_lit.value {
                         true => self.emit(Opcode::True, &[]),
@@ -200,6 +219,13 @@ impl Compiler {
     fn replace_instruction(&mut self, pos: usize, new_instruction: &[u8]) {
         let end = pos + new_instruction.len();
         self.instructions.0[pos..end].copy_from_slice(new_instruction);
+    }
+    // TODO: I don't like this api for remembering previous compilations. is there any other way?
+    pub fn new_with_state(s: SymbolTable, constants: Vec<Object>) -> Self {
+        let mut compiler = Compiler::new();
+        compiler.symbol_table = s;
+        compiler.constants = constants;
+        compiler
     }
 }
 
@@ -562,6 +588,54 @@ mod tests {
                     // 0008 1 bytes
                     Instructions::new(make(Op::Null, &[])),
                     // 0009 1 byte
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
+    }
+    #[test]
+    fn test_global_let_statements() {
+        let tests = vec![
+            CompilerTestCase::new(
+                "
+let one = 1;
+let two = 2;
+",
+                vec![Box::new(1i64), Box::new(2i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::SetGlobal, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::SetGlobal, &[1])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "
+let one = 1;
+one;
+",
+                vec![Box::new(1i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::SetGlobal, &[0])),
+                    Instructions::new(make(Op::GetGlobal, &[0])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "
+let one = 1;
+let two = one;
+two;
+",
+                vec![Box::new(1i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::SetGlobal, &[0])),
+                    Instructions::new(make(Op::GetGlobal, &[0])),
+                    Instructions::new(make(Op::SetGlobal, &[1])),
+                    Instructions::new(make(Op::GetGlobal, &[1])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),
