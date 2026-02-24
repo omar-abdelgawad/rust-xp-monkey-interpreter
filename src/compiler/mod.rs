@@ -36,6 +36,14 @@ impl Compiler {
             },
             Node::Expression(exp) => match exp {
                 Exp::Infix(infix_exp) => {
+                    if infix_exp.operator == "<" {
+                        // note that this means an expression is not guranteed to be evaluated in
+                        // from left to right
+                        self.compile(Node::Expression(*infix_exp.right))?;
+                        self.compile(Node::Expression(*infix_exp.left))?;
+                        self.emit(Opcode::GreaterThan, &[]);
+                        return Ok(());
+                    }
                     self.compile(Node::Expression(*infix_exp.left))?;
                     self.compile(Node::Expression(*infix_exp.right))?;
                     match infix_exp.operator.as_str() {
@@ -43,17 +51,32 @@ impl Compiler {
                         "-" => self.emit(Opcode::Sub, &[]),
                         "*" => self.emit(Opcode::Mul, &[]),
                         "/" => self.emit(Opcode::Div, &[]),
+                        ">" => self.emit(Opcode::GreaterThan, &[]),
+                        "==" => self.emit(Opcode::Equal, &[]),
+                        "!=" => self.emit(Opcode::NotEqual, &[]),
                         _ => return Err(format!("unknown operator {}", infix_exp.operator)),
                     };
                 }
                 Exp::Identifier(identifier) => todo!(),
-                Exp::Boolean(boolean) => todo!(),
+                Exp::Boolean(bool_lit) => {
+                    match bool_lit.value {
+                        true => self.emit(Opcode::True, &[]),
+                        false => self.emit(Opcode::False, &[]),
+                    };
+                }
                 Exp::Integer(int_lit) => {
                     let int_val = Object::new_int_var(int_lit.value);
                     let const_id = self.add_constant(int_val);
                     self.emit(Opcode::Constant, &[const_id as i64]);
                 }
-                Exp::Prefix(prefix_expression) => todo!(),
+                Exp::Prefix(pre_exp) => {
+                    self.compile(Node::Expression(*pre_exp.right))?;
+                    match pre_exp.operator.as_str() {
+                        "!" => self.emit(Opcode::Bang, &[]),
+                        "-" => self.emit(Opcode::Minus, &[]),
+                        _ => return Err(format!("unknown operator {}", pre_exp.operator)),
+                    };
+                }
                 Exp::If(if_expression) => todo!(),
                 Exp::Function(function_literal) => todo!(),
                 Exp::Call(call_expression) => todo!(),
@@ -186,6 +209,106 @@ mod tests {
                     Instructions::new(make(Op::Constant, &[0])),
                     Instructions::new(make(Op::Constant, &[1])),
                     Instructions::new(make(Op::Div, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "-1",
+                vec![Box::new(1i64)], // the constant is 1
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Minus, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
+    }
+    #[test]
+    fn test_boolean_expressions() {
+        let tests = vec![
+            CompilerTestCase::new(
+                "true",
+                vec![],
+                vec![
+                    Instructions::new(make(Op::True, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "false",
+                vec![],
+                vec![
+                    Instructions::new(make(Op::False, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "1 > 2",
+                vec![Box::new(1i64), Box::new(2i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::GreaterThan, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "1 < 2",
+                vec![Box::new(2i64), Box::new(1i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::GreaterThan, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "1 == 2",
+                vec![Box::new(1i64), Box::new(2i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Equal, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "1 != 2",
+                vec![Box::new(1i64), Box::new(2i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::NotEqual, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "true == false",
+                vec![],
+                vec![
+                    Instructions::new(make(Op::True, &[])),
+                    Instructions::new(make(Op::False, &[])),
+                    Instructions::new(make(Op::Equal, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "true != false",
+                vec![],
+                vec![
+                    Instructions::new(make(Op::True, &[])),
+                    Instructions::new(make(Op::False, &[])),
+                    Instructions::new(make(Op::NotEqual, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "!true",
+                vec![],
+                vec![
+                    Instructions::new(make(Op::True, &[])),
+                    Instructions::new(make(Op::Bang, &[])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),

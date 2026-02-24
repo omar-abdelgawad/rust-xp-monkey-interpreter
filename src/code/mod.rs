@@ -55,6 +55,13 @@ pub enum Opcode {
     Sub = 0x03,
     Mul = 0x04,
     Div = 0x05,
+    True = 0x06,
+    False = 0x07,
+    Equal = 0x08,
+    NotEqual = 0x09,
+    GreaterThan = 0x0a,
+    Minus = 0x0b,
+    Bang = 0x0c,
 }
 use Opcode as Op;
 
@@ -62,6 +69,7 @@ impl TryFrom<u8> for Op {
     type Error = String;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
+        // NOTE: don't forget to add any new opcode here as it won't give a compiler error
         match value {
             val if val == Op::Constant as u8 => Ok(Op::Constant),
             val if val == Op::Add as u8 => Ok(Op::Add),
@@ -69,6 +77,13 @@ impl TryFrom<u8> for Op {
             val if val == Op::Sub as u8 => Ok(Op::Sub),
             val if val == Op::Mul as u8 => Ok(Op::Mul),
             val if val == Op::Div as u8 => Ok(Op::Div),
+            val if val == Op::True as u8 => Ok(Op::True),
+            val if val == Op::False as u8 => Ok(Op::False),
+            val if val == Op::Equal as u8 => Ok(Op::Equal),
+            val if val == Op::NotEqual as u8 => Ok(Op::NotEqual),
+            val if val == Op::GreaterThan as u8 => Ok(Op::GreaterThan),
+            val if val == Op::Minus as u8 => Ok(Op::Minus),
+            val if val == Op::Bang as u8 => Ok(Op::Bang),
             _ => Err(format!("unknown opcode {value}")),
         }
     }
@@ -127,6 +142,13 @@ pub fn lookup(opcode: u8) -> Definition {
         Ok(Op::Sub) => Definition::new("OpSub".into(), vec![]),
         Ok(Op::Mul) => Definition::new("OpMul".into(), vec![]),
         Ok(Op::Div) => Definition::new("OpDiv".into(), vec![]),
+        Ok(Op::True) => Definition::new("OpTrue".into(), vec![]),
+        Ok(Op::False) => Definition::new("OpFalse".into(), vec![]),
+        Ok(Op::Equal) => Definition::new("OpEqual".into(), vec![]),
+        Ok(Op::NotEqual) => Definition::new("OpNotEqual".into(), vec![]),
+        Ok(Op::GreaterThan) => Definition::new("OpGreaterThan".into(), vec![]),
+        Ok(Op::Minus) => Definition::new("OpMinus".into(), vec![]),
+        Ok(Op::Bang) => Definition::new("OpBang".into(), vec![]),
         Err(op) => panic!("opcode {op:?} undefined"),
     }
 }
