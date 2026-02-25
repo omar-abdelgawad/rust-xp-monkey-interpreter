@@ -62,11 +62,15 @@ impl VM {
     fn execute_binary_operation(&mut self, op: Opcode) -> Result<(), String> {
         let right = self.pop();
         let left = self.pop();
-        match (&left, &right) {
+        match (left, right) {
             (Object::Integer(left_val), Object::Integer(right_val)) => {
                 self.execute_binary_integer_operation(op, left_val.value, right_val.value)
             }
-            _ => todo!(
+            // TODO: maybe I should have let the other side free to allow string + int
+            (Object::String(left_val), Object::String(right_val)) => {
+                self.execute_binary_string_operation(op, left_val.value, right_val.value)
+            }
+            (left, right) => todo!(
                 "unsupported types for binary operation: {} {}",
                 left.r#type(),
                 right.r#type()
@@ -87,6 +91,18 @@ impl VM {
             _ => return Err(format!("unknown integer operator: {:?}", op)),
         };
         self.push(Object::new_int_var(result))
+    }
+    fn execute_binary_string_operation(
+        &mut self,
+        op: Opcode,
+        left: String,
+        right: String,
+    ) -> Result<(), String> {
+        let result = match op {
+            Opcode::Add => format!("{}{}", left, right),
+            _ => return Err(format!("unknown integer operator: {:?}", op)),
+        };
+        self.push(Object::new_str_var(&result))
     }
     fn execute_comparison(&mut self, op: Opcode) -> Result<(), String> {
         let right = self.pop();
@@ -323,6 +339,9 @@ mod tests {
         } else if let Some(expec) = expected.downcast_ref::<bool>() {
             test_boolean_object(*expec, actual)
                 .unwrap_or_else(|e| panic!("test_boolean_object failed: {e}"));
+        } else if let Some(expec) = expected.downcast_ref::<&str>() {
+            test_string_object(*expec, actual)
+                .unwrap_or_else(|e| panic!("test_string_object failed: {e}"));
         } else if let Some(expec) = expected.downcast_ref::<Null>() {
             test_null_object(actual).unwrap_or_else(|e| panic!("test_null_object failed: {e}"));
         } else {
@@ -342,6 +361,21 @@ mod tests {
             }
         } else {
             Err(format!("object is not Integer. got=({:?})", actual))
+        }
+    }
+    // TODO: remove one of duplicated function
+    pub fn test_string_object(expected: &str, actual: &Object) -> Result<(), String> {
+        if let Object::String(result) = actual {
+            if result.value != expected {
+                Err(format!(
+                    "object has wrong value. got={}, want={}",
+                    result.value, expected
+                ))
+            } else {
+                Ok(())
+            }
+        } else {
+            Err(format!("object is not String. got=({:?})", actual))
         }
     }
     pub fn test_boolean_object(expected: bool, actual: &Object) -> Result<(), String> {
@@ -398,6 +432,15 @@ mod tests {
         ];
         //dbg!(std::mem::size_of::<Object>()); // 88 bytes
         //dbg!(std::mem::size_of::<Rc<RefCell<Object>>>()); /8 bytes
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_string_expressions() {
+        let tests = vec![
+            VmTestCase::new(r#""monkey""#, Box::new("monkey")),
+            VmTestCase::new(r#""mon" + "key""#, Box::new("monkey")),
+            VmTestCase::new(r#""mon" + "key" + "banana""#, Box::new("monkeybanana")),
+        ];
         run_vm_tests(tests);
     }
 }

@@ -161,7 +161,11 @@ impl Compiler {
                 }
                 Exp::Function(function_literal) => todo!(),
                 Exp::Call(call_expression) => todo!(),
-                Exp::Str(string_literal) => todo!(),
+                Exp::Str(str_lit) => {
+                    let str_obj = Object::new_str_var(&str_lit.value);
+                    let const_id = self.add_constant(str_obj);
+                    self.emit(Opcode::Constant, &[const_id as i64]);
+                }
                 Exp::Arr(array_literal) => todo!(),
                 Exp::Ind(index_expression) => todo!(),
                 Exp::Hash(hash_literal) => todo!(),
@@ -255,6 +259,22 @@ mod tests {
         lexer::Lexer,
         parser::Parser,
     };
+    pub fn test_string_object(obj: &Object, expected: &str) -> bool {
+        if let Object::String(result) = obj {
+            if result.value != expected {
+                eprintln!(
+                    "object has wrong value. got={}, want{}",
+                    result.value, expected
+                );
+                false
+            } else {
+                true
+            }
+        } else {
+            eprintln!("object is not String. got=({:?})", obj);
+            false
+        }
+    }
 
     use super::*;
     struct CompilerTestCase {
@@ -495,6 +515,10 @@ mod tests {
                 if !test_integer_object(&actual[i], *exp_constant) {
                     return Err(format!("constant {} - test_integer_object failed", i));
                 }
+            } else if let Some(expected_constant) = constant.downcast_ref::<&str>() {
+                if !test_string_object(&actual[i], *expected_constant) {
+                    return Err(format!("constant {} - test_string_object failed", i));
+                }
             } else {
                 return Err(format!("unknown dyn object: {:?}", constant));
             }
@@ -636,6 +660,31 @@ two;
                     Instructions::new(make(Op::GetGlobal, &[0])),
                     Instructions::new(make(Op::SetGlobal, &[1])),
                     Instructions::new(make(Op::GetGlobal, &[1])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_string_expressions() {
+        let tests = vec![
+            CompilerTestCase::new(
+                r#""monkey""#,
+                vec![Box::new("monkey")],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                r#""mon" + "key""#,
+                vec![Box::new("mon"), Box::new("key")],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Add, &[])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),
