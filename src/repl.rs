@@ -68,6 +68,11 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
         let code = comp.bytecode();
         constants = code.constants.clone();
         symbol_table = comp.symbol_table();
+        write!(
+            output,
+            "compiled prog:\n{}===prog end===\n",
+            code.instructions
+        );
 
         let mut machine = VM::new_with_globals_store(code, globals.clone());
         if let Err(err) = machine.run() {

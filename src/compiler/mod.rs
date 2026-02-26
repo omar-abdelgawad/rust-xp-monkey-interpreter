@@ -694,6 +694,7 @@ mod tests {
     #[should_panic]
     #[test]
     fn test_custom_empty_block_returns_null() {
+        // also what about "if (true) {}"
         let tests = vec![
             CompilerTestCase::new(
                 "if (false) { 10 } else { };",
