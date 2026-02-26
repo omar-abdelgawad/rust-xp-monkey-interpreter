@@ -8,6 +8,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::ast::{BlockStatement, Identifier};
+use crate::code::Instructions;
 
 //TODO: make all of the values below singletons with no copies
 // which should be done with static.
@@ -39,6 +40,7 @@ pub enum ObjectType {
     BuiltinFunction,
     ARRAY_OBJ, // arrays are immutable in monkey
     Hash_OBJ,
+    Compiled_Function_OBJ,
 }
 impl Display for ObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -54,6 +56,7 @@ impl Display for ObjectType {
             ObjT::BuiltinFunction => "builtin function",
             ObjT::ARRAY_OBJ => "ARRAY",
             ObjT::Hash_OBJ => "HASH",
+            ObjT::Compiled_Function_OBJ => "COMPILED FUNCTION",
         };
         write!(f, "{}", to_write)
     }
@@ -94,6 +97,7 @@ pub enum Object {
     Builtin(BuiltinObj),
     Arr(Array), // arrays are immutable in monkey
     Hash(HashObj),
+    CompiledFunction(CompiledFunctionObj),
 }
 impl Object {
     pub fn new_int_var(value: i64) -> Object {
@@ -133,6 +137,7 @@ impl ObjectTrait for Object {
             Object::Builtin(s) => s.r#type(),
             Object::Arr(s) => s.r#type(),
             Object::Hash(s) => s.r#type(),
+            Object::CompiledFunction(s) => s.r#type(),
         }
     }
     fn inspect(&self) -> String {
@@ -147,6 +152,7 @@ impl ObjectTrait for Object {
             Object::Builtin(s) => s.inspect(),
             Object::Arr(s) => s.inspect(),
             Object::Hash(s) => s.inspect(),
+            Object::CompiledFunction(s) => s.inspect(),
         }
     }
 }
@@ -433,6 +439,25 @@ impl ObjectTrait for HashObj {
         }
 
         format!("{{{}}}", pairs_str.join(", "))
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct CompiledFunctionObj {
+    pub instructions: Instructions,
+}
+impl CompiledFunctionObj {
+    pub fn new(instructions: Instructions) -> Self {
+        Self { instructions }
+    }
+}
+
+impl ObjectTrait for CompiledFunctionObj {
+    fn r#type(&self) -> ObjectType {
+        ObjectType::Compiled_Function_OBJ
+    }
+    fn inspect(&self) -> String {
+        format!("CompiledFunction[{:p}]", self)
     }
 }
 

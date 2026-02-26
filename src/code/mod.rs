@@ -1,6 +1,6 @@
 use std::{fmt::Display, ops::Deref};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct Instructions(pub Vec<u8>);
 
 impl Display for Instructions {
@@ -70,6 +70,9 @@ pub enum Opcode {
     Array = 0x12,
     Hash = 0x13,
     Index = 0x14,
+    Call = 0x15,
+    ReturnValue = 0x16,
+    Return = 0x17,
 }
 use Opcode as Op;
 
@@ -100,6 +103,9 @@ impl TryFrom<u8> for Op {
             val if val == Op::Array as u8 => Ok(Op::Array),
             val if val == Op::Hash as u8 => Ok(Op::Hash),
             val if val == Op::Index as u8 => Ok(Op::Index),
+            val if val == Op::Call as u8 => Ok(Op::Call),
+            val if val == Op::ReturnValue as u8 => Ok(Op::ReturnValue),
+            val if val == Op::Return as u8 => Ok(Op::Return),
             _ => Err(format!("unknown opcode {value}")),
         }
     }
@@ -173,6 +179,9 @@ pub fn lookup(opcode: u8) -> Definition {
         Ok(Op::Array) => Definition::new("OpArray".into(), vec![2]), // maximum array size is 65536
         Ok(Op::Hash) => Definition::new("OpHash".into(), vec![2]),   // maximum array size is 65536
         Ok(Op::Index) => Definition::new("OpIndex".into(), vec![]),  // maximum array size is 65536
+        Ok(Op::Call) => Definition::new("OpCall".into(), vec![]),    // maximum array size is 65536
+        Ok(Op::ReturnValue) => Definition::new("OpReturnValue".into(), vec![]), // maximum array size is 65536
+        Ok(Op::Return) => Definition::new("OpReturn".into(), vec![]), // maximum array size is 65536
         Err(op) => panic!("opcode {op:?} undefined"),
     }
 }

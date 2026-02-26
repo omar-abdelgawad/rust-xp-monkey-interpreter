@@ -409,7 +409,7 @@ impl Display for BlockStatement {
 pub struct FunctionLiteral {
     token: Token, // the 'fn' token
     pub parameters: Vec<Identifier>,
-    // how is this an option again?
+    // FIX: how is this an option again?
     pub body: Option<Box<BlockStatement>>,
 }
 impl FunctionLiteral {
