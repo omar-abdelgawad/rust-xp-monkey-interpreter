@@ -166,9 +166,37 @@ impl Compiler {
                     let const_id = self.add_constant(str_obj);
                     self.emit(Opcode::Constant, &[const_id as i64]);
                 }
-                Exp::Arr(array_literal) => todo!(),
-                Exp::Ind(index_expression) => todo!(),
-                Exp::Hash(hash_literal) => todo!(),
+                Exp::Arr(arr_lit) => {
+                    let arr_len = arr_lit.elements.len();
+                    for el in arr_lit.elements {
+                        self.compile(Node::Expression(el))?;
+                    }
+                    self.emit(Opcode::Array, &[arr_len as i64]);
+                }
+                Exp::Ind(ind_exp) => {
+                    self.compile(Node::Expression(*ind_exp.left))?;
+                    self.compile(Node::Expression(*ind_exp.index))?;
+                    self.emit(Opcode::Index, &[]);
+                }
+                Exp::Hash(hash_lit) => {
+                    // AI generated cause I was too lazy to read go docs
+                    // TODO: fix this AI cloning crap in the future
+                    // 1️⃣ Collect keys
+                    let mut keys: Vec<_> = hash_lit.pairs.keys().cloned().collect();
+                    // 2️⃣ Sort by string representation (like Go's String())
+                    keys.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+                    // 3️⃣ Compile key/value pairs
+                    for key in keys {
+                        let value = hash_lit.pairs.get(&key).unwrap().clone();
+                        // compile key
+                        self.compile(Node::Expression(key))?;
+
+                        // compile value
+                        self.compile(Node::Expression(value))?;
+                    }
+                    // 4️⃣ Emit OpHash
+                    self.emit(Opcode::Hash, &[(hash_lit.pairs.len() * 2) as i64]);
+                }
                 Exp::While(while_expression) => todo!(),
             },
         }
@@ -685,6 +713,159 @@ two;
                     Instructions::new(make(Op::Constant, &[0])),
                     Instructions::new(make(Op::Constant, &[1])),
                     Instructions::new(make(Op::Add, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
+    }
+    #[test]
+    fn test_array_literals() {
+        let tests = vec![
+            CompilerTestCase::new(
+                "[]",
+                vec![],
+                vec![
+                    Instructions::new(make(Op::Array, &[0])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "[1, 2, 3]",
+                vec![Box::new(1i64), Box::new(2i64), Box::new(3i64)],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Constant, &[2])),
+                    Instructions::new(make(Op::Array, &[3])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "[1 + 2, 3 - 4, 5 * 6]",
+                vec![
+                    Box::new(1i64),
+                    Box::new(2i64),
+                    Box::new(3i64),
+                    Box::new(4i64),
+                    Box::new(5i64),
+                    Box::new(6i64),
+                ],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Add, &[])),
+                    Instructions::new(make(Op::Constant, &[2])),
+                    Instructions::new(make(Op::Constant, &[3])),
+                    Instructions::new(make(Op::Sub, &[])),
+                    Instructions::new(make(Op::Constant, &[4])),
+                    Instructions::new(make(Op::Constant, &[5])),
+                    Instructions::new(make(Op::Mul, &[])),
+                    Instructions::new(make(Op::Array, &[3])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
+    }
+    #[test]
+    fn test_hash_literals() {
+        let tests = vec![
+            CompilerTestCase::new(
+                "{}",
+                vec![],
+                vec![
+                    Instructions::new(make(Op::Hash, &[0])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "{1: 2, 3: 4, 5: 6}",
+                vec![
+                    Box::new(1i64),
+                    Box::new(2i64),
+                    Box::new(3i64),
+                    Box::new(4i64),
+                    Box::new(5i64),
+                    Box::new(6i64),
+                ],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Constant, &[2])),
+                    Instructions::new(make(Op::Constant, &[3])),
+                    Instructions::new(make(Op::Constant, &[4])),
+                    Instructions::new(make(Op::Constant, &[5])),
+                    Instructions::new(make(Op::Hash, &[6])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "{1: 2 + 3, 4: 5 * 6}",
+                vec![
+                    Box::new(1i64),
+                    Box::new(2i64),
+                    Box::new(3i64),
+                    Box::new(4i64),
+                    Box::new(5i64),
+                    Box::new(6i64),
+                ],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Constant, &[2])),
+                    Instructions::new(make(Op::Add, &[])),
+                    Instructions::new(make(Op::Constant, &[3])),
+                    Instructions::new(make(Op::Constant, &[4])),
+                    Instructions::new(make(Op::Constant, &[5])),
+                    Instructions::new(make(Op::Mul, &[])),
+                    Instructions::new(make(Op::Hash, &[4])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
+    }
+    #[test]
+    fn test_index_expressions() {
+        let tests = vec![
+            CompilerTestCase::new(
+                "[1, 2, 3][1 + 1]",
+                vec![
+                    Box::new(1i64),
+                    Box::new(2i64),
+                    Box::new(3i64),
+                    Box::new(1i64),
+                    Box::new(1i64),
+                ],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Constant, &[2])),
+                    Instructions::new(make(Op::Array, &[3])),
+                    Instructions::new(make(Op::Constant, &[3])),
+                    Instructions::new(make(Op::Constant, &[4])),
+                    Instructions::new(make(Op::Add, &[])),
+                    Instructions::new(make(Op::Index, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "{1: 2}[2 - 1]",
+                vec![
+                    Box::new(1i64),
+                    Box::new(2i64),
+                    Box::new(2i64),
+                    Box::new(1i64),
+                ],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Hash, &[2])),
+                    Instructions::new(make(Op::Constant, &[2])),
+                    Instructions::new(make(Op::Constant, &[3])),
+                    Instructions::new(make(Op::Sub, &[])),
+                    Instructions::new(make(Op::Index, &[])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),

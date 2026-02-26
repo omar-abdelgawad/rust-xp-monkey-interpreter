@@ -67,6 +67,9 @@ pub enum Opcode {
     Null = 0x0f,
     GetGlobal = 0x10,
     SetGlobal = 0x11,
+    Array = 0x12,
+    Hash = 0x13,
+    Index = 0x14,
 }
 use Opcode as Op;
 
@@ -94,6 +97,9 @@ impl TryFrom<u8> for Op {
             val if val == Op::Null as u8 => Ok(Op::Null),
             val if val == Op::GetGlobal as u8 => Ok(Op::GetGlobal),
             val if val == Op::SetGlobal as u8 => Ok(Op::SetGlobal),
+            val if val == Op::Array as u8 => Ok(Op::Array),
+            val if val == Op::Hash as u8 => Ok(Op::Hash),
+            val if val == Op::Index as u8 => Ok(Op::Index),
             _ => Err(format!("unknown opcode {value}")),
         }
     }
@@ -164,6 +170,9 @@ pub fn lookup(opcode: u8) -> Definition {
         Ok(Op::Null) => Definition::new("OpNull".into(), vec![]),
         Ok(Op::GetGlobal) => Definition::new("OpGetGlobal".into(), vec![2]),
         Ok(Op::SetGlobal) => Definition::new("OpSetGlobal".into(), vec![2]),
+        Ok(Op::Array) => Definition::new("OpArray".into(), vec![2]), // maximum array size is 65536
+        Ok(Op::Hash) => Definition::new("OpHash".into(), vec![2]),   // maximum array size is 65536
+        Ok(Op::Index) => Definition::new("OpIndex".into(), vec![]),  // maximum array size is 65536
         Err(op) => panic!("opcode {op:?} undefined"),
     }
 }

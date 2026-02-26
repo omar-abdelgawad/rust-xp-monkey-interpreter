@@ -67,6 +67,9 @@ pub trait ObjectTrait {
 pub trait Hashable {
     fn hash_key(&self) -> HashKey;
 }
+pub trait IsHashable {
+    fn is_hashable(&self) -> Result<(), String>;
+}
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct HashKey {
@@ -102,6 +105,12 @@ impl Object {
 
     pub fn new_ret_var(value: Object) -> Object {
         Object::Ret(ReturnValue::new(Box::new(value)))
+    }
+    pub fn new_array_var(value: Vec<Object>) -> Object {
+        Object::Arr(Array::new(value))
+    }
+    pub fn new_hash_var(value: HashMap<HashKey, HashPair>) -> Object {
+        Object::Hash(HashObj::new(value))
     }
     pub fn is_truthy(&self) -> bool {
         match self {
@@ -148,6 +157,16 @@ impl Hashable for Object {
             Object::Integer(i) => i.hash_key(),
             Object::String(s) => s.hash_key(),
             _ => panic!("not a hashable object"),
+        }
+    }
+}
+impl IsHashable for Object {
+    fn is_hashable(&self) -> Result<(), String> {
+        match self {
+            Object::Boolean(b) => Ok(()),
+            Object::Integer(i) => Ok(()),
+            Object::String(s) => Ok(()),
+            _ => Err(format!("unusable as hash key: {}", self.r#type())),
         }
     }
 }

@@ -3,10 +3,12 @@ use crate::code::{read_u16, Instructions, Opcode};
 use crate::compiler::Bytecode;
 use crate::lexer::Lexer;
 use crate::object::{
-    native_bool_to_boolean_object, Null, Object, ObjectTrait, FALSE, GARBAGEVALOBJ, NULL, TRUE,
+    native_bool_to_boolean_object, Array, HashObj, HashPair, Hashable, Integer, IsHashable, Null,
+    Object, ObjectTrait, FALSE, GARBAGEVALOBJ, NULL, TRUE,
 };
 use crate::parser::Parser;
 use std::array;
+use std::collections::HashMap;
 
 const STACKSIZE: usize = 2048;
 pub const GLOBALSSIZE: usize = 65536;
@@ -164,6 +166,39 @@ impl VM {
             _ => todo!("unsupported type for negation: {}", right.r#type()),
         }
     }
+    fn execute_index_expression(&mut self, left: Object, index: Object) -> Result<(), String> {
+        match (left, index) {
+            (Object::Arr(arr_obj), Object::Integer(int_obj)) => {
+                self.execute_array_index(arr_obj, int_obj)
+            }
+            (Object::Hash(hash_obj), index) => self.execute_hash_index(hash_obj, index),
+            (left, right) => todo!(
+                "unsupported types for index operation: {} {}",
+                left.r#type(),
+                right.r#type()
+            ),
+        }
+    }
+    fn execute_array_index(&mut self, arr_obj: Array, int_obj: Integer) -> Result<(), String> {
+        let i = int_obj.value;
+        let max = arr_obj.elements.len() as i64 - 1;
+        if i < 0 || i > max {
+            self.push(NULL)
+        } else {
+            self.push(arr_obj.elements[i as usize].clone())
+        }
+    }
+    fn execute_hash_index(&mut self, hash_obj: HashObj, index: Object) -> Result<(), String> {
+        index.is_hashable()?;
+        let pair = hash_obj
+            .pairs
+            .get(&index.hash_key())
+            .ok_or("key doesn't exist");
+        match pair {
+            Ok(pair) => self.push(pair.val.clone()),
+            Err(err) => self.push(NULL),
+        }
+    }
     pub fn run(&mut self) -> Result<(), String> {
         // TODO: rename ip to pc and make it a struct field in order to make the step function for
         // the VM
@@ -213,6 +248,28 @@ impl VM {
 
                     self.push(self.globals[glob_ind].clone())?;
                 }
+                Opcode::Array => {
+                    let num_elements = read_u16(&self.instructions[ip + 1..ip + 3]) as usize;
+                    ip += 2;
+
+                    let array = self.build_array(self.sp - num_elements, self.sp);
+                    self.sp = self.sp - num_elements;
+                    self.push(array)?;
+                }
+                Opcode::Hash => {
+                    let num_elements = read_u16(&self.instructions[ip + 1..ip + 3]) as usize;
+                    ip += 2;
+
+                    let hash = self.build_hash(self.sp - num_elements, self.sp)?;
+                    self.sp = self.sp - num_elements;
+                    self.push(hash)?;
+                }
+                Opcode::Index => {
+                    let index = self.pop();
+                    let left = self.pop();
+
+                    self.execute_index_expression(left, index)?;
+                }
 
                 _ => panic!("unknown instruction"),
             }
@@ -235,6 +292,34 @@ impl VM {
         vm.globals = s;
         vm
     }
+
+    fn build_array(&mut self, start_ind: usize, end_ind: usize) -> Object {
+        let mut elements = vec![NULL; end_ind - start_ind];
+        let mut i = start_ind;
+        while i < end_ind {
+            elements[i - start_ind] = self.stack[i].clone();
+            i += 1;
+        }
+        Object::new_array_var(elements)
+    }
+    fn build_hash(&mut self, start_ind: usize, end_ind: usize) -> Result<Object, String> {
+        let mut hashed_pairs = HashMap::new();
+        let mut i = start_ind;
+        while i < end_ind {
+            let key = self.stack[i].clone();
+            let value = self.stack[i + 1].clone();
+
+            // TODO: this hash_key should return result instead
+            key.is_hashable()?;
+            let hash_key = key.hash_key();
+
+            let pair = HashPair::new(key, value);
+            hashed_pairs.insert(hash_key, pair);
+
+            i += 2;
+        }
+        Ok(Object::new_hash_var(hashed_pairs))
+    }
 }
 
 // TODO: remove this copied function
@@ -246,9 +331,12 @@ fn parse(input: String) -> ast::Program {
 
 #[cfg(test)]
 mod tests {
-    use std::any::Any;
+    use std::{any::Any, collections::HashMap};
 
-    use crate::compiler::{self, Compiler};
+    use crate::{
+        compiler::{self, Compiler},
+        object::{HashKey, Hashable},
+    };
 
     use super::*;
     #[derive(Debug)]
@@ -344,8 +432,57 @@ mod tests {
                 .unwrap_or_else(|e| panic!("test_string_object failed: {e}"));
         } else if let Some(expec) = expected.downcast_ref::<Null>() {
             test_null_object(actual).unwrap_or_else(|e| panic!("test_null_object failed: {e}"));
+        } else if let Some(expec) = expected.downcast_ref::<Vec<i64>>() {
+            test_arr_ints_object(&expec, actual)
+                .unwrap_or_else(|e| panic!("test_arr_object failed: {e}"));
+        } else if let Some(expec) = expected.downcast_ref::<HashMap<HashKey, i64>>() {
+            test_hash_ints_object(&expec, actual)
+                .unwrap_or_else(|e| panic!("test_arr_object failed: {e}"));
         } else {
             panic!("unknown dyn object: {:?}", expected);
+        }
+    }
+    pub fn test_hash_ints_object(
+        expected: &HashMap<HashKey, i64>,
+        actual: &Object,
+    ) -> Result<(), String> {
+        if let Object::Hash(result) = actual {
+            if result.pairs.len() != expected.len() {
+                Err(format!(
+                    "hash has wrong number of pairs. want={}, got={}",
+                    expected.len(),
+                    result.pairs.len()
+                ))
+            } else {
+                for (expected_key, expected_value) in expected {
+                    let pair = result
+                        .pairs
+                        .get(expected_key)
+                        .ok_or("no pair for given key in pairs")?;
+                    test_integer_object(*expected_value, &pair.val)?;
+                }
+                Ok(())
+            }
+        } else {
+            Err(format!("object not Hash. got=({:?})", actual))
+        }
+    }
+    pub fn test_arr_ints_object(expected: &[i64], actual: &Object) -> Result<(), String> {
+        if let Object::Arr(result) = actual {
+            if result.elements.len() != expected.len() {
+                Err(format!(
+                    "wrong num of elements. want={}, got={}",
+                    expected.len(),
+                    result.elements.len()
+                ))
+            } else {
+                for (i, expected_elm) in expected.iter().enumerate() {
+                    test_integer_object(*expected_elm, &result.elements[i])?;
+                }
+                Ok(())
+            }
+        } else {
+            Err(format!("object not Array. got=({:?})", actual))
         }
     }
     // TODO: remove one of duplicated function
@@ -440,6 +577,52 @@ mod tests {
             VmTestCase::new(r#""monkey""#, Box::new("monkey")),
             VmTestCase::new(r#""mon" + "key""#, Box::new("monkey")),
             VmTestCase::new(r#""mon" + "key" + "banana""#, Box::new("monkeybanana")),
+        ];
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_array_literals() {
+        let tests = vec![
+            VmTestCase::new("[]", Box::new(vec![0 as i64; 0])),
+            VmTestCase::new("[1, 2, 3]", Box::new(vec![1i64, 2, 3])),
+            VmTestCase::new("[1 + 2, 3 * 4, 5 + 6]", Box::new(vec![3i64, 12, 11])),
+        ];
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_hash_literals() {
+        let tests = vec![
+            VmTestCase::new("{}", Box::new(HashMap::<HashKey, i64>::new())),
+            VmTestCase::new(
+                "{1: 2, 2: 3}",
+                Box::new(HashMap::from([
+                    (Object::new_int_var(1).hash_key(), 2i64),
+                    (Object::new_int_var(2).hash_key(), 3i64),
+                ])),
+            ),
+            VmTestCase::new(
+                "{1 + 1: 2 * 2, 3 + 3: 4 * 4}",
+                Box::new(HashMap::from([
+                    (Object::new_int_var(2).hash_key(), 4i64),
+                    (Object::new_int_var(6).hash_key(), 16i64),
+                ])),
+            ),
+        ];
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_index_expressions() {
+        let tests = vec![
+            VmTestCase::new("[1, 2, 3][1]", Box::new(2i64)),
+            VmTestCase::new("[1, 2, 3][0 + 2]", Box::new(3i64)),
+            VmTestCase::new("[[1, 1, 1]][0][0]", Box::new(1i64)),
+            VmTestCase::new("[][0]", Box::new(Null)),
+            VmTestCase::new("[1, 2, 3][99]", Box::new(Null)),
+            VmTestCase::new("[1][-1]", Box::new(Null)),
+            VmTestCase::new("{1: 1, 2: 2}[1]", Box::new(1i64)),
+            VmTestCase::new("{1: 1, 2: 2}[2]", Box::new(2i64)),
+            VmTestCase::new("{1: 1}[0]", Box::new(Null)),
+            VmTestCase::new("{}[0]", Box::new(Null)),
         ];
         run_vm_tests(tests);
     }
