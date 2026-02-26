@@ -11,7 +11,7 @@ pub struct Compiler {
     constants: Vec<Object>,
     symbol_table: SymbolTable,
     scopes: Vec<CompilationScope>,
-    scope_index: usize,
+    scope_index: usize, // TODO: does this variable actually need to exist?
 }
 
 #[derive(Debug, Clone, Default)]
@@ -199,7 +199,10 @@ impl Compiler {
                     let const_ind = self.add_constant(Object::CompiledFunction(compiled_fn));
                     self.emit(Opcode::Constant, &[const_ind as i64]);
                 }
-                Exp::Call(call_expression) => todo!(),
+                Exp::Call(call_exp) => {
+                    self.compile(Node::Expression(*call_exp.function))?;
+                    self.emit(Opcode::Call, &[]);
+                }
                 Exp::Str(str_lit) => {
                     let str_obj = Object::new_str_var(&str_lit.value);
                     let const_id = self.add_constant(str_obj);
@@ -690,7 +693,7 @@ mod tests {
         run_compiler_tests(tests);
     }
 
-    // TODO: fix this later
+    // TODO: fix this later (handle empty if consequence blocks)
     #[should_panic]
     #[test]
     fn test_custom_empty_block_returns_null() {
@@ -1085,5 +1088,44 @@ two;
             last.opcode,
             Opcode::Mul
         );
+    }
+    #[test]
+    fn test_function_calls() {
+        let tests = vec![
+            CompilerTestCase::new(
+                "fn() { 24 }()",
+                vec![
+                    Box::new(24i64),
+                    Box::new(vec![
+                        Instructions::new(make(Op::Constant, &[0])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                ],
+                vec![
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Call, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "let noArg = fn(){ 24 };
+noArg();",
+                vec![
+                    Box::new(24i64),
+                    Box::new(vec![
+                        Instructions::new(make(Op::Constant, &[0])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                ],
+                vec![
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::SetGlobal, &[0])),
+                    Instructions::new(make(Op::GetGlobal, &[0])),
+                    Instructions::new(make(Op::Call, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
     }
 }

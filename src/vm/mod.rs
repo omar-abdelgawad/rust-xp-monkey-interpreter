@@ -3,8 +3,8 @@ use crate::code::{read_u16, Instructions, Opcode};
 use crate::compiler::Bytecode;
 use crate::lexer::Lexer;
 use crate::object::{
-    native_bool_to_boolean_object, Array, HashObj, HashPair, Hashable, Integer, IsHashable, Null,
-    Object, ObjectTrait, FALSE, GARBAGEVALOBJ, NULL, TRUE,
+    native_bool_to_boolean_object, Array, CompiledFunctionObj, HashObj, HashPair, Hashable,
+    Integer, IsHashable, Null, Object, ObjectTrait, FALSE, GARBAGEVALOBJ, NULL, TRUE,
 };
 use crate::parser::Parser;
 use std::array;
@@ -12,11 +12,33 @@ use std::collections::HashMap;
 
 const STACKSIZE: usize = 2048;
 pub const GLOBALSSIZE: usize = 65536;
+const MAXFRAMES: usize = 1024;
+
+#[derive(Debug, Clone)]
+struct Frame {
+    comp_fn: CompiledFunctionObj,
+    ip: i64,
+}
+impl Default for Frame {
+    fn default() -> Self {
+        Self {
+            comp_fn: Default::default(),
+            ip: -1,
+        }
+    }
+}
+impl Frame {
+    fn new(comp_fn: CompiledFunctionObj) -> Self {
+        Self { comp_fn, ip: -1 }
+    }
+    fn instructions(&mut self) -> &mut Instructions {
+        &mut self.comp_fn.instructions
+    }
+}
 
 #[derive(Debug)]
 pub struct VM {
     constants: Vec<Object>,
-    instructions: Instructions,
     stack: Vec<Object>,
     sp: usize, // always points to next value. top of stack is stack[sp -1]
     //pc: usize // TODO: implement in future
@@ -24,6 +46,8 @@ pub struct VM {
     // everything a lot but I am too lazy. I had to use it here since I need a pointer with small
     // size to be stored on the stack and object is on the heap from what I understand
     globals: Vec<Object>,
+    frames: Vec<Frame>,
+    frames_index: usize,
 }
 
 impl VM {
@@ -36,23 +60,32 @@ impl VM {
             instructions,
         }: Bytecode,
     ) -> Self {
+        let main_fn = CompiledFunctionObj::new(instructions);
+        let main_frame = Frame::new(main_fn);
+
+        let mut frames = vec![Default::default(); MAXFRAMES];
+        frames[0] = main_frame;
         Self {
             constants,
-            instructions,
             stack: vec![GARBAGEVALOBJ; STACKSIZE],
             sp: 0,
             globals: vec![GARBAGEVALOBJ; GLOBALSSIZE],
+            frames: frames,
+            frames_index: 1,
         }
     }
+    fn current_frame(&mut self) -> &mut Frame {
+        &mut self.frames[self.frames_index - 1]
+    }
+    fn push_frame(&mut self, f: Frame) {
+        self.frames[self.frames_index] = f;
+        self.frames_index += 1;
+    }
+    fn pop_frame(&mut self) -> Frame {
+        self.frames_index -= 1;
+        self.frames[self.frames_index].clone()
+    }
 
-    //pub fn stack_top(&self) -> Option<Object> {
-    //    if self.sp == 0 {
-    //        None
-    //    } else {
-    //        // TODO: does this have to be clone? probably not
-    //        Some(self.stack[self.sp - 1].clone())
-    //    }
-    //}
     pub fn last_popped_stack_elem(&self) -> Object {
         self.stack[self.sp].clone()
     }
@@ -202,13 +235,19 @@ impl VM {
     pub fn run(&mut self) -> Result<(), String> {
         // TODO: rename ip to pc and make it a struct field in order to make the step function for
         // the VM
-        let mut ip = 0; // the instruction pointer is not fancy in this vm
-        while ip < self.instructions.len() {
-            let op: Opcode = TryFrom::try_from(self.instructions[ip])?;
+        let mut ip: i64; // the instruction pointer is not fancy in this vm
+        let mut ins;
+        let mut op: Opcode;
+        while self.current_frame().ip < (self.current_frame().instructions().len() as i64 - 1) {
+            self.current_frame().ip += 1;
+
+            ip = self.current_frame().ip;
+            ins = self.current_frame().instructions();
+            op = TryFrom::try_from(ins[ip as usize])?;
             match op {
                 Opcode::Constant => {
-                    let const_ind = read_u16(&self.instructions[ip + 1..ip + 3]);
-                    ip += 2;
+                    let const_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]);
+                    self.current_frame().ip += 2;
                     self.push(self.constants[const_ind as usize].clone())?;
                 }
                 Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div => {
@@ -225,40 +264,40 @@ impl VM {
                 Opcode::Bang => self.execute_bang_operator()?,
                 Opcode::Minus => self.execute_minus_operator()?,
                 Opcode::Jump => {
-                    let pos = read_u16(&self.instructions[ip + 1..ip + 3]) as usize;
-                    ip = pos - 1; // minus 1 is because counter is always incremented
+                    let pos = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
+                    self.current_frame().ip = pos as i64 - 1; // minus 1 is because counter is always incremented
                 }
                 Opcode::JumpNotTruthy => {
-                    let pos = read_u16(&self.instructions[ip + 1..ip + 3]) as usize;
-                    ip += 2;
+                    let pos = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
+                    self.current_frame().ip += 2;
                     let condition = self.pop();
                     if !condition.is_truthy() {
-                        ip = pos - 1;
+                        self.current_frame().ip = pos as i64 - 1;
                     }
                 }
                 Opcode::Null => self.push(NULL)?,
                 Opcode::SetGlobal => {
-                    let glob_ind = read_u16(&self.instructions[ip + 1..ip + 3]) as usize;
-                    ip += 2;
+                    let glob_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
+                    self.current_frame().ip += 2;
                     self.globals[glob_ind] = self.pop();
                 }
                 Opcode::GetGlobal => {
-                    let glob_ind = read_u16(&self.instructions[ip + 1..ip + 3]) as usize;
-                    ip += 2;
+                    let glob_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
+                    self.current_frame().ip += 2;
 
                     self.push(self.globals[glob_ind].clone())?;
                 }
                 Opcode::Array => {
-                    let num_elements = read_u16(&self.instructions[ip + 1..ip + 3]) as usize;
-                    ip += 2;
+                    let num_elements = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
+                    self.current_frame().ip += 2;
 
                     let array = self.build_array(self.sp - num_elements, self.sp);
                     self.sp = self.sp - num_elements;
                     self.push(array)?;
                 }
                 Opcode::Hash => {
-                    let num_elements = read_u16(&self.instructions[ip + 1..ip + 3]) as usize;
-                    ip += 2;
+                    let num_elements = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
+                    self.current_frame().ip += 2;
 
                     let hash = self.build_hash(self.sp - num_elements, self.sp)?;
                     self.sp = self.sp - num_elements;
@@ -273,7 +312,6 @@ impl VM {
 
                 _ => panic!("unknown instruction"),
             }
-            ip += 1;
         }
         Ok(())
     }

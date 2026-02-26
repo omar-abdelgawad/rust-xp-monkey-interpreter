@@ -442,7 +442,7 @@ impl ObjectTrait for HashObj {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct CompiledFunctionObj {
     pub instructions: Instructions,
 }
