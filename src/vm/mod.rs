@@ -64,7 +64,7 @@ impl VM {
             instructions,
         }: Bytecode,
     ) -> Self {
-        let main_fn = CompiledFunctionObj::new(instructions, 0); // I am not sure what to have here
+        let main_fn = CompiledFunctionObj::new(instructions, 0, 0); // I am not sure how to init here
         let main_frame = Frame::new(main_fn, 0);
 
         let mut frames = vec![Frame::garbage_value(); MAXFRAMES];
@@ -314,15 +314,10 @@ impl VM {
                     self.execute_index_expression(left, index)?;
                 }
                 Opcode::Call => {
-                    if let Object::CompiledFunction(ref comp_fn) = self.stack[self.sp - 1] {
-                        let frame = Frame::new(comp_fn.clone(), self.sp.try_into().unwrap());
-                        let next_sp: usize = frame.bp as usize + comp_fn.num_locals;
-                        self.push_frame(frame);
-                        self.sp = next_sp;
-                    } else {
-                        // note that in error case top of stack is not popped
-                        return Err("calling non-function".to_string());
-                    }
+                    let num_args = ins[usize::try_from(ip + 1).unwrap()] as usize;
+                    self.current_frame().ip += 1;
+
+                    self.call_function(num_args)?;
                 }
                 Opcode::ReturnValue => {
                     let return_value = self.pop();
@@ -347,12 +342,10 @@ impl VM {
                     self.stack[frame_bp + local_ind] = local_var_val;
                 }
                 Opcode::GetLocal => {
-                    dbg!(&ins);
-                    let local_ind = ins[usize::try_from(dbg!(ip + 1)).unwrap()] as usize;
+                    let local_ind = ins[usize::try_from(ip + 1).unwrap()] as usize;
                     self.current_frame().ip += 1;
 
-                    let frame_bp: usize = dbg!(self.current_frame().bp.try_into()).unwrap();
-                    dbg!(local_ind);
+                    let frame_bp: usize = self.current_frame().bp.try_into().unwrap();
                     self.push(self.stack[frame_bp + local_ind].clone())?;
                 }
 
@@ -360,6 +353,27 @@ impl VM {
             }
         }
         Ok(())
+    }
+    fn call_function(&mut self, num_args: usize) -> Result<(), String> {
+        if let Object::CompiledFunction(ref comp_fn) = self.stack[self.sp - 1 - num_args] {
+            if num_args != comp_fn.num_parameters {
+                return Err(format!(
+                    "wrong number of arguments: want={}, got={num_args}",
+                    comp_fn.num_parameters,
+                ));
+            }
+            let frame = Frame::new(
+                comp_fn.clone(),
+                usize::try_into(self.sp - num_args).unwrap(),
+            );
+            let next_sp: usize = frame.bp as usize + comp_fn.num_locals;
+            self.push_frame(frame);
+            self.sp = next_sp;
+            Ok(())
+        } else {
+            // note that in error case top of stack is not popped
+            return Err("calling non-function".to_string());
+        }
     }
 
     pub fn push(&mut self, o: Object) -> Result<(), String> {
@@ -828,5 +842,98 @@ returnsOneReturner()();",
             ),
         ];
         run_vm_tests(tests);
+    }
+    #[test]
+    fn test_calling_functions_with_arguments_and_bindings() {
+        let tests = vec![
+            VmTestCase::new(
+                "let identity = fn(a) { a; };
+identity(4);",
+                Box::new(4i64),
+            ),
+            VmTestCase::new(
+                "let sum = fn(a, b) { a + b; };
+sum(1, 2);",
+                Box::new(3i64),
+            ),
+            VmTestCase::new(
+                "let sum = fn(a, b) {
+let c = a + b;
+c;
+};
+sum(1, 2);",
+                Box::new(3i64),
+            ),
+            VmTestCase::new(
+                "let sum = fn(a, b) {
+let c = a + b;
+c;
+};
+sum(1, 2) + sum(3, 4);",
+                Box::new(10i64),
+            ),
+            VmTestCase::new(
+                "let sum = fn(a, b) {
+let c = a + b;
+c;
+};
+let outer = fn() {
+sum(1, 2) + sum(3, 4);
+};
+outer();",
+                Box::new(10i64),
+            ),
+            VmTestCase::new(
+                "let globalNum = 10;
+let sum = fn(a, b) {
+let c = a + b;
+c + globalNum;
+};
+let outer = fn() {
+sum(1, 2) + sum(3, 4) + globalNum;
+};
+outer() + globalNum;",
+                Box::new(50i64),
+            ),
+        ];
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_calling_functions_with_wrong_arguments() {
+        let tests = vec![
+            VmTestCase::new(
+                "fn() { 1; }(1);",
+                Box::new("wrong number of arguments: want=0, got=1"),
+            ),
+            VmTestCase::new(
+                "fn(a) { a; }();",
+                Box::new("wrong number of arguments: want=1, got=0"),
+            ),
+            VmTestCase::new(
+                "fn(a, b) { a + b; }(1);",
+                Box::new("wrong number of arguments: want=2, got=1"),
+            ),
+        ];
+        for VmTestCase { input, expected } in tests {
+            let program = parse(input);
+
+            let mut comp = Compiler::new();
+            comp.compile(ast::Node::Program(program))
+                .unwrap_or_else(|e| panic!("compiler error: {e}"));
+
+            let mut vm = VM::new(comp.bytecode());
+            let err = vm.run();
+            let Some(expected) = expected.downcast_ref::<&str>() else {
+                panic!()
+            };
+            match err {
+                Ok(_) => panic!("expected VM error but resulted in none."),
+                Err(err_msg) => assert_eq!(
+                    &err_msg, expected,
+                    "wrong VM error: want={expected}, got={err_msg}"
+                ),
+            }
+        }
+        //run_vm_tests(tests);
     }
 }

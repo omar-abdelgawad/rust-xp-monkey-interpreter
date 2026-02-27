@@ -187,7 +187,7 @@ pub fn lookup(opcode: u8) -> Definition {
         Ok(Op::Array) => Definition::new("OpArray".into(), vec![2]), // max array size is 65536
         Ok(Op::Hash) => Definition::new("OpHash".into(), vec![2]),   // max hash size is 65536/2
         Ok(Op::Index) => Definition::new("OpIndex".into(), vec![]),
-        Ok(Op::Call) => Definition::new("OpCall".into(), vec![]),
+        Ok(Op::Call) => Definition::new("OpCall".into(), vec![1]), // max num of args is 256
         Ok(Op::ReturnValue) => Definition::new("OpReturnValue".into(), vec![]),
         Ok(Op::Return) => Definition::new("OpReturn".into(), vec![]),
         Ok(Op::GetLocal) => Definition::new("OpGetLocal".into(), vec![1]), // maximum local bindings is 65536

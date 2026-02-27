@@ -200,6 +200,13 @@ impl Compiler {
                 }
                 Exp::Function(fn_lit) => {
                     self.enter_scope();
+
+                    // define arguments as local variabls
+                    let num_parameters = fn_lit.parameters.len();
+                    for p in fn_lit.parameters {
+                        self.symbol_table().borrow_mut().define(p.value);
+                    }
+
                     let fn_lit_body = fn_lit.body.unwrap(); //FIX: what to do here?
                     self.compile(Node::Statement(St::Block(*fn_lit_body)))?;
                     // implicit returnvalue
@@ -212,13 +219,18 @@ impl Compiler {
                     }
                     let num_locals = self.symbol_table.borrow().num_definitions;
                     let instructions = self.leave_scope();
-                    let compiled_fn = CompiledFunctionObj::new(instructions, num_locals);
+                    let compiled_fn =
+                        CompiledFunctionObj::new(instructions, num_locals, num_parameters);
                     let const_ind = self.add_constant(Object::CompiledFunction(compiled_fn));
                     self.emit(Opcode::Constant, &[const_ind as i64]);
                 }
                 Exp::Call(call_exp) => {
                     self.compile(Node::Expression(*call_exp.function))?;
-                    self.emit(Opcode::Call, &[]);
+                    let len_args = call_exp.arguments.len() as i64;
+                    for a in call_exp.arguments {
+                        self.compile(Node::Expression(a))?;
+                    }
+                    self.emit(Opcode::Call, &[len_args]);
                 }
                 Exp::Str(str_lit) => {
                     let str_obj = Object::new_str_var(&str_lit.value);
@@ -1150,7 +1162,7 @@ two;
                 ],
                 vec![
                     Instructions::new(make(Op::Constant, &[1])),
-                    Instructions::new(make(Op::Call, &[])),
+                    Instructions::new(make(Op::Call, &[0])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),
@@ -1168,7 +1180,53 @@ noArg();",
                     Instructions::new(make(Op::Constant, &[1])),
                     Instructions::new(make(Op::SetGlobal, &[0])),
                     Instructions::new(make(Op::GetGlobal, &[0])),
-                    Instructions::new(make(Op::Call, &[])),
+                    Instructions::new(make(Op::Call, &[0])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "let oneArg = fn(a){ a };
+oneArg(24);",
+                vec![
+                    Box::new(vec![
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                    Box::new(24i64),
+                ],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::SetGlobal, &[0])),
+                    Instructions::new(make(Op::GetGlobal, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Call, &[1])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "let manyArg = fn(a, b, c){ a; b; c };
+manyArg(24, 25, 26);",
+                vec![
+                    Box::new(vec![
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::Pop, &[])),
+                        Instructions::new(make(Op::GetLocal, &[1])),
+                        Instructions::new(make(Op::Pop, &[])),
+                        Instructions::new(make(Op::GetLocal, &[2])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                    Box::new(24i64),
+                    Box::new(25i64),
+                    Box::new(26i64),
+                ],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::SetGlobal, &[0])),
+                    Instructions::new(make(Op::GetGlobal, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Constant, &[2])),
+                    Instructions::new(make(Op::Constant, &[3])),
+                    Instructions::new(make(Op::Call, &[3])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),
