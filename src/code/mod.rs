@@ -1,5 +1,6 @@
 use std::{fmt::Display, ops::Deref};
 
+// The fields will be laid out in big endian
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Instructions(pub Vec<u8>);
 
@@ -73,6 +74,8 @@ pub enum Opcode {
     Call = 0x15,
     ReturnValue = 0x16,
     Return = 0x17,
+    GetLocal = 0x18,
+    SetLocal = 0x19,
 }
 use Opcode as Op;
 
@@ -106,6 +109,8 @@ impl TryFrom<u8> for Op {
             val if val == Op::Call as u8 => Ok(Op::Call),
             val if val == Op::ReturnValue as u8 => Ok(Op::ReturnValue),
             val if val == Op::Return as u8 => Ok(Op::Return),
+            val if val == Op::GetLocal as u8 => Ok(Op::GetLocal),
+            val if val == Op::SetLocal as u8 => Ok(Op::SetLocal),
             _ => Err(format!("unknown opcode {value}")),
         }
     }
@@ -133,6 +138,9 @@ pub fn make(op: Op, operands: &[i64]) -> Vec<u8> {
             2 => {
                 let bytes = (*o as u16).to_be_bytes();
                 instruction[offset..offset + 2].copy_from_slice(&bytes);
+            }
+            1 => {
+                instruction[offset] = *o as u8;
             }
             _ => panic!(),
         }
@@ -176,12 +184,14 @@ pub fn lookup(opcode: u8) -> Definition {
         Ok(Op::Null) => Definition::new("OpNull".into(), vec![]),
         Ok(Op::GetGlobal) => Definition::new("OpGetGlobal".into(), vec![2]),
         Ok(Op::SetGlobal) => Definition::new("OpSetGlobal".into(), vec![2]),
-        Ok(Op::Array) => Definition::new("OpArray".into(), vec![2]), // maximum array size is 65536
-        Ok(Op::Hash) => Definition::new("OpHash".into(), vec![2]),   // maximum array size is 65536
-        Ok(Op::Index) => Definition::new("OpIndex".into(), vec![]),  // maximum array size is 65536
-        Ok(Op::Call) => Definition::new("OpCall".into(), vec![]),    // maximum array size is 65536
-        Ok(Op::ReturnValue) => Definition::new("OpReturnValue".into(), vec![]), // maximum array size is 65536
-        Ok(Op::Return) => Definition::new("OpReturn".into(), vec![]), // maximum array size is 65536
+        Ok(Op::Array) => Definition::new("OpArray".into(), vec![2]), // max array size is 65536
+        Ok(Op::Hash) => Definition::new("OpHash".into(), vec![2]),   // max hash size is 65536/2
+        Ok(Op::Index) => Definition::new("OpIndex".into(), vec![]),
+        Ok(Op::Call) => Definition::new("OpCall".into(), vec![]),
+        Ok(Op::ReturnValue) => Definition::new("OpReturnValue".into(), vec![]),
+        Ok(Op::Return) => Definition::new("OpReturn".into(), vec![]),
+        Ok(Op::GetLocal) => Definition::new("OpGetLocal".into(), vec![1]), // maximum local bindings is 65536
+        Ok(Op::SetLocal) => Definition::new("OpSetLocal".into(), vec![1]), // maximum local bindings is 65536
         Err(op) => panic!("opcode {op:?} undefined"),
     }
 }
@@ -192,6 +202,7 @@ pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<i64>, i64) {
     for (i, width) in def.operand_widths.iter().enumerate() {
         match width {
             2 => operands[i] = read_u16(&ins[offset..offset + 2]) as i64,
+            1 => operands[i] = read_u8(&ins[offset..offset + 1]) as i64,
             _ => panic!("unsupported operand width"),
         }
         offset += *width as usize;
@@ -201,6 +212,9 @@ pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<i64>, i64) {
 
 pub fn read_u16(x: &[u8]) -> u16 {
     u16::from_be_bytes([x[0], x[1]])
+}
+pub fn read_u8(x: &[u8]) -> u8 {
+    x[0]
 }
 
 #[cfg(test)]
@@ -215,6 +229,7 @@ mod test {
                 vec![Op::Constant as u8, 255, 254],
             ),
             (Op::Add, vec![], vec![Op::Add as u8]),
+            (Op::GetLocal, vec![255], vec![Op::GetLocal as u8, 255u8]),
         ];
         let mut errors = Vec::new();
         for (op, operands, expected) in tests {
@@ -243,12 +258,14 @@ mod test {
     fn test_instructions_string() {
         let instructions = vec![
             make(Op::Add, &[]),
+            make(Op::GetLocal, &[1]),
             make(Op::Constant, &[2]),
             make(Op::Constant, &[65535]),
         ];
         let expected = r#"0000 OpAdd
-0001 OpConstant 2
-0004 OpConstant 65535
+0001 OpGetLocal 1
+0003 OpConstant 2
+0006 OpConstant 65535
 "#;
         let mut concatted = Instructions::default();
         for ins in instructions {
@@ -264,7 +281,7 @@ mod test {
 
     #[test]
     fn test_read_operands() {
-        let tests = vec![(Op::Constant, &[65535], 2)];
+        let tests = vec![(Op::Constant, &[65535], 2), (Op::GetLocal, &[255], 1)];
         for (op, operands, bytes_read) in tests {
             let instruction = make(op, operands);
             let def = lookup(op as u8);

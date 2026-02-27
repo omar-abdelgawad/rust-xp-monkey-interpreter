@@ -1,5 +1,5 @@
 use crate::ast::Node;
-use crate::compiler::symbol_table::SymbolTable;
+use crate::compiler::symbol_table::{SymbolTable, SymbolTableRef};
 use crate::compiler::Compiler;
 use crate::lexer::Lexer;
 use crate::object::environment::Environment;
@@ -33,7 +33,7 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
     // the future and add a test case as well.
     let mut constants = vec![];
     let mut globals = vec![GARBAGEVALOBJ; GLOBALSSIZE];
-    let mut symbol_table = SymbolTable::new();
+    let mut symbol_table: SymbolTableRef = Rc::new(RefCell::new(SymbolTable::new()));
 
     loop {
         // Print prompt

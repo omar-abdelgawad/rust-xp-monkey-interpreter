@@ -1,7 +1,9 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     ast::{self, LetStatement},
     code::{make, Instructions, Opcode},
-    compiler::symbol_table::SymbolTable,
+    compiler::symbol_table::{SymbolScope, SymbolTable, SymbolTableRef},
     object::{CompiledFunctionObj, Object},
 };
 pub mod symbol_table;
@@ -9,7 +11,7 @@ pub mod symbol_table;
 #[derive(Debug)]
 pub struct Compiler {
     constants: Vec<Object>,
-    symbol_table: SymbolTable,
+    symbol_table: SymbolTableRef, // note that symbol_table and scopes are related
     scopes: Vec<CompilationScope>,
     scope_index: usize, // TODO: does this variable actually need to exist?
 }
@@ -56,14 +58,14 @@ impl Default for EmittedInstruction {
 
 impl Compiler {
     // should remove this function but need it for now
-    pub fn symbol_table(&self) -> SymbolTable {
+    pub fn symbol_table(&self) -> SymbolTableRef {
         self.symbol_table.clone()
     }
     pub fn new() -> Self {
         let main_scope = CompilationScope::default();
         Self {
             constants: vec![],
-            symbol_table: SymbolTable::new(),
+            symbol_table: Rc::new(RefCell::new(SymbolTable::new())),
             scopes: vec![main_scope],
             scope_index: 0,
         }
@@ -90,8 +92,15 @@ impl Compiler {
                 St::Let(let_stmt) => {
                     let LetStatement { name, value, .. } = let_stmt;
                     self.compile(Node::Expression(*value))?;
-                    let symbol = self.symbol_table.define(name.value);
-                    self.emit(Opcode::SetGlobal, &[symbol.index as i64]);
+                    let symbol = self.symbol_table.borrow_mut().define(name.value);
+                    match symbol.scope {
+                        SymbolScope::Global => {
+                            self.emit(Opcode::SetGlobal, &[symbol.index as i64]);
+                        }
+                        SymbolScope::Local => {
+                            self.emit(Opcode::SetLocal, &[symbol.index as i64]);
+                        }
+                    }
                 }
                 St::Return(ret_stmt) => {
                     self.compile(Node::Expression(*ret_stmt.return_value));
@@ -133,9 +142,14 @@ impl Compiler {
                 Exp::Identifier(ident) => {
                     let symbol = self
                         .symbol_table
+                        .borrow()
                         .resolve(&ident.value)
                         .ok_or(format!("undefined variable {}", ident.value))?;
-                    self.emit(Opcode::GetGlobal, &[symbol.index as i64]);
+                    let op = match symbol.scope {
+                        SymbolScope::Global => Opcode::GetGlobal,
+                        SymbolScope::Local => Opcode::GetLocal,
+                    };
+                    self.emit(op, &[symbol.index as i64]);
                 }
                 Exp::Boolean(bool_lit) => {
                     match bool_lit.value {
@@ -188,14 +202,17 @@ impl Compiler {
                     self.enter_scope();
                     let fn_lit_body = fn_lit.body.unwrap(); //FIX: what to do here?
                     self.compile(Node::Statement(St::Block(*fn_lit_body)))?;
+                    // implicit returnvalue
                     if self.last_instruction_is(Opcode::Pop) {
                         self.replace_last_pop_with_return();
                     }
+                    // empty function case
                     if !self.last_instruction_is(Opcode::ReturnValue) {
                         self.emit(Opcode::Return, &[]);
                     }
+                    let num_locals = self.symbol_table.borrow().num_definitions;
                     let instructions = self.leave_scope();
-                    let compiled_fn = CompiledFunctionObj::new(instructions);
+                    let compiled_fn = CompiledFunctionObj::new(instructions, num_locals);
                     let const_ind = self.add_constant(Object::CompiledFunction(compiled_fn));
                     self.emit(Opcode::Constant, &[const_ind as i64]);
                 }
@@ -311,7 +328,7 @@ impl Compiler {
         ins.0[pos..end].copy_from_slice(new_instruction);
     }
     // TODO: I don't like this api for remembering previous compilations. is there any other way?
-    pub fn new_with_state(s: SymbolTable, constants: Vec<Object>) -> Self {
+    pub fn new_with_state(s: SymbolTableRef, constants: Vec<Object>) -> Self {
         let mut compiler = Compiler::new();
         compiler.symbol_table = s;
         compiler.constants = constants;
@@ -322,6 +339,7 @@ impl Compiler {
         let scope = CompilationScope::default();
         self.scopes.push(scope);
         self.scope_index += 1;
+        self.symbol_table = SymbolTable::new_enclosed_symbol_table(self.symbol_table.clone())
     }
     fn leave_scope(&mut self) -> Instructions {
         let scope = self
@@ -329,6 +347,14 @@ impl Compiler {
             .pop()
             .expect("There should always be a scope entered");
         self.scope_index -= 1;
+        let outer = self
+            .symbol_table
+            .borrow()
+            .outer
+            .as_ref()
+            .expect("fds")
+            .clone();
+        self.symbol_table = outer;
         scope.instructions
     }
 
@@ -358,7 +384,7 @@ impl Bytecode {
 
 #[cfg(test)]
 mod tests {
-    use std::any::Any;
+    use std::{any::Any, cell::RefCell, rc::Rc};
 
     use crate::{
         code::{make, Opcode as Op},
@@ -1037,6 +1063,7 @@ two;
             "scope_index wrong. got={}, want=0",
             compiler.scope_index
         );
+        let global_symbol_table = compiler.symbol_table.clone();
         compiler.emit(Opcode::Mul, &[]);
         compiler.enter_scope();
         assert_eq!(
@@ -1058,12 +1085,32 @@ two;
             last.opcode,
             Opcode::Sub
         );
+
+        if compiler
+            .symbol_table
+            .borrow()
+            .outer
+            .clone()
+            .expect("global exists")
+            != global_symbol_table
+        {
+            panic!()
+        }
+
         compiler.leave_scope();
         assert_eq!(
             compiler.scope_index, 0,
             "scope_index wrong. got={}, want=0",
             compiler.scope_index
         );
+
+        if compiler.symbol_table != global_symbol_table {
+            panic!("compiler did not restore global symbol table");
+        }
+        if compiler.symbol_table.borrow().outer.is_some() {
+            panic!("compiler modified global symbol table incorrectly")
+        }
+
         compiler.emit(Opcode::Add, &[]);
         let len = compiler.scopes[compiler.scope_index].instructions.len();
         assert_eq!(len, 2, "instructions length wrong. got={len}",);
@@ -1122,6 +1169,79 @@ noArg();",
                     Instructions::new(make(Op::SetGlobal, &[0])),
                     Instructions::new(make(Op::GetGlobal, &[0])),
                     Instructions::new(make(Op::Call, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
+    }
+    #[test]
+    fn test_let_statements_scopes() {
+        let tests = vec![
+            CompilerTestCase::new(
+                "
+let num = 55;
+fn() { num }
+",
+                vec![
+                    Box::new(55i64),
+                    Box::new(vec![
+                        Instructions::new(make(Op::GetGlobal, &[0])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                ],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::SetGlobal, &[0])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "
+fn() {
+let num = 55;
+num
+}
+",
+                vec![
+                    Box::new(55i64),
+                    Box::new(vec![
+                        Instructions::new(make(Op::Constant, &[0])),
+                        Instructions::new(make(Op::SetLocal, &[0])),
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                ],
+                vec![
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "
+fn() {
+let a = 55;
+let b = 77;
+a + b
+}
+",
+                vec![
+                    Box::new(55i64),
+                    Box::new(77i64),
+                    Box::new(vec![
+                        Instructions::new(make(Op::Constant, &[0])),
+                        Instructions::new(make(Op::SetLocal, &[0])),
+                        Instructions::new(make(Op::Constant, &[1])),
+                        Instructions::new(make(Op::SetLocal, &[1])),
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::GetLocal, &[1])),
+                        Instructions::new(make(Op::Add, &[])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                ],
+                vec![
+                    Instructions::new(make(Op::Constant, &[2])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),

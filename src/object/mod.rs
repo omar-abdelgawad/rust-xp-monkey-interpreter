@@ -445,10 +445,14 @@ impl ObjectTrait for HashObj {
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct CompiledFunctionObj {
     pub instructions: Instructions,
+    pub num_locals: usize,
 }
 impl CompiledFunctionObj {
-    pub fn new(instructions: Instructions) -> Self {
-        Self { instructions }
+    pub fn new(instructions: Instructions, num_locals: usize) -> Self {
+        Self {
+            instructions,
+            num_locals,
+        }
     }
 }
 
@@ -457,7 +461,7 @@ impl ObjectTrait for CompiledFunctionObj {
         ObjectType::Compiled_Function_OBJ
     }
     fn inspect(&self) -> String {
-        format!("CompiledFunction[{:p}]", self)
+        format!("CompiledFunction[{:p}]:\n{}", self, self.instructions)
     }
 }
 

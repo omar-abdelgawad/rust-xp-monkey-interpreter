@@ -1,5 +1,5 @@
 use crate::ast;
-use crate::code::{read_u16, Instructions, Opcode};
+use crate::code::{read_u16, read_u8, Instructions, Opcode};
 use crate::compiler::Bytecode;
 use crate::lexer::Lexer;
 use crate::object::{
@@ -18,18 +18,22 @@ const MAXFRAMES: usize = 1024;
 struct Frame {
     comp_fn: CompiledFunctionObj,
     ip: i64,
+    bp: i64,
 }
-impl Default for Frame {
-    fn default() -> Self {
+impl Frame {
+    fn new(comp_fn: CompiledFunctionObj, bp: i64) -> Self {
+        Self {
+            comp_fn,
+            ip: -1,
+            bp: bp,
+        }
+    }
+    fn garbage_value() -> Self {
         Self {
             comp_fn: Default::default(),
             ip: -1,
+            bp: -1,
         }
-    }
-}
-impl Frame {
-    fn new(comp_fn: CompiledFunctionObj) -> Self {
-        Self { comp_fn, ip: -1 }
     }
     fn instructions(&mut self) -> &mut Instructions {
         &mut self.comp_fn.instructions
@@ -60,10 +64,10 @@ impl VM {
             instructions,
         }: Bytecode,
     ) -> Self {
-        let main_fn = CompiledFunctionObj::new(instructions);
-        let main_frame = Frame::new(main_fn);
+        let main_fn = CompiledFunctionObj::new(instructions, 0); // I am not sure what to have here
+        let main_frame = Frame::new(main_fn, 0);
 
-        let mut frames = vec![Default::default(); MAXFRAMES];
+        let mut frames = vec![Frame::garbage_value(); MAXFRAMES];
         frames[0] = main_frame;
         Self {
             constants,
@@ -308,6 +312,48 @@ impl VM {
                     let left = self.pop();
 
                     self.execute_index_expression(left, index)?;
+                }
+                Opcode::Call => {
+                    if let Object::CompiledFunction(ref comp_fn) = self.stack[self.sp - 1] {
+                        let frame = Frame::new(comp_fn.clone(), self.sp.try_into().unwrap());
+                        let next_sp: usize = frame.bp as usize + comp_fn.num_locals;
+                        self.push_frame(frame);
+                        self.sp = next_sp;
+                    } else {
+                        // note that in error case top of stack is not popped
+                        return Err("calling non-function".to_string());
+                    }
+                }
+                Opcode::ReturnValue => {
+                    let return_value = self.pop();
+
+                    let frame = self.pop_frame();
+                    self.sp = usize::try_from(frame.bp).unwrap() - 1; // - 1 instead of popping the function obj
+
+                    self.push(return_value)?;
+                }
+                Opcode::Return => {
+                    let frame = self.pop_frame();
+                    self.sp = usize::try_from(frame.bp).unwrap() - 1; // - 1 instead of popping the function obj
+
+                    self.push(NULL)?;
+                }
+                Opcode::SetLocal => {
+                    let local_ind = ins[usize::try_from(ip + 1).unwrap()] as usize;
+                    self.current_frame().ip += 1;
+
+                    let frame_bp: usize = self.current_frame().bp.try_into().unwrap();
+                    let local_var_val = self.pop();
+                    self.stack[frame_bp + local_ind] = local_var_val;
+                }
+                Opcode::GetLocal => {
+                    dbg!(&ins);
+                    let local_ind = ins[usize::try_from(dbg!(ip + 1)).unwrap()] as usize;
+                    self.current_frame().ip += 1;
+
+                    let frame_bp: usize = dbg!(self.current_frame().bp.try_into()).unwrap();
+                    dbg!(local_ind);
+                    self.push(self.stack[frame_bp + local_ind].clone())?;
                 }
 
                 _ => panic!("unknown instruction"),
@@ -661,6 +707,125 @@ mod tests {
             VmTestCase::new("{1: 1, 2: 2}[2]", Box::new(2i64)),
             VmTestCase::new("{1: 1}[0]", Box::new(Null)),
             VmTestCase::new("{}[0]", Box::new(Null)),
+        ];
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_calling_functions_without_arguments() {
+        let tests = vec![
+            VmTestCase::new(
+                "let fivePlusTen = fn() { 5 + 10; };
+fivePlusTen();",
+                Box::new(15i64),
+            ),
+            VmTestCase::new(
+                "let one = fn() { 1; };
+let two = fn() { 2; };
+one() + two()",
+                Box::new(3i64),
+            ),
+            VmTestCase::new(
+                "let a = fn() { 1 };
+let b = fn() { a() + 1 };
+let c = fn() { b() + 1 };
+c();",
+                Box::new(3i64),
+            ),
+        ];
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_functions_with_return_statement() {
+        let tests = vec![
+            VmTestCase::new(
+                "let earlyExit = fn() { return 99; 100; };
+earlyExit();",
+                Box::new(99i64),
+            ),
+            VmTestCase::new(
+                "let earlyExit = fn() { return 99; return 100; };
+earlyExit();",
+                Box::new(99i64),
+            ),
+        ];
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_functions_without_return_value() {
+        let tests = vec![
+            VmTestCase::new(
+                "let noReturn = fn() { };
+noReturn();",
+                Box::new(Null),
+            ),
+            VmTestCase::new(
+                "let noReturn = fn() { };
+let noReturnTwo = fn() { noReturn(); };
+noReturn();
+noReturnTwo();",
+                Box::new(Null),
+            ),
+        ];
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_first_class_functions() {
+        let tests = vec![
+            VmTestCase::new(
+                "let returnsOne = fn() { 1; };
+            let returnsOneReturner = fn() { returnsOne; };
+            returnsOneReturner()();",
+                Box::new(1i64),
+            ),
+            VmTestCase::new(
+                "let returnsOneReturner = fn() {
+let returnsOne = fn() { 1; };
+returnsOne;
+};
+returnsOneReturner()();",
+                Box::new(1i64),
+            ),
+        ];
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_calling_functions_with_bindings() {
+        let tests = vec![
+            VmTestCase::new(
+                "let one = fn() { let one = 1; one };
+            one();",
+                Box::new(1i64),
+            ),
+            VmTestCase::new(
+                "let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
+            oneAndTwo();",
+                Box::new(3i64),
+            ),
+            VmTestCase::new(
+                "let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
+                        let threeAndFour = fn() { let three = 3; let four = 4; three + four; };
+                        oneAndTwo() + threeAndFour();",
+                Box::new(10i64),
+            ),
+            VmTestCase::new(
+                "let firstFoobar = fn() { let foobar = 50; foobar; };
+                        let secondFoobar = fn() { let foobar = 100; foobar; };
+                        firstFoobar() + secondFoobar();",
+                Box::new(150i64),
+            ),
+            VmTestCase::new(
+                "let globalSeed = 50;
+            let minusOne = fn() {
+            let num = 1;
+            globalSeed - num;
+            }
+            let minusTwo = fn() {
+            let num = 2;
+            globalSeed - num;
+            }
+            minusOne() + minusTwo();",
+                Box::new(97i64),
+            ),
         ];
         run_vm_tests(tests);
     }
