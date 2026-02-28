@@ -1,4 +1,6 @@
+pub mod builtins;
 pub mod environment;
+
 use fnv::FnvHasher;
 use std::hash::Hasher;
 use std::{collections::HashMap, fmt::Display};
@@ -373,7 +375,7 @@ impl ObjectTrait for BuiltinObj {
         ObjectType::BuiltinFunction
     }
     fn inspect(&self) -> String {
-        "builting function".to_string()
+        "builtin function".to_string()
     }
 }
 

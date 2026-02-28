@@ -3,8 +3,8 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     ast::{self, LetStatement},
     code::{make, Instructions, Opcode},
-    compiler::symbol_table::{SymbolScope, SymbolTable, SymbolTableRef},
-    object::{CompiledFunctionObj, Object},
+    compiler::symbol_table::{Symbol, SymbolScope, SymbolTable, SymbolTableRef},
+    object::{builtins::BUILTINS, CompiledFunctionObj, Object},
 };
 pub mod symbol_table;
 
@@ -63,9 +63,14 @@ impl Compiler {
     }
     pub fn new() -> Self {
         let main_scope = CompilationScope::default();
+        let mut symbol_table = SymbolTable::new();
+        // define all builtin symbols
+        for (i, (name, _)) in BUILTINS.iter().enumerate() {
+            symbol_table.define_builtin(i, name.to_string());
+        }
         Self {
             constants: vec![],
-            symbol_table: Rc::new(RefCell::new(SymbolTable::new())),
+            symbol_table: Rc::new(RefCell::new(symbol_table)),
             scopes: vec![main_scope],
             scope_index: 0,
         }
@@ -100,6 +105,7 @@ impl Compiler {
                         SymbolScope::Local => {
                             self.emit(Opcode::SetLocal, &[symbol.index as i64]);
                         }
+                        SymbolScope::Builtin => panic!("builtin scope can't be set"),
                     }
                 }
                 St::Return(ret_stmt) => {
@@ -145,11 +151,8 @@ impl Compiler {
                         .borrow()
                         .resolve(&ident.value)
                         .ok_or(format!("undefined variable {}", ident.value))?;
-                    let op = match symbol.scope {
-                        SymbolScope::Global => Opcode::GetGlobal,
-                        SymbolScope::Local => Opcode::GetLocal,
-                    };
-                    self.emit(op, &[symbol.index as i64]);
+
+                    self.load_symbol(&symbol);
                 }
                 Exp::Boolean(bool_lit) => {
                     match bool_lit.value {
@@ -375,6 +378,13 @@ impl Compiler {
         self.replace_instruction(last_pos, &make(Opcode::ReturnValue, &[]));
 
         self.scopes[self.scope_index].last_instruction.opcode = Opcode::ReturnValue;
+    }
+    fn load_symbol(&mut self, s: &Symbol) {
+        match s.scope {
+            SymbolScope::Global => self.emit(Opcode::GetGlobal, &[s.index as i64]),
+            SymbolScope::Local => self.emit(Opcode::GetLocal, &[s.index as i64]),
+            SymbolScope::Builtin => self.emit(Opcode::GetBuiltin, &[s.index as i64]),
+        };
     }
 }
 
@@ -1300,6 +1310,42 @@ a + b
                 ],
                 vec![
                     Instructions::new(make(Op::Constant, &[2])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
+    }
+
+    #[test]
+    fn test_builtins() {
+        let tests = vec![
+            CompilerTestCase::new(
+                "len([]);
+push([], 1);",
+                vec![Box::new(1i64)],
+                vec![
+                    Instructions::new(make(Op::GetBuiltin, &[0])),
+                    Instructions::new(make(Op::Array, &[0])),
+                    Instructions::new(make(Op::Call, &[1])),
+                    Instructions::new(make(Op::Pop, &[])),
+                    Instructions::new(make(Op::GetBuiltin, &[5])),
+                    Instructions::new(make(Op::Array, &[0])),
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Call, &[2])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "fn() { len([]) }",
+                vec![Box::new(vec![
+                    Instructions::new(make(Op::GetBuiltin, &[0])),
+                    Instructions::new(make(Op::Array, &[0])),
+                    Instructions::new(make(Op::Call, &[1])),
+                    Instructions::new(make(Op::ReturnValue, &[])),
+                ])],
+                vec![
+                    Instructions::new(make(Op::Constant, &[0])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),

@@ -4,6 +4,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 pub enum SymbolScope {
     Global,
     Local,
+    Builtin,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -52,6 +53,11 @@ impl SymbolTable {
         }
         self.store.insert(ident, symbol.clone());
         self.num_definitions += 1;
+        symbol
+    }
+    pub fn define_builtin(&mut self, index: usize, name: String) -> Symbol {
+        let symbol = Symbol::new(name.clone(), SymbolScope::Builtin, index);
+        self.store.insert(name, symbol.clone());
         symbol
     }
     pub fn resolve(&self, ident: &str) -> Option<Symbol> {
@@ -218,5 +224,50 @@ mod test {
                 );
             }
         }
+    }
+    #[test]
+    fn test_define_resolve_builtins() {
+        let mut global = Rc::new(RefCell::new(SymbolTable::new()));
+        let mut first_local = SymbolTable::new_enclosed_symbol_table(Rc::clone(&global));
+        let mut second_local = SymbolTable::new_enclosed_symbol_table(Rc::clone(&first_local));
+
+        let expected = vec![
+            Symbol::new("a", SymbolScope::Builtin, 0),
+            Symbol::new("c", SymbolScope::Builtin, 1),
+            Symbol::new("e", SymbolScope::Builtin, 2),
+            Symbol::new("f", SymbolScope::Builtin, 3),
+        ];
+        for (i, v) in expected.iter().enumerate() {
+            global.borrow_mut().define_builtin(i, v.name.clone());
+        }
+        for table in [global, first_local, second_local] {
+            for sym in expected.iter() {
+                let result = table
+                    .borrow()
+                    .resolve(&sym.name)
+                    .unwrap_or_else(|| panic!("name {} not resolvable", sym.name));
+                assert_eq!(
+                    &result, sym,
+                    "expected {} to resolve to {sym:?}, got={result:?}",
+                    sym.name
+                )
+            }
+        }
+        //global.borrow_mut().define("a".to_string());
+        //global.borrow_mut().define("b".to_string());
+        //
+        //local.borrow_mut().define("c".to_string());
+        //local.borrow_mut().define("d".to_string());
+        //for sym in expected {
+        //    let res = local
+        //        .borrow()
+        //        .resolve(&sym.name)
+        //        .unwrap_or_else(|| panic!("name {} not resolvable", sym.name));
+        //    assert_eq!(
+        //        res, sym,
+        //        "expected {} to resolve to {:?}, got={:?}",
+        //        sym.name, sym, res
+        //    );
+        //}
     }
 }

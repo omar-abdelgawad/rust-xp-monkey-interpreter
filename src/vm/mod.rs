@@ -2,9 +2,10 @@ use crate::ast;
 use crate::code::{read_u16, read_u8, Instructions, Opcode};
 use crate::compiler::Bytecode;
 use crate::lexer::Lexer;
+use crate::object::builtins::BUILTINS;
 use crate::object::{
-    native_bool_to_boolean_object, Array, CompiledFunctionObj, HashObj, HashPair, Hashable,
-    Integer, IsHashable, Null, Object, ObjectTrait, FALSE, GARBAGEVALOBJ, NULL, TRUE,
+    native_bool_to_boolean_object, Array, BuiltinObj, CompiledFunctionObj, HashObj, HashPair,
+    Hashable, Integer, IsHashable, Null, Object, ObjectTrait, FALSE, GARBAGEVALOBJ, NULL, TRUE,
 };
 use crate::parser::Parser;
 use std::array;
@@ -317,7 +318,7 @@ impl VM {
                     let num_args = ins[usize::try_from(ip + 1).unwrap()] as usize;
                     self.current_frame().ip += 1;
 
-                    self.call_function(num_args)?;
+                    self.execute_call(num_args)?;
                 }
                 Opcode::ReturnValue => {
                     let return_value = self.pop();
@@ -348,32 +349,55 @@ impl VM {
                     let frame_bp: usize = self.current_frame().bp.try_into().unwrap();
                     self.push(self.stack[frame_bp + local_ind].clone())?;
                 }
+                Opcode::GetBuiltin => {
+                    let builtin_ind = ins[usize::try_from(ip + 1).unwrap()] as usize;
+                    self.current_frame().ip += 1;
+
+                    let definition = BUILTINS
+                        .get(builtin_ind)
+                        .expect("index is always valid from compiler");
+                    // TODO: try to remove the clone by storing Rc<BuiltinObj>
+                    self.push(Object::Builtin(definition.1.clone()))?;
+                }
 
                 _ => panic!("unknown instruction"),
             }
         }
         Ok(())
     }
-    fn call_function(&mut self, num_args: usize) -> Result<(), String> {
-        if let Object::CompiledFunction(ref comp_fn) = self.stack[self.sp - 1 - num_args] {
-            if num_args != comp_fn.num_parameters {
-                return Err(format!(
-                    "wrong number of arguments: want={}, got={num_args}",
-                    comp_fn.num_parameters,
-                ));
-            }
-            let frame = Frame::new(
-                comp_fn.clone(),
-                usize::try_into(self.sp - num_args).unwrap(),
-            );
-            let next_sp: usize = frame.bp as usize + comp_fn.num_locals;
-            self.push_frame(frame);
-            self.sp = next_sp;
-            Ok(())
-        } else {
-            // note that in error case top of stack is not popped
-            return Err("calling non-function".to_string());
+    fn execute_call(&mut self, num_args: usize) -> Result<(), String> {
+        let callee = self.stack[self.sp - 1 - num_args].clone();
+        match callee {
+            Object::CompiledFunction(comp_fn) => self.call_function(comp_fn, num_args),
+            Object::Builtin(builtin_obj) => self.call_builtin(builtin_obj, num_args),
+            _ => Err("calling non-function and non-built-in".to_string()),
         }
+    }
+    fn call_function(
+        &mut self,
+        comp_fn: CompiledFunctionObj,
+        num_args: usize,
+    ) -> Result<(), String> {
+        if num_args != comp_fn.num_parameters {
+            return Err(format!(
+                "wrong number of arguments: want={}, got={num_args}",
+                comp_fn.num_parameters,
+            ));
+        }
+        let frame = Frame::new(
+            comp_fn.clone(),
+            usize::try_into(self.sp - num_args).unwrap(),
+        );
+        let next_sp: usize = frame.bp as usize + comp_fn.num_locals;
+        self.push_frame(frame);
+        self.sp = next_sp;
+        Ok(())
+    }
+    fn call_builtin(&mut self, builtin_obj: BuiltinObj, num_args: usize) -> Result<(), String> {
+        let args = &self.stack[self.sp - num_args..self.sp];
+        let result = (builtin_obj.function)(args);
+        self.sp = self.sp - num_args - 1;
+        self.push(result)
     }
 
     pub fn push(&mut self, o: Object) -> Result<(), String> {
@@ -433,7 +457,7 @@ mod tests {
 
     use crate::{
         compiler::{self, Compiler},
-        object::{HashKey, Hashable},
+        object::{Error, HashKey, Hashable},
     };
 
     use super::*;
@@ -536,8 +560,25 @@ mod tests {
         } else if let Some(expec) = expected.downcast_ref::<HashMap<HashKey, i64>>() {
             test_hash_ints_object(&expec, actual)
                 .unwrap_or_else(|e| panic!("test_arr_object failed: {e}"));
+        } else if let Some(expec) = expected.downcast_ref::<Error>() {
+            test_error_object(&expec, actual)
+                .unwrap_or_else(|e| panic!("test_arr_object failed: {e}"));
         } else {
             panic!("unknown dyn object: {:?}", expected);
+        }
+    }
+    pub fn test_error_object(expected: &Error, actual: &Object) -> Result<(), String> {
+        if let Object::Err(err_obj) = actual {
+            if err_obj.message != expected.message {
+                Err(format!(
+                    "wrong error message. expected={}, got={}",
+                    expected.message, err_obj.message
+                ))
+            } else {
+                Ok(())
+            }
+        } else {
+            Err(format!("object is not Error: {actual:?}"))
         }
     }
     pub fn test_hash_ints_object(
@@ -935,5 +976,54 @@ outer() + globalNum;",
             }
         }
         //run_vm_tests(tests);
+    }
+    #[test]
+    fn test_builtin_functions() {
+        let tests = vec![
+            VmTestCase::new(r#"len("")"#, Box::new(0i64)),
+            VmTestCase::new(r#"len("four")"#, Box::new(4i64)),
+            VmTestCase::new(r#"len("hello world")"#, Box::new(11i64)),
+            VmTestCase::new(
+                "len(1)",
+                Box::new(Error::new(
+                    "argument to `len` not supported, got INTEGER".to_string(),
+                )),
+            ),
+            VmTestCase::new(
+                r#"len("one", "two")"#,
+                Box::new(Error::new(
+                    "wrong number of arguments. got=2, want=1".to_string(),
+                )),
+            ),
+            VmTestCase::new("len([1, 2, 3])", Box::new(3i64)),
+            VmTestCase::new("len([])", Box::new(0i64)),
+            VmTestCase::new(r#"puts("hello", "world!")"#, Box::new(Null)),
+            VmTestCase::new("first([1, 2, 3])", Box::new(1i64)),
+            VmTestCase::new("first([])", Box::new(Null)),
+            VmTestCase::new(
+                "first(1)",
+                Box::new(Error::new(
+                    "argument to `first` must be ARRAY, got INTEGER".to_string(),
+                )),
+            ),
+            VmTestCase::new("last([1, 2, 3])", Box::new(3i64)),
+            VmTestCase::new("last([])", Box::new(Null)),
+            VmTestCase::new(
+                "last(1)",
+                Box::new(Error::new(
+                    "argument to `last` must be ARRAY, got INTEGER".to_string(),
+                )),
+            ),
+            VmTestCase::new("rest([1, 2, 3])", Box::new(vec![2i64, 3i64])),
+            VmTestCase::new("push([], 1)", Box::new(vec![1i64])),
+            VmTestCase::new(
+                "push(1, 1)",
+                Box::new(Error::new(
+                    "argument to `push` must be ARRAY, got INTEGER".to_string(),
+                )),
+            ),
+        ];
+
+        run_vm_tests(tests);
     }
 }

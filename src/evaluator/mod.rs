@@ -805,7 +805,7 @@ addTwo(2);";
             ("len(\"hello world\")", Expec::Val(11)),
             (
                 "len(1)",
-                Expec::Mess("argument to \"len\" not supported, got INTEGER"),
+                Expec::Mess("argument to `len` not supported, got INTEGER"),
             ),
             (
                 "len(\"one\", \"two\")",

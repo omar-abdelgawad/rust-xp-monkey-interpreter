@@ -2,6 +2,7 @@ use crate::ast::Node;
 use crate::compiler::symbol_table::{SymbolTable, SymbolTableRef};
 use crate::compiler::Compiler;
 use crate::lexer::Lexer;
+use crate::object::builtins::BUILTINS;
 use crate::object::environment::Environment;
 use crate::object::{ObjectTrait, GARBAGEVALOBJ};
 use crate::parser::Parser;
@@ -26,7 +27,6 @@ const MONKEY_FACE: &str = r#"            __,__
 
 pub fn start(mut input: impl BufRead, mut output: impl Write) {
     let mut line = String::new();
-    let _env = Rc::new(RefCell::new(Environment::new()));
 
     // TODO: in the book he uses pointers to avoid mutating them manually inside the loop but I am
     // too lazy to thing about this now. I don't like this api anyways and I should change it in
@@ -34,6 +34,11 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
     let mut constants = vec![];
     let mut globals = vec![GARBAGEVALOBJ; GLOBALSSIZE];
     let mut symbol_table: SymbolTableRef = Rc::new(RefCell::new(SymbolTable::new()));
+    for (i, (name, _)) in BUILTINS.iter().enumerate() {
+        symbol_table
+            .borrow_mut()
+            .define_builtin(i, name.to_string());
+    }
 
     loop {
         // Print prompt

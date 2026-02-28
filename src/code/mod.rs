@@ -76,6 +76,7 @@ pub enum Opcode {
     Return = 0x17,
     GetLocal = 0x18,
     SetLocal = 0x19,
+    GetBuiltin = 0x1a,
 }
 use Opcode as Op;
 
@@ -111,6 +112,7 @@ impl TryFrom<u8> for Op {
             val if val == Op::Return as u8 => Ok(Op::Return),
             val if val == Op::GetLocal as u8 => Ok(Op::GetLocal),
             val if val == Op::SetLocal as u8 => Ok(Op::SetLocal),
+            val if val == Op::GetBuiltin as u8 => Ok(Op::GetBuiltin),
             _ => Err(format!("unknown opcode {value}")),
         }
     }
@@ -190,8 +192,9 @@ pub fn lookup(opcode: u8) -> Definition {
         Ok(Op::Call) => Definition::new("OpCall".into(), vec![1]), // max num of args is 256
         Ok(Op::ReturnValue) => Definition::new("OpReturnValue".into(), vec![]),
         Ok(Op::Return) => Definition::new("OpReturn".into(), vec![]),
-        Ok(Op::GetLocal) => Definition::new("OpGetLocal".into(), vec![1]), // maximum local bindings is 65536
-        Ok(Op::SetLocal) => Definition::new("OpSetLocal".into(), vec![1]), // maximum local bindings is 65536
+        Ok(Op::GetLocal) => Definition::new("OpGetLocal".into(), vec![1]), // maximum local bindings is 256
+        Ok(Op::SetLocal) => Definition::new("OpSetLocal".into(), vec![1]), // maximum local bindings is 256
+        Ok(Op::GetBuiltin) => Definition::new("OpGetBuiltin".into(), vec![1]), // maximum builtins is 256
         Err(op) => panic!("opcode {op:?} undefined"),
     }
 }
