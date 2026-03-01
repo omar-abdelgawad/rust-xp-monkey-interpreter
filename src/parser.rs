@@ -397,11 +397,16 @@ impl Parser {
             return None;
         }
         self.next_token();
-        let stmt = LetStatement::new(
+        let mut stmt = LetStatement::new(
             cur_token_tmp,
             name_tmp,
             self.parse_expression(Precedence::LOWEST)?,
         );
+        // Added for recursive functions
+        if let Expression::Function(ref mut fn_lit) = &mut *stmt.value {
+            fn_lit.name = stmt.name.value.clone();
+        }
+
         if self.peek_token_is(TokenType::SEMICOLON) {
             self.next_token();
         }
@@ -1497,5 +1502,45 @@ mod test {
             );
         };
         assert!(test_identifier(&expr_stmt.expression, "y"));
+    }
+    #[test]
+    fn test_function_literal_with_name() {
+        let input = "let myFunction = fn() { };";
+
+        let l = lexer::Lexer::new(input);
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        check_parser_errors(p);
+
+        // Should only parse two let statements and one expression statement
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "program.statements doesn't contain 1 statements. got={}",
+            program.statements.len()
+        );
+
+        // First let statement: let x = 5;
+        let stmt = &program.statements[0];
+        let Statement::Let(let_stmt) = stmt else {
+            panic!(
+                "program.statements[0] is not a LetStatement. got={:?}",
+                stmt
+            );
+        };
+        //assert_eq!(let_stmt.name_value(), "x");
+        //assert!(test_literal_expression(&let_stmt.value, &5));
+        let Expression::Function(fn_lit) = &*let_stmt.value else {
+            panic!(
+                "let_stmt.value is not FunctionLiteral. got={:?}",
+                let_stmt.value
+            );
+        };
+        assert_eq!(
+            fn_lit.name,
+            "myFunction".to_string(),
+            "function literal name wrong. want 'myFunction', got={}",
+            fn_lit.name
+        )
     }
 }

@@ -1,12 +1,12 @@
-use std::{cell::RefCell, rc::Rc};
+pub mod symbol_table;
 
 use crate::{
     ast::{self, LetStatement},
     code::{make, Instructions, Opcode},
-    compiler::symbol_table::{Symbol, SymbolScope, SymbolTable, SymbolTableRef},
     object::{builtins::BUILTINS, CompiledFunctionObj, Object},
 };
-pub mod symbol_table;
+use std::{cell::RefCell, rc::Rc};
+use symbol_table::{Symbol, SymbolScope, SymbolTable, SymbolTableRef};
 
 #[derive(Debug)]
 pub struct Compiler {
@@ -96,8 +96,12 @@ impl Compiler {
                 }
                 St::Let(let_stmt) => {
                     let LetStatement { name, value, .. } = let_stmt;
-                    self.compile(Node::Expression(*value))?;
+                    // define the symbol first to allow recursive functions;
+                    // FIX: this should only be allow for functions since now we can do things like
+                    // "let a = !a;" and a on the left hand side will be the garbage value which is
+                    // TRUE so yeah idk how to fix this.
                     let symbol = self.symbol_table.borrow_mut().define(name.value);
+                    self.compile(Node::Expression(*value))?;
                     match symbol.scope {
                         SymbolScope::Global => {
                             self.emit(Opcode::SetGlobal, &[symbol.index as i64]);
@@ -105,7 +109,10 @@ impl Compiler {
                         SymbolScope::Local => {
                             self.emit(Opcode::SetLocal, &[symbol.index as i64]);
                         }
+                        // you are not supposed to be able to define free scope so idk maybe panic
+                        SymbolScope::Free => todo!(),
                         SymbolScope::Builtin => panic!("builtin scope can't be set"),
+                        SymbolScope::Function => todo!(),
                     }
                 }
                 St::Return(ret_stmt) => {
@@ -148,7 +155,7 @@ impl Compiler {
                 Exp::Identifier(ident) => {
                     let symbol = self
                         .symbol_table
-                        .borrow()
+                        .borrow_mut()
                         .resolve(&ident.value)
                         .ok_or(format!("undefined variable {}", ident.value))?;
 
@@ -204,6 +211,12 @@ impl Compiler {
                 Exp::Function(fn_lit) => {
                     self.enter_scope();
 
+                    // define the functions own name if it has one
+                    if fn_lit.name != "" {
+                        self.symbol_table
+                            .borrow_mut()
+                            .define_function_name(fn_lit.name);
+                    }
                     // define arguments as local variabls
                     let num_parameters = fn_lit.parameters.len();
                     for p in fn_lit.parameters {
@@ -220,12 +233,20 @@ impl Compiler {
                     if !self.last_instruction_is(Opcode::ReturnValue) {
                         self.emit(Opcode::Return, &[]);
                     }
+                    let symbol_table_ref = self.symbol_table();
+                    let free_symbols = &symbol_table_ref.borrow().free_symbols;
                     let num_locals = self.symbol_table.borrow().num_definitions;
                     let instructions = self.leave_scope();
+                    for s in free_symbols {
+                        self.load_symbol(&s);
+                    }
                     let compiled_fn =
                         CompiledFunctionObj::new(instructions, num_locals, num_parameters);
-                    let const_ind = self.add_constant(Object::CompiledFunction(compiled_fn));
-                    self.emit(Opcode::Constant, &[const_ind as i64]);
+                    let fn_const_index = self.add_constant(Object::CompiledFunction(compiled_fn));
+                    self.emit(
+                        Opcode::Closure,
+                        &[fn_const_index as i64, free_symbols.len() as i64],
+                    );
                 }
                 Exp::Call(call_exp) => {
                     self.compile(Node::Expression(*call_exp.function))?;
@@ -384,6 +405,8 @@ impl Compiler {
             SymbolScope::Global => self.emit(Opcode::GetGlobal, &[s.index as i64]),
             SymbolScope::Local => self.emit(Opcode::GetLocal, &[s.index as i64]),
             SymbolScope::Builtin => self.emit(Opcode::GetBuiltin, &[s.index as i64]),
+            SymbolScope::Free => self.emit(Opcode::GetFree, &[s.index as i64]),
+            SymbolScope::Function => self.emit(Opcode::CurrentClosure, &[]),
         };
     }
 }
@@ -1013,6 +1036,18 @@ two;
         run_compiler_tests(tests);
     }
     #[test]
+    fn test_functions_without_return_value() {
+        let tests = vec![CompilerTestCase::new(
+            "fn() {}",
+            vec![Box::new(vec![Instructions::new(make(Op::Return, &[]))])],
+            vec![
+                Instructions::new(make(Op::Closure, &[0, 0])),
+                Instructions::new(make(Op::Pop, &[])),
+            ],
+        )];
+        run_compiler_tests(tests);
+    }
+    #[test]
     fn test_functions() {
         let tests = vec![
             CompilerTestCase::new(
@@ -1028,7 +1063,7 @@ two;
                     ]),
                 ],
                 vec![
-                    Instructions::new(make(Op::Constant, &[2])),
+                    Instructions::new(make(Op::Closure, &[2, 0])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),
@@ -1045,7 +1080,7 @@ two;
                     ]),
                 ],
                 vec![
-                    Instructions::new(make(Op::Constant, &[2])),
+                    Instructions::new(make(Op::Closure, &[2, 0])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),
@@ -1062,21 +1097,14 @@ two;
                     ]),
                 ],
                 vec![
-                    Instructions::new(make(Op::Constant, &[2])),
-                    Instructions::new(make(Op::Pop, &[])),
-                ],
-            ),
-            CompilerTestCase::new(
-                "fn() {}",
-                vec![Box::new(vec![Instructions::new(make(Op::Return, &[]))])],
-                vec![
-                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Closure, &[2, 0])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),
         ];
         run_compiler_tests(tests);
     }
+
     #[test]
     fn test_compiler_scopes() {
         let mut compiler = Compiler::new();
@@ -1171,7 +1199,7 @@ two;
                     ]),
                 ],
                 vec![
-                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Closure, &[1, 0])),
                     Instructions::new(make(Op::Call, &[0])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
@@ -1187,7 +1215,7 @@ noArg();",
                     ]),
                 ],
                 vec![
-                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Closure, &[1, 0])),
                     Instructions::new(make(Op::SetGlobal, &[0])),
                     Instructions::new(make(Op::GetGlobal, &[0])),
                     Instructions::new(make(Op::Call, &[0])),
@@ -1205,7 +1233,7 @@ oneArg(24);",
                     Box::new(24i64),
                 ],
                 vec![
-                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Closure, &[0, 0])),
                     Instructions::new(make(Op::SetGlobal, &[0])),
                     Instructions::new(make(Op::GetGlobal, &[0])),
                     Instructions::new(make(Op::Constant, &[1])),
@@ -1230,7 +1258,7 @@ manyArg(24, 25, 26);",
                     Box::new(26i64),
                 ],
                 vec![
-                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Closure, &[0, 0])),
                     Instructions::new(make(Op::SetGlobal, &[0])),
                     Instructions::new(make(Op::GetGlobal, &[0])),
                     Instructions::new(make(Op::Constant, &[1])),
@@ -1261,7 +1289,7 @@ fn() { num }
                 vec![
                     Instructions::new(make(Op::Constant, &[0])),
                     Instructions::new(make(Op::SetGlobal, &[0])),
-                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Closure, &[1, 0])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),
@@ -1282,7 +1310,7 @@ num
                     ]),
                 ],
                 vec![
-                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::Closure, &[1, 0])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),
@@ -1309,7 +1337,7 @@ a + b
                     ]),
                 ],
                 vec![
-                    Instructions::new(make(Op::Constant, &[2])),
+                    Instructions::new(make(Op::Closure, &[2, 0])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),
@@ -1345,7 +1373,197 @@ push([], 1);",
                     Instructions::new(make(Op::ReturnValue, &[])),
                 ])],
                 vec![
+                    Instructions::new(make(Op::Closure, &[0, 0])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
+    }
+    #[test]
+    fn test_closures() {
+        let tests = vec![
+            CompilerTestCase::new(
+                "fn(a) {
+    fn(b) {
+    a + b
+    }
+}
+",
+                vec![
+                    Box::new(vec![
+                        Instructions::new(make(Op::GetFree, &[0])),
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::Add, &[])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                    Box::new(vec![
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::Closure, &[0, 1])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                ],
+                vec![
+                    Instructions::new(make(Op::Closure, &[1, 0])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "
+fn(a) {
+    fn(b) {
+        fn(c) {
+            a + b + c
+        }
+    }
+};
+",
+                vec![
+                    Box::new(vec![
+                        Instructions::new(make(Op::GetFree, &[0])),
+                        Instructions::new(make(Op::GetFree, &[1])),
+                        Instructions::new(make(Op::Add, &[])),
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::Add, &[])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                    Box::new(vec![
+                        Instructions::new(make(Op::GetFree, &[0])),
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::Closure, &[0, 2])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                    Box::new(vec![
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::Closure, &[1, 1])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                ],
+                vec![
+                    Instructions::new(make(Op::Closure, &[2, 0])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            // every non-local non-global non-builtin is a free variable
+            CompilerTestCase::new(
+                "
+let global = 55;
+fn() {
+    let a = 66;
+    fn() {
+        let b = 77;
+        fn() {
+            let c = 88;
+            global + a + b + c;
+        }
+    }
+}
+",
+                vec![
+                    Box::new(55i64),
+                    Box::new(66i64),
+                    Box::new(77i64),
+                    Box::new(88i64),
+                    Box::new(vec![
+                        Instructions::new(make(Op::Constant, &[3])),
+                        Instructions::new(make(Op::SetLocal, &[0])),
+                        Instructions::new(make(Op::GetGlobal, &[0])),
+                        Instructions::new(make(Op::GetFree, &[0])),
+                        Instructions::new(make(Op::Add, &[])),
+                        Instructions::new(make(Op::GetFree, &[1])),
+                        Instructions::new(make(Op::Add, &[])),
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::Add, &[])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                    Box::new(vec![
+                        Instructions::new(make(Op::Constant, &[2])),
+                        Instructions::new(make(Op::SetLocal, &[0])),
+                        Instructions::new(make(Op::GetFree, &[0])),
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::Closure, &[4, 2])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                    Box::new(vec![
+                        Instructions::new(make(Op::Constant, &[1])),
+                        Instructions::new(make(Op::SetLocal, &[0])),
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::Closure, &[5, 1])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                ],
+                vec![
                     Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::SetGlobal, &[0])),
+                    Instructions::new(make(Op::Closure, &[6, 0])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+        ];
+        run_compiler_tests(tests);
+    }
+    #[test]
+    fn test_recursive_functions() {
+        let tests = vec![
+            CompilerTestCase::new(
+                "
+let countDown = fn(x) { countDown(x - 1); };
+countDown(1);
+",
+                vec![
+                    Box::new(1i64),
+                    Box::new(vec![
+                        Instructions::new(make(Op::CurrentClosure, &[])),
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::Constant, &[0])),
+                        Instructions::new(make(Op::Sub, &[])),
+                        Instructions::new(make(Op::Call, &[1])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                    Box::new(1i64),
+                ],
+                vec![
+                    Instructions::new(make(Op::Closure, &[1, 0])),
+                    Instructions::new(make(Op::SetGlobal, &[0])),
+                    Instructions::new(make(Op::GetGlobal, &[0])),
+                    Instructions::new(make(Op::Constant, &[2])),
+                    Instructions::new(make(Op::Call, &[1])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "
+let wrapper = fn() {
+let countDown = fn(x) { countDown(x - 1); };
+countDown(1);
+};
+wrapper();
+",
+                vec![
+                    Box::new(1i64),
+                    Box::new(vec![
+                        Instructions::new(make(Op::CurrentClosure, &[])),
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::Constant, &[0])),
+                        Instructions::new(make(Op::Sub, &[])),
+                        Instructions::new(make(Op::Call, &[1])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                    Box::new(1i64),
+                    Box::new(vec![
+                        Instructions::new(make(Op::Closure, &[1, 0])),
+                        Instructions::new(make(Op::SetLocal, &[0])),
+                        Instructions::new(make(Op::GetLocal, &[0])),
+                        Instructions::new(make(Op::Constant, &[2])),
+                        Instructions::new(make(Op::Call, &[1])),
+                        Instructions::new(make(Op::ReturnValue, &[])),
+                    ]),
+                ],
+                vec![
+                    Instructions::new(make(Op::Closure, &[3, 0])),
+                    Instructions::new(make(Op::SetGlobal, &[0])),
+                    Instructions::new(make(Op::GetGlobal, &[0])),
+                    Instructions::new(make(Op::Call, &[0])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),

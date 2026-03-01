@@ -42,6 +42,7 @@ impl Instructions {
         match operand_count {
             0 => format!("{}", def.name),
             1 => format!("{} {}", def.name, operands[0]),
+            2 => format!("{} {} {}", def.name, operands[0], operands[1]),
             _ => format!("ERROR: unhandled operand_count for {\n}", def.name),
         }
     }
@@ -77,6 +78,9 @@ pub enum Opcode {
     GetLocal = 0x18,
     SetLocal = 0x19,
     GetBuiltin = 0x1a,
+    Closure = 0x1b,
+    GetFree = 0x1c,
+    CurrentClosure = 0x1d,
 }
 use Opcode as Op;
 
@@ -113,6 +117,9 @@ impl TryFrom<u8> for Op {
             val if val == Op::GetLocal as u8 => Ok(Op::GetLocal),
             val if val == Op::SetLocal as u8 => Ok(Op::SetLocal),
             val if val == Op::GetBuiltin as u8 => Ok(Op::GetBuiltin),
+            val if val == Op::Closure as u8 => Ok(Op::Closure),
+            val if val == Op::GetFree as u8 => Ok(Op::GetFree),
+            val if val == Op::CurrentClosure as u8 => Ok(Op::CurrentClosure),
             _ => Err(format!("unknown opcode {value}")),
         }
     }
@@ -195,6 +202,9 @@ pub fn lookup(opcode: u8) -> Definition {
         Ok(Op::GetLocal) => Definition::new("OpGetLocal".into(), vec![1]), // maximum local bindings is 256
         Ok(Op::SetLocal) => Definition::new("OpSetLocal".into(), vec![1]), // maximum local bindings is 256
         Ok(Op::GetBuiltin) => Definition::new("OpGetBuiltin".into(), vec![1]), // maximum builtins is 256
+        Ok(Op::Closure) => Definition::new("OpClosure".into(), vec![2, 1]), // const_ind for comp_fn and num_free_variables on the stack
+        Ok(Op::GetFree) => Definition::new("OpGetFree".into(), vec![1]),
+        Ok(Op::CurrentClosure) => Definition::new("OpCurrentClosure".into(), vec![]),
         Err(op) => panic!("opcode {op:?} undefined"),
     }
 }
@@ -233,6 +243,11 @@ mod test {
             ),
             (Op::Add, vec![], vec![Op::Add as u8]),
             (Op::GetLocal, vec![255], vec![Op::GetLocal as u8, 255u8]),
+            (
+                Op::Closure,
+                vec![65534, 255],
+                vec![Op::Closure as u8, 255u8, 254u8, 255u8],
+            ),
         ];
         let mut errors = Vec::new();
         for (op, operands, expected) in tests {
@@ -264,11 +279,13 @@ mod test {
             make(Op::GetLocal, &[1]),
             make(Op::Constant, &[2]),
             make(Op::Constant, &[65535]),
+            make(Op::Closure, &[65535, 255]),
         ];
         let expected = r#"0000 OpAdd
 0001 OpGetLocal 1
 0003 OpConstant 2
 0006 OpConstant 65535
+0009 OpClosure 65535 255
 "#;
         let mut concatted = Instructions::default();
         for ins in instructions {
@@ -284,7 +301,11 @@ mod test {
 
     #[test]
     fn test_read_operands() {
-        let tests = vec![(Op::Constant, &[65535], 2), (Op::GetLocal, &[255], 1)];
+        let tests: Vec<(Opcode, &[i64], i64)> = vec![
+            (Op::Constant, &[65535], 2),
+            (Op::GetLocal, &[255], 1),
+            (Op::Closure, &[65535, 255], 3),
+        ];
         for (op, operands, bytes_read) in tests {
             let instruction = make(op, operands);
             let def = lookup(op as u8);

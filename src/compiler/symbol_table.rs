@@ -5,6 +5,8 @@ pub enum SymbolScope {
     Global,
     Local,
     Builtin,
+    Free,
+    Function, // only define one symbol with this symbscope per scope for self-referencing
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -30,6 +32,7 @@ pub struct SymbolTable {
 
     store: HashMap<String, Symbol>,
     pub num_definitions: usize,
+    pub free_symbols: Vec<Symbol>,
 }
 
 impl SymbolTable {
@@ -38,6 +41,7 @@ impl SymbolTable {
             outer: None,
             store: HashMap::new(),
             num_definitions: 0,
+            free_symbols: vec![],
         }
     }
     pub fn new_enclosed_symbol_table(outer: SymbolTableRef) -> SymbolTableRef {
@@ -60,14 +64,44 @@ impl SymbolTable {
         self.store.insert(name, symbol.clone());
         symbol
     }
-    pub fn resolve(&self, ident: &str) -> Option<Symbol> {
-        let obj = self.store.get(ident);
-        match obj {
-            None => match &self.outer {
-                Some(outer_symb_table) => outer_symb_table.borrow().resolve(ident),
-                None => None,
-            },
-            Some(symb) => Some(symb.clone()),
+    pub fn define_free(&mut self, original: Symbol) -> Symbol {
+        self.free_symbols.push(original.clone());
+
+        let symbol = Symbol::new(
+            original.name.clone(),
+            SymbolScope::Free,
+            self.free_symbols.len() - 1,
+        );
+
+        self.store.insert(original.name, symbol.clone());
+        symbol
+    }
+    pub fn define_function_name(&mut self, name: String) -> Symbol {
+        // this symbols index choice is kind of arbitrary and doesn't matter
+        let symbol = Symbol::new(name.clone(), SymbolScope::Function, 0);
+        self.store.insert(name, symbol.clone());
+        symbol
+    }
+    pub fn resolve(&mut self, name: &str) -> Option<Symbol> {
+        // AI generated logic cause I am in a hurry and lazy
+        // 1️⃣ Check local scope
+        if let Some(sym) = self.store.get(name) {
+            return Some(sym.clone());
+        }
+
+        // 2️⃣ Check outer scope
+        let outer = self.outer.as_ref()?; // no outer scope means global scope
+        let resolved = outer.borrow_mut().resolve(name)?;
+
+        // 3️⃣ If global or builtin → return as-is
+        match resolved.scope {
+            SymbolScope::Global | SymbolScope::Builtin => Some(resolved),
+
+            // 4️⃣ Otherwise it's a free symbol
+            _ => {
+                let free = self.define_free(resolved);
+                Some(free)
+            }
         }
     }
 }
@@ -167,7 +201,7 @@ mod test {
         ];
         for sym in expected {
             let res = local
-                .borrow()
+                .borrow_mut()
                 .resolve(&sym.name)
                 .unwrap_or_else(|| panic!("name {} not resolvable", sym.name));
             assert_eq!(
@@ -214,7 +248,7 @@ mod test {
         for (table, expected_symbols) in tests {
             for sym in expected_symbols {
                 let res = table
-                    .borrow()
+                    .borrow_mut()
                     .resolve(&sym.name)
                     .unwrap_or_else(|| panic!("name {} not resolvable", sym.name));
                 assert_eq!(
@@ -243,7 +277,7 @@ mod test {
         for table in [global, first_local, second_local] {
             for sym in expected.iter() {
                 let result = table
-                    .borrow()
+                    .borrow_mut()
                     .resolve(&sym.name)
                     .unwrap_or_else(|| panic!("name {} not resolvable", sym.name));
                 assert_eq!(
@@ -253,21 +287,148 @@ mod test {
                 )
             }
         }
-        //global.borrow_mut().define("a".to_string());
-        //global.borrow_mut().define("b".to_string());
-        //
-        //local.borrow_mut().define("c".to_string());
-        //local.borrow_mut().define("d".to_string());
-        //for sym in expected {
-        //    let res = local
-        //        .borrow()
-        //        .resolve(&sym.name)
-        //        .unwrap_or_else(|| panic!("name {} not resolvable", sym.name));
-        //    assert_eq!(
-        //        res, sym,
-        //        "expected {} to resolve to {:?}, got={:?}",
-        //        sym.name, sym, res
-        //    );
-        //}
+    }
+    #[test]
+    fn test_resolve_free() {
+        let global = Rc::new(RefCell::new(SymbolTable::new()));
+        global.borrow_mut().define("a".to_string());
+        global.borrow_mut().define("b".to_string());
+
+        let first_local = SymbolTable::new_enclosed_symbol_table(global.clone());
+        first_local.borrow_mut().define("c".to_string());
+        first_local.borrow_mut().define("d".to_string());
+
+        let mut second_local = SymbolTable::new_enclosed_symbol_table(first_local.clone());
+        second_local.borrow_mut().define("e".to_string());
+        second_local.borrow_mut().define("f".to_string());
+
+        let tests = vec![
+            (
+                first_local,
+                vec![
+                    Symbol::new("a", SymbolScope::Global, 0),
+                    Symbol::new("b", SymbolScope::Global, 1),
+                    Symbol::new("c", SymbolScope::Local, 0),
+                    Symbol::new("d", SymbolScope::Local, 1),
+                ],
+                vec![],
+            ),
+            (
+                second_local,
+                vec![
+                    Symbol::new("a", SymbolScope::Global, 0),
+                    Symbol::new("b", SymbolScope::Global, 1),
+                    Symbol::new("c", SymbolScope::Free, 0),
+                    Symbol::new("d", SymbolScope::Free, 1),
+                    Symbol::new("e", SymbolScope::Local, 0),
+                    Symbol::new("f", SymbolScope::Local, 1),
+                ],
+                vec![
+                    Symbol::new("c", SymbolScope::Local, 0),
+                    Symbol::new("d", SymbolScope::Local, 1),
+                ],
+            ),
+        ];
+        for (table, expected_symbols, expected_free_symbols) in tests {
+            for sym in expected_symbols {
+                let res = table
+                    .borrow_mut()
+                    .resolve(&sym.name)
+                    .unwrap_or_else(|| panic!("name {} not resolvable", sym.name));
+                assert_eq!(
+                    res, sym,
+                    "expected {} to resolve to {sym:?}, got={res:?}",
+                    sym.name,
+                );
+            }
+            assert_eq!(
+                table.borrow().free_symbols.len(),
+                expected_free_symbols.len(),
+                "wrong number of free symbols. got={}, want={}",
+                table.borrow().free_symbols.len(),
+                expected_free_symbols.len()
+            );
+            let table_ref = table.borrow();
+            for (i, sym) in expected_free_symbols.iter().enumerate() {
+                let res = table_ref
+                    .free_symbols
+                    .get(i)
+                    .unwrap_or_else(|| panic!("name {} not resolvable", sym.name));
+                assert_eq!(res, sym, "wrong free symbol. got={res:?}, want={sym:?}",);
+            }
+        }
+    }
+    #[test]
+    fn test_resolve_unresolvable_free() {
+        let global = Rc::new(RefCell::new(SymbolTable::new()));
+        global.borrow_mut().define("a".to_string());
+
+        let first_local = SymbolTable::new_enclosed_symbol_table(global.clone());
+        first_local.borrow_mut().define("c".to_string());
+
+        let mut second_local = SymbolTable::new_enclosed_symbol_table(first_local.clone());
+        second_local.borrow_mut().define("e".to_string());
+        second_local.borrow_mut().define("f".to_string());
+
+        let expected = vec![
+            Symbol::new("a", SymbolScope::Global, 0),
+            Symbol::new("c", SymbolScope::Free, 0),
+            Symbol::new("e", SymbolScope::Local, 0),
+            Symbol::new("f", SymbolScope::Local, 1),
+        ];
+        for sym in expected {
+            let res = second_local
+                .borrow_mut()
+                .resolve(&sym.name)
+                .unwrap_or_else(|| panic!("name {} not resolvable", sym.name));
+            assert_eq!(
+                res, sym,
+                "expected {} to resolve to {sym:?}, got={res:?}",
+                sym.name,
+            );
+        }
+        let expected_unresolvable = vec!["b", "d"];
+        for name in expected_unresolvable {
+            let err = second_local.borrow_mut().resolve(name);
+            assert!(
+                err.is_none(),
+                "name {name} resolved, but was expected not to"
+            );
+        }
+    }
+    #[test]
+    fn test_define_and_resolve_function_name() {
+        let global = Rc::new(RefCell::new(SymbolTable::new()));
+        global.borrow_mut().define_function_name("a".to_string());
+
+        let expected = Symbol::new("a", SymbolScope::Function, 0);
+
+        let result = global
+            .borrow_mut()
+            .resolve(&expected.name)
+            .unwrap_or_else(|| panic!("function name {} not resolvable", expected.name));
+        assert_eq!(
+            result, expected,
+            "expected {} to resolve to {expected:?}, got={result:?}",
+            expected.name,
+        );
+    }
+    #[test]
+    fn test_shadowing_function_name() {
+        let global = Rc::new(RefCell::new(SymbolTable::new()));
+        global.borrow_mut().define_function_name("a".to_string());
+        global.borrow_mut().define("a".to_string());
+
+        let expected = Symbol::new("a", SymbolScope::Global, 0);
+
+        let result = global
+            .borrow_mut()
+            .resolve(&expected.name)
+            .unwrap_or_else(|| panic!("function name {} not resolvable", expected.name));
+        assert_eq!(
+            result, expected,
+            "expected {} to resolve to {expected:?}, got={result:?}",
+            expected.name,
+        );
     }
 }

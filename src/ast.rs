@@ -411,6 +411,7 @@ pub struct FunctionLiteral {
     pub parameters: Vec<Identifier>,
     // FIX: how is this an option again?
     pub body: Option<Box<BlockStatement>>,
+    pub name: String,
 }
 impl FunctionLiteral {
     pub fn new(
@@ -422,6 +423,7 @@ impl FunctionLiteral {
             token,
             parameters,
             body,
+            name: "".to_string(),
         }
     }
     pub fn token_literal(&self) -> String {
@@ -431,7 +433,11 @@ impl FunctionLiteral {
 impl Display for FunctionLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let params: Vec<String> = self.parameters.iter().map(|p| p.to_string()).collect();
-        write!(f, "{}({})", self.token.literal, params.join(", "))?;
+        write!(f, "{}", self.token.literal)?;
+        if self.name != "" {
+            write!(f, "<{}>", self.name);
+        }
+        write!(f, "({})", params.join(", "))?;
         if let Some(body) = &self.body {
             write!(f, " {}", body)
         } else {

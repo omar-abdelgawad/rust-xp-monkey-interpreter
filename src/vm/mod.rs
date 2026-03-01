@@ -4,8 +4,9 @@ use crate::compiler::Bytecode;
 use crate::lexer::Lexer;
 use crate::object::builtins::BUILTINS;
 use crate::object::{
-    native_bool_to_boolean_object, Array, BuiltinObj, CompiledFunctionObj, HashObj, HashPair,
-    Hashable, Integer, IsHashable, Null, Object, ObjectTrait, FALSE, GARBAGEVALOBJ, NULL, TRUE,
+    native_bool_to_boolean_object, Array, BuiltinObj, ClosureObj, CompiledFunctionObj, HashObj,
+    HashPair, Hashable, Integer, IsHashable, Null, Object, ObjectTrait, FALSE, GARBAGEVALOBJ, NULL,
+    TRUE,
 };
 use crate::parser::Parser;
 use std::array;
@@ -17,27 +18,23 @@ const MAXFRAMES: usize = 1024;
 
 #[derive(Debug, Clone)]
 struct Frame {
-    comp_fn: CompiledFunctionObj,
+    cl: ClosureObj,
     ip: i64,
     bp: i64,
 }
 impl Frame {
-    fn new(comp_fn: CompiledFunctionObj, bp: i64) -> Self {
-        Self {
-            comp_fn,
-            ip: -1,
-            bp: bp,
-        }
+    fn new(cl: ClosureObj, bp: i64) -> Self {
+        Self { cl, ip: -1, bp }
     }
     fn garbage_value() -> Self {
         Self {
-            comp_fn: Default::default(),
+            cl: Default::default(),
             ip: -1,
             bp: -1,
         }
     }
     fn instructions(&mut self) -> &mut Instructions {
-        &mut self.comp_fn.instructions
+        &mut self.cl.comp_fn.instructions
     }
 }
 
@@ -66,7 +63,8 @@ impl VM {
         }: Bytecode,
     ) -> Self {
         let main_fn = CompiledFunctionObj::new(instructions, 0, 0); // I am not sure how to init here
-        let main_frame = Frame::new(main_fn, 0);
+        let main_closure = ClosureObj::new(main_fn, vec![]);
+        let main_frame = Frame::new(main_closure, 0);
 
         let mut frames = vec![Frame::garbage_value(); MAXFRAMES];
         frames[0] = main_frame;
@@ -79,8 +77,13 @@ impl VM {
             frames_index: 1,
         }
     }
+    // TODO: replace all current_frame with current_frame_mut
     fn current_frame(&mut self) -> &mut Frame {
         &mut self.frames[self.frames_index - 1]
+    }
+    // TODO: rename to current_frame
+    fn current_frame_immut(&self) -> &Frame {
+        &self.frames[self.frames_index - 1]
     }
     fn push_frame(&mut self, f: Frame) {
         self.frames[self.frames_index] = f;
@@ -89,6 +92,20 @@ impl VM {
     fn pop_frame(&mut self) -> Frame {
         self.frames_index -= 1;
         self.frames[self.frames_index].clone()
+    }
+    fn push_closure(&mut self, const_ind: usize, num_free: usize) -> Result<(), String> {
+        let constant = self.constants[const_ind].clone();
+        if let Object::CompiledFunction(function) = constant {
+            let mut free = vec![GARBAGEVALOBJ; num_free];
+            for i in 0..num_free {
+                free[i] = self.stack[self.sp - num_free + i].clone();
+            }
+            self.sp = self.sp - num_free;
+            let closure = ClosureObj::new(function, free);
+            self.push(Object::Closure(closure))
+        } else {
+            Err(format!("not a function: {constant:?}"))
+        }
     }
 
     pub fn last_popped_stack_elem(&self) -> Object {
@@ -282,6 +299,12 @@ impl VM {
                 }
                 Opcode::Null => self.push(NULL)?,
                 Opcode::SetGlobal => {
+                    // FIX: new globals override old ones;e.g. "let a=1;leta=2;" then old a is
+                    // still stored but never referenced. try to make a test case for it;
+                    // this is not only a problem of memory efficiency but also of behavious since
+                    // now compiled functions reference old index values of the global. e.g.
+                    // "let a =1; let my_fn(){a}; let a =2; my_fn()" -> returns 1 not 2 because a's
+                    // index changed from 0 to something else.
                     let glob_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
                     self.current_frame().ip += 2;
                     self.globals[glob_ind] = self.pop();
@@ -359,6 +382,23 @@ impl VM {
                     // TODO: try to remove the clone by storing Rc<BuiltinObj>
                     self.push(Object::Builtin(definition.1.clone()))?;
                 }
+                Opcode::Closure => {
+                    let const_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
+                    let num_free = ins[usize::try_from(ip + 3).unwrap()] as usize;
+                    self.current_frame().ip += 3;
+
+                    self.push_closure(const_ind, num_free)?;
+                }
+                Opcode::GetFree => {
+                    let free_ind = ins[usize::try_from(ip + 1).unwrap()] as usize;
+                    self.current_frame().ip += 1;
+                    let current_closure = &self.current_frame_immut().cl;
+                    self.push(current_closure.free[free_ind].clone())?;
+                }
+                Opcode::CurrentClosure => {
+                    let current_closure = self.current_frame_immut().cl.clone();
+                    self.push(Object::Closure(current_closure))?;
+                }
 
                 _ => panic!("unknown instruction"),
             }
@@ -368,27 +408,21 @@ impl VM {
     fn execute_call(&mut self, num_args: usize) -> Result<(), String> {
         let callee = self.stack[self.sp - 1 - num_args].clone();
         match callee {
-            Object::CompiledFunction(comp_fn) => self.call_function(comp_fn, num_args),
+            Object::Closure(closure_obj) => self.call_closure(closure_obj, num_args),
             Object::Builtin(builtin_obj) => self.call_builtin(builtin_obj, num_args),
-            _ => Err("calling non-function and non-built-in".to_string()),
+            _ => Err("calling non-closure and non-built-in".to_string()),
         }
     }
-    fn call_function(
-        &mut self,
-        comp_fn: CompiledFunctionObj,
-        num_args: usize,
-    ) -> Result<(), String> {
-        if num_args != comp_fn.num_parameters {
+    fn call_closure(&mut self, cl: ClosureObj, num_args: usize) -> Result<(), String> {
+        if num_args != cl.comp_fn.num_parameters {
             return Err(format!(
                 "wrong number of arguments: want={}, got={num_args}",
-                comp_fn.num_parameters,
+                cl.comp_fn.num_parameters,
             ));
         }
-        let frame = Frame::new(
-            comp_fn.clone(),
-            usize::try_into(self.sp - num_args).unwrap(),
-        );
-        let next_sp: usize = frame.bp as usize + comp_fn.num_locals;
+        let num_locals = cl.comp_fn.num_locals;
+        let frame = Frame::new(cl, usize::try_into(self.sp - num_args).unwrap());
+        let next_sp: usize = frame.bp as usize + num_locals;
         self.push_frame(frame);
         self.sp = next_sp;
         Ok(())
@@ -530,11 +564,23 @@ mod tests {
         run_vm_tests(tests);
     }
     fn run_vm_tests(tests: Vec<VmTestCase>) {
-        for VmTestCase { input, expected } in tests {
+        for (i, VmTestCase { input, expected }) in tests.into_iter().enumerate() {
             let program = parse(input);
             let mut comp = Compiler::new();
             comp.compile(ast::Node::Program(program))
                 .unwrap_or_else(|e| panic!("compiler error: {e:?}"));
+            println!("test {}:", i + 1);
+            for (i, constant) in comp.bytecode().constants.iter().enumerate() {
+                println!("CONSTANT {i} {constant:p} {}", constant.inspect());
+                match constant {
+                    Object::CompiledFunction(constant) => {
+                        print!(" Instructions:\n{}", constant.instructions)
+                    }
+                    Object::Integer(constant) => print!(" Value: {}\n", constant.value),
+                    _ => {}
+                }
+                println!()
+            }
             let mut vm = VM::new(comp.bytecode());
             vm.run().unwrap_or_else(|e| panic!("vm error: {e}"));
             let stack_elm = vm.last_popped_stack_elem();
@@ -1021,6 +1067,137 @@ outer() + globalNum;",
                 Box::new(Error::new(
                     "argument to `push` must be ARRAY, got INTEGER".to_string(),
                 )),
+            ),
+        ];
+
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_closures() {
+        let tests = vec![
+            VmTestCase::new(
+                "
+let newClosure = fn(a) {
+    fn() { a; };
+};
+let closure = newClosure(99);
+closure();
+",
+                Box::new(99i64),
+            ),
+            VmTestCase::new(
+                "
+let newAdder = fn(a, b) {
+fn(c) { a + b + c };
+};
+let adder = newAdder(1, 2);
+adder(8);
+",
+                Box::new(11i64),
+            ),
+            VmTestCase::new(
+                "
+let newAdder = fn(a, b) {
+let c = a + b;
+fn(d) { c + d };
+};
+let adder = newAdder(1, 2);
+adder(8);
+",
+                Box::new(11i64),
+            ),
+            VmTestCase::new(
+                "
+let newAdderOuter = fn(a, b) {
+    let c = a + b;
+    fn(d) {
+        let e = d + c;
+        fn(f) { e + f; };
+    };
+};
+let newAdderInner = newAdderOuter(1, 2)
+let adder = newAdderInner(3);
+adder(8);
+",
+                Box::new(14i64),
+            ),
+            VmTestCase::new(
+                "
+let a = 1;
+let newAdderOuter = fn(b) {
+    fn(c) {
+        fn(d) { a + b + c + d };
+    };
+};
+let newAdderInner = newAdderOuter(2)
+let adder = newAdderInner(3);
+adder(8);
+",
+                Box::new(14i64),
+            ),
+            VmTestCase::new(
+                "
+let newClosure = fn(a, b) {
+    let one = fn() { a; };
+    let two = fn() { b; };
+    fn() { one() + two(); };
+};
+let closure = newClosure(9, 90);
+closure();
+",
+                Box::new(99i64),
+            ),
+        ];
+
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_recursive_closures() {
+        let tests = vec![
+            VmTestCase::new(
+                "
+let countDown = fn(x) {
+    if (x == 0) {
+        return 0;
+    } else {
+        countDown(x - 1);
+    }
+};
+countDown(1);
+",
+                Box::new(0i64),
+            ),
+            VmTestCase::new(
+                "
+let countDown = fn(x) {
+    if (x == 0) {
+        return 0;
+    } else {
+        countDown(x - 1);
+    }
+};
+let wrapper = fn() {
+    countDown(1);
+};
+wrapper();
+",
+                Box::new(0i64),
+            ),
+            VmTestCase::new(
+                "
+let wrapper = fn() {
+    let countDown = fn(x) {
+        if (x == 0) {
+            return 0;
+        } else {
+            countDown(x - 1);
+        }
+    };
+    countDown(1);
+};
+wrapper();
+",
+                Box::new(0i64),
             ),
         ];
 

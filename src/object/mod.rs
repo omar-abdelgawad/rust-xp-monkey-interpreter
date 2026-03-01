@@ -43,6 +43,7 @@ pub enum ObjectType {
     ARRAY_OBJ, // arrays are immutable in monkey
     Hash_OBJ,
     Compiled_Function_OBJ,
+    Closure_OBJ,
 }
 impl Display for ObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -59,6 +60,7 @@ impl Display for ObjectType {
             ObjT::ARRAY_OBJ => "ARRAY",
             ObjT::Hash_OBJ => "HASH",
             ObjT::Compiled_Function_OBJ => "COMPILED FUNCTION",
+            ObjT::Closure_OBJ => "CLOSURE",
         };
         write!(f, "{}", to_write)
     }
@@ -100,6 +102,7 @@ pub enum Object {
     Arr(Array), // arrays are immutable in monkey
     Hash(HashObj),
     CompiledFunction(CompiledFunctionObj),
+    Closure(ClosureObj),
 }
 impl Object {
     pub fn new_int_var(value: i64) -> Object {
@@ -140,6 +143,7 @@ impl ObjectTrait for Object {
             Object::Arr(s) => s.r#type(),
             Object::Hash(s) => s.r#type(),
             Object::CompiledFunction(s) => s.r#type(),
+            Object::Closure(s) => s.r#type(),
         }
     }
     fn inspect(&self) -> String {
@@ -155,6 +159,7 @@ impl ObjectTrait for Object {
             Object::Arr(s) => s.inspect(),
             Object::Hash(s) => s.inspect(),
             Object::CompiledFunction(s) => s.inspect(),
+            Object::Closure(s) => s.inspect(),
         }
     }
 }
@@ -465,7 +470,27 @@ impl ObjectTrait for CompiledFunctionObj {
         ObjectType::Compiled_Function_OBJ
     }
     fn inspect(&self) -> String {
-        format!("CompiledFunction[{:p}]:\n{}", self, self.instructions)
+        format!("CompiledFunction[{:p}]", self)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Default)]
+pub struct ClosureObj {
+    pub comp_fn: CompiledFunctionObj, // may need to be a reference
+    pub free: Vec<Object>,
+}
+impl ClosureObj {
+    pub fn new(comp_fn: CompiledFunctionObj, free: Vec<Object>) -> Self {
+        Self { comp_fn, free }
+    }
+}
+
+impl ObjectTrait for ClosureObj {
+    fn r#type(&self) -> ObjectType {
+        ObjectType::Closure_OBJ
+    }
+    fn inspect(&self) -> String {
+        format!("Closure[{:p}]", self)
     }
 }
 

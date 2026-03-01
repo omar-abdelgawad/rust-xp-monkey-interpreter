@@ -2,7 +2,7 @@
 
 This is an implementation of the monkey programming language from the book  [*Writing an Interpreter in Go* by Thorsten Ball](https://interpreterbook.com/) in rust. please don't ask why I did it in rust. I learned a lot of stuff though.
 
-I am currently reading [*Writing a Compiler in Go* by Thorsten Ball](https://compilerbook.com/) and I finished chapter 8 and should start at page 233.
+I am currently reading [*Writing a Compiler in Go* by Thorsten Ball](https://compilerbook.com/) and I finished chapter 9 and should start at page 273.
 
 ## 📖 About
 
@@ -12,11 +12,11 @@ It supports:
 - Integers and booleans  
 - Arithmetic and boolean expressions  
 - Variable bindings (`let`)  
-- First-class functions & closures  
 - Conditionals (`if` / `else`)  
-- Return statements  
 - Strings and built-in functions  
 - Hashes and arrays 
+- Return statements  
+- First-class functions & closures  
 
 ## 🚀 Getting Started
 
