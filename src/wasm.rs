@@ -4,11 +4,13 @@ use wasm_bindgen::prelude::*;
 
 use crate::ast::Node;
 use crate::ast::Program;
+use crate::compiler::Compiler;
 use crate::evaluator;
 use crate::lexer::Lexer;
 use crate::object::environment::Environment;
 use crate::object::ObjectTrait;
 use crate::parser::Parser;
+use crate::vm::VM;
 
 // Thread-local storage for output callback
 thread_local! {
@@ -29,8 +31,6 @@ pub fn stream_output(text: &str) {
         if let Some(ref callback) = *cb.borrow() {
             let text_js = JsValue::from_str(text);
             let _ = callback.call1(&JsValue::NULL, &text_js);
-        } else {
-            panic!("didn't find callback");
         }
     });
 }
@@ -118,6 +118,7 @@ impl MonkeyInterpreter {
     #[wasm_bindgen]
     pub fn reset(&mut self) {
         self.env = Rc::new(RefCell::new(Environment::new()));
+        self.prog = None;
     }
 }
 
@@ -273,4 +274,48 @@ pub fn get_available_examples() -> String {
         ["game_of_life", "Conway's Game of Life"]
     ]"#
     .to_string()
+}
+
+#[wasm_bindgen]
+pub struct MonkeyVM {
+    // vm: Option<VM>,
+    // prog: Option<Program>,
+}
+
+#[wasm_bindgen]
+impl MonkeyVM {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            // vm: None,
+            // prog: None,
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn evaluate(&mut self, code: &str) -> String {
+        let lexer = Lexer::new(code);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        if !parser.errors().is_empty() {
+            let mut error_msg = String::from("Parser errors:\n");
+            for error in parser.errors() {
+                error_msg.push_str(&format!("  {}\n", error));
+            }
+            return error_msg;
+        }
+        let mut compiler = Compiler::new();
+        if let Err(err) = compiler.compile(Node::Program(program)) {
+            return format!("Compiler error: {}", err);
+        }
+        let bytecode = compiler.bytecode();
+        let mut machine = VM::new(bytecode);
+        if let Err(err) = machine.run() {
+            return format!("VM error: {}", err);
+        }
+
+        let result = machine.last_popped_stack_elem();
+        result.inspect()
+    }
 }
