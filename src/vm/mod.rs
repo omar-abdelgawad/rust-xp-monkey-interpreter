@@ -1203,4 +1203,60 @@ wrapper();
 
         run_vm_tests(tests);
     }
+    #[test]
+    fn test_recursive_fibonacci() {
+        let tests = vec![
+            VmTestCase::new(
+                "
+let fibonacci = fn(x) {
+    if (x == 0) {
+        return 0;
+    } else {
+        if (x == 1) {
+            return 1;
+        } else {
+            fibonacci(x - 1) + fibonacci(x - 2);
+        }
+    }
+};
+fibonacci(15);
+",
+                Box::new(610i64),
+            ),
+            VmTestCase::new(
+                "
+let countDown = fn(x) {
+    if (x == 0) {
+        return 0;
+    } else {
+        countDown(x - 1);
+    }
+};
+let wrapper = fn() {
+    countDown(1);
+};
+wrapper();
+",
+                Box::new(0i64),
+            ),
+            VmTestCase::new(
+                "
+let wrapper = fn() {
+    let countDown = fn(x) {
+        if (x == 0) {
+            return 0;
+        } else {
+            countDown(x - 1);
+        }
+    };
+    countDown(1);
+};
+wrapper();
+",
+                Box::new(0i64),
+            ),
+        ];
+
+        run_vm_tests(tests);
+    }
 }

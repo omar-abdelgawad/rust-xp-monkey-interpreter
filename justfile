@@ -4,7 +4,7 @@ default:
 
 # run all tests
 test:
-  @cargo test
+  @cargo test -q --lib
 
 # run interactive shell
 run:
@@ -13,6 +13,10 @@ run:
 # run a Monkey script file
 run-file FILE:
   @cargo run -q -- {{FILE}}
+
+# run book's benchmark
+bench ENGINE="vm":
+  cargo run --release -q --bin benchmark -- --engine {{ENGINE}}
 
 # records an interactive shells
 record:
