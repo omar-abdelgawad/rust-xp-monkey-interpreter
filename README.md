@@ -1,8 +1,7 @@
 # Monkey-rs
 
-This is an implementation of the monkey programming language from the book  [*Writing an Interpreter in Go* by Thorsten Ball](https://interpreterbook.com/) in rust. please don't ask why I did it in rust. I learned a lot of stuff though.
+This is an implementation of the monkey programming language from the books  [*Writing an Interpreter in Go* by Thorsten Ball](https://interpreterbook.com/) and [*Writing a Compiler in Go* by Thorsten Ball](https://compilerbook.com/) in rust. please don't ask why I did it in rust. I learned a ton of stuff though.
 
-I am currently reading [*Writing a Compiler in Go* by Thorsten Ball](https://compilerbook.com/) and I finished chapter 9 and should start at page 273.
 
 ## 📖 About
 
@@ -18,13 +17,51 @@ It supports:
 - Return statements  
 - First-class functions & closures  
 
+## Inspirations & Other Implementations
+
+While implementing I had a lot of TODOs and FIXes that I couldn't really think about for too long because I wanted to finish the book first. now I have A LOT of unidiomatic rust and wrong types because I kind of ported from go and I also have some ideas that I want to implement such as wasm interactive vm with visible running instruction in bytecode. I want to record here some resources that I count as important for inspirations later so that I could look for how did someone else do the thing I want to do:
+
+- https://github.com/ktanaka101/monkey.rs
+- https://github.com/yesmeck/monkey-lang
+- [Writing a 16-bit VM in rust](https://www.youtube.com/watch?v=oArXOAhzOdY&list=PLUkZG7_4JtUL22HycWYR_J-1xJo7rQGhr)
+
+examples of TODOs in future:
+- reduce cloning as much as possible.
+- reduce cloning objects by making them Rc<Object>
+- make step() function for executing a single instruction.
+- remove all warnings.
+- fix getters like current_frame()
+- refactor the stack into standalone struct
+- add more monkey code examples like map
+- better benchmarking with criterion
+- Write a better API for executing more than one compiled input. the current one is too ugly with new_with_state constructors.
+- Refactor objects into single files and maybe implement Into<Object> trait for ergonomic use later.
+- Add a halt instruction and exit builtin?
+- Use enumKind or Write your own macros for repetitive blocks.
+- I don't like the token field but removing it will break many tests unfortunately.
+- Empty code blocks should return NULL.
+- how to have global mappings without a function at runtime?
+- make an assembler?
+- the wasm interactive stuff ofc (prob hard maybe I can vibe code it)
+- Also clean up the wasm module its currently really bad because it was mainly ai-generated
+- trust me when I say there is much more stuff to do but I forgot.
+
 ## 🚀 Getting Started
 
 Download the repo:
 
 ```bash
-git clone https://github.com/omar-abdelgawad/rust-xp-monkey-interpreter.git monkey-rs
-cd monkey-rs
+$ git clone https://github.com/omar-abdelgawad/rust-xp-monkey-interpreter.git monkey-rs
+$ cd monkey-rs
+$ just run
+>> let people = [{"name": "Omar", "age": 22}, {"name": "Ahmed", "age": 44}];
+null
+>> people[0]["name"];
+"Omar"
+>> let getName = fn(person) { person["name"]; };
+null
+>> getName(people[0]);
+"Omar"
 ```
 
 ## 🌐 Web Interface
@@ -46,30 +83,6 @@ If you have [just](https://just.systems/) (the command runner), you can:
   ```bash
   just run path/to/script.monkey
   ```
-
-Or, if you don't have `just`, you can use `cargo` directly:
-
-- Run the REPL:
-  ```bash
-  cargo run -q
-  ```
-- Run a Monkey script file:
-  ```bash
-  cargo run -- path/to/script.monkey
-  ```
-
-Finally, you can try doing something cool with arrays and hashes like
-
-```bash
->> let people = [{"name": "Omar", "age": 22}, {"name": "Ahmed", "age": 44}];
-null
->> people[0]["name"];
-"Omar"
->> let getName = fn(person) { person["name"]; };
-null
->> getName(people[0]);
-"Omar"
-```
 
 ## 🧪 Running Tests
 
