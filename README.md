@@ -31,7 +31,6 @@ examples of TODOs in future:
 - reduce cloning objects by making them Rc<Object>
 - make step() function for executing a single instruction.
 - remove all warnings.
-- fix getters like current_frame()
 - refactor the stack into standalone struct
 - add more monkey code examples like map
 - better benchmarking with criterion

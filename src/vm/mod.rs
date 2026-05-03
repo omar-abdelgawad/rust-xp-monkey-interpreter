@@ -77,12 +77,10 @@ impl VM {
             frames_index: 1,
         }
     }
-    // TODO: replace all current_frame with current_frame_mut
-    fn current_frame(&mut self) -> &mut Frame {
+    fn current_frame_mut(&mut self) -> &mut Frame {
         &mut self.frames[self.frames_index - 1]
     }
-    // TODO: rename to current_frame
-    fn current_frame_immut(&self) -> &Frame {
+    fn current_frame(&self) -> &Frame {
         &self.frames[self.frames_index - 1]
     }
     fn push_frame(&mut self, f: Frame) {
@@ -260,16 +258,18 @@ impl VM {
         let mut ip: i64; // the instruction pointer is not fancy in this vm
         let mut ins;
         let mut op: Opcode;
-        while self.current_frame().ip < (self.current_frame().instructions().len() as i64 - 1) {
-            self.current_frame().ip += 1;
+        while self.current_frame_mut().ip
+            < (self.current_frame_mut().instructions().len() as i64 - 1)
+        {
+            self.current_frame_mut().ip += 1;
 
-            ip = self.current_frame().ip;
-            ins = self.current_frame().instructions();
+            ip = self.current_frame_mut().ip;
+            ins = self.current_frame_mut().instructions();
             op = TryFrom::try_from(ins[ip as usize])?;
             match op {
                 Opcode::Constant => {
                     let const_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]);
-                    self.current_frame().ip += 2;
+                    self.current_frame_mut().ip += 2;
                     self.push(self.constants[const_ind as usize].clone())?;
                 }
                 Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div => {
@@ -287,14 +287,14 @@ impl VM {
                 Opcode::Minus => self.execute_minus_operator()?,
                 Opcode::Jump => {
                     let pos = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
-                    self.current_frame().ip = pos as i64 - 1; // minus 1 is because counter is always incremented
+                    self.current_frame_mut().ip = pos as i64 - 1; // minus 1 is because counter is always incremented
                 }
                 Opcode::JumpNotTruthy => {
                     let pos = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
-                    self.current_frame().ip += 2;
+                    self.current_frame_mut().ip += 2;
                     let condition = self.pop();
                     if !condition.is_truthy() {
-                        self.current_frame().ip = pos as i64 - 1;
+                        self.current_frame_mut().ip = pos as i64 - 1;
                     }
                 }
                 Opcode::Null => self.push(NULL)?,
@@ -306,18 +306,18 @@ impl VM {
                     // "let a =1; let my_fn(){a}; let a =2; my_fn()" -> returns 1 not 2 because a's
                     // index changed from 0 to something else.
                     let glob_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
-                    self.current_frame().ip += 2;
+                    self.current_frame_mut().ip += 2;
                     self.globals[glob_ind] = self.pop();
                 }
                 Opcode::GetGlobal => {
                     let glob_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
-                    self.current_frame().ip += 2;
+                    self.current_frame_mut().ip += 2;
 
                     self.push(self.globals[glob_ind].clone())?;
                 }
                 Opcode::Array => {
                     let num_elements = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
-                    self.current_frame().ip += 2;
+                    self.current_frame_mut().ip += 2;
 
                     let array = self.build_array(self.sp - num_elements, self.sp);
                     self.sp = self.sp - num_elements;
@@ -325,7 +325,7 @@ impl VM {
                 }
                 Opcode::Hash => {
                     let num_elements = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
-                    self.current_frame().ip += 2;
+                    self.current_frame_mut().ip += 2;
 
                     let hash = self.build_hash(self.sp - num_elements, self.sp)?;
                     self.sp = self.sp - num_elements;
@@ -339,7 +339,7 @@ impl VM {
                 }
                 Opcode::Call => {
                     let num_args = ins[usize::try_from(ip + 1).unwrap()] as usize;
-                    self.current_frame().ip += 1;
+                    self.current_frame_mut().ip += 1;
 
                     self.execute_call(num_args)?;
                 }
@@ -359,22 +359,22 @@ impl VM {
                 }
                 Opcode::SetLocal => {
                     let local_ind = ins[usize::try_from(ip + 1).unwrap()] as usize;
-                    self.current_frame().ip += 1;
+                    self.current_frame_mut().ip += 1;
 
-                    let frame_bp: usize = self.current_frame().bp.try_into().unwrap();
+                    let frame_bp: usize = self.current_frame_mut().bp.try_into().unwrap();
                     let local_var_val = self.pop();
                     self.stack[frame_bp + local_ind] = local_var_val;
                 }
                 Opcode::GetLocal => {
                     let local_ind = ins[usize::try_from(ip + 1).unwrap()] as usize;
-                    self.current_frame().ip += 1;
+                    self.current_frame_mut().ip += 1;
 
-                    let frame_bp: usize = self.current_frame().bp.try_into().unwrap();
+                    let frame_bp: usize = self.current_frame_mut().bp.try_into().unwrap();
                     self.push(self.stack[frame_bp + local_ind].clone())?;
                 }
                 Opcode::GetBuiltin => {
                     let builtin_ind = ins[usize::try_from(ip + 1).unwrap()] as usize;
-                    self.current_frame().ip += 1;
+                    self.current_frame_mut().ip += 1;
 
                     let definition = BUILTINS
                         .get(builtin_ind)
@@ -385,18 +385,18 @@ impl VM {
                 Opcode::Closure => {
                     let const_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
                     let num_free = ins[usize::try_from(ip + 3).unwrap()] as usize;
-                    self.current_frame().ip += 3;
+                    self.current_frame_mut().ip += 3;
 
                     self.push_closure(const_ind, num_free)?;
                 }
                 Opcode::GetFree => {
                     let free_ind = ins[usize::try_from(ip + 1).unwrap()] as usize;
-                    self.current_frame().ip += 1;
-                    let current_closure = &self.current_frame_immut().cl;
+                    self.current_frame_mut().ip += 1;
+                    let current_closure = &self.current_frame().cl;
                     self.push(current_closure.free[free_ind].clone())?;
                 }
                 Opcode::CurrentClosure => {
-                    let current_closure = self.current_frame_immut().cl.clone();
+                    let current_closure = self.current_frame().cl.clone();
                     self.push(Object::Closure(current_closure))?;
                 }
 
