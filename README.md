@@ -29,7 +29,6 @@ examples of TODOs in future:
 - Add history for repl
 - reduce cloning as much as possible.
 - reduce cloning objects by making them Rc<Object>
-- make step() function for executing a single instruction.
 - remove all warnings.
 - refactor the stack into standalone struct
 - add more monkey code examples like map
