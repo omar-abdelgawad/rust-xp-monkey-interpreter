@@ -26,6 +26,7 @@ While implementing I had a lot of TODOs and FIXes that I couldn't really think a
 - [Writing a 16-bit VM in rust](https://www.youtube.com/watch?v=oArXOAhzOdY&list=PLUkZG7_4JtUL22HycWYR_J-1xJo7rQGhr)
 
 examples of TODOs in future:
+- Add history for repl
 - reduce cloning as much as possible.
 - reduce cloning objects by making them Rc<Object>
 - make step() function for executing a single instruction.

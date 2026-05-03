@@ -409,16 +409,11 @@ impl Display for BlockStatement {
 pub struct FunctionLiteral {
     token: Token, // the 'fn' token
     pub parameters: Vec<Identifier>,
-    // FIX: how is this an option again?
-    pub body: Option<Box<BlockStatement>>,
+    pub body: Box<BlockStatement>,
     pub name: String,
 }
 impl FunctionLiteral {
-    pub fn new(
-        token: Token,
-        parameters: Vec<Identifier>,
-        body: Option<Box<BlockStatement>>,
-    ) -> Self {
+    pub fn new(token: Token, parameters: Vec<Identifier>, body: Box<BlockStatement>) -> Self {
         Self {
             token,
             parameters,
@@ -438,11 +433,7 @@ impl Display for FunctionLiteral {
             write!(f, "<{}>", self.name);
         }
         write!(f, "({})", params.join(", "))?;
-        if let Some(body) = &self.body {
-            write!(f, " {}", body)
-        } else {
-            write!(f, " {{}}")
-        }
+        write!(f, " {}", self.body)
     }
 }
 

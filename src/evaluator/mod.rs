@@ -68,7 +68,7 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
             Exp::Identifier(ident) => eval_identifier(ident, Rc::clone(&env)),
             Exp::Function(fun_exp) => {
                 let params = fun_exp.parameters;
-                let body = *fun_exp.body.unwrap();
+                let body = *fun_exp.body;
                 Object::Func(Function::new(params, body, Rc::clone(&env)))
             }
             Exp::Call(call_exp) => {

@@ -223,7 +223,7 @@ impl Compiler {
                         self.symbol_table().borrow_mut().define(p.value);
                     }
 
-                    let fn_lit_body = fn_lit.body.unwrap(); //FIX: what to do here?
+                    let fn_lit_body = fn_lit.body;
                     self.compile(Node::Statement(St::Block(*fn_lit_body)))?;
                     // implicit returnvalue
                     if self.last_instruction_is(Opcode::Pop) {

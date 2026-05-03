@@ -91,7 +91,7 @@ impl Parser {
         if !self.expect_peek(TokenType::LBRACE) {
             return None;
         }
-        let loop_body = self.parse_block_statement().unwrap();
+        let loop_body = self.parse_block_statement();
         let exp = WhileExpression::new(cur_token_tmp, cond_tmp, loop_body);
         Some(Box::new(Expression::While(exp)))
     }
@@ -232,19 +232,19 @@ impl Parser {
         if !self.expect_peek(TokenType::LBRACE) {
             return None;
         }
-        let consq_tmp = self.parse_block_statement().unwrap();
+        let consq_tmp = self.parse_block_statement();
         let mut alt_tmp = None;
         if self.peek_token_is(TokenType::ELSE) {
             self.next_token();
             if !self.expect_peek(TokenType::LBRACE) {
                 return None;
             }
-            alt_tmp = self.parse_block_statement();
+            alt_tmp = Some(self.parse_block_statement());
         }
         let exp = IfExpression::new(cur_token_tmp, cond_tmp, consq_tmp, alt_tmp);
         Some(Box::new(Expression::If(exp)))
     }
-    fn parse_block_statement(&mut self) -> Option<Box<BlockStatement>> {
+    fn parse_block_statement(&mut self) -> Box<BlockStatement> {
         let cur_token_tmp = self.cur_token.clone();
         let mut stmts_tmp: Vec<Statement> = vec![];
         self.next_token();
@@ -256,7 +256,7 @@ impl Parser {
             self.next_token();
         }
         let block = BlockStatement::new(cur_token_tmp, stmts_tmp);
-        Some(Box::new(block))
+        Box::new(block)
     }
     fn parse_grouped_expression(&mut self) -> Option<Box<Expression>> {
         self.next_token();
@@ -1098,23 +1098,19 @@ mod test {
         let boxed: Box<Expression> =
             Box::new(Expression::Identifier(function.parameters[1].clone()));
         test_literal_expression(&boxed, &"y");
-        if let Some(body) = &function.body {
-            assert_eq!(
-                body.statements.len(),
-                1,
-                "function.body.statements has not 1 statements. got={}",
-                body.statements.len()
+        assert_eq!(
+            function.body.statements.len(),
+            1,
+            "function.body.statements has not 1 statements. got={}",
+            function.body.statements.len()
+        );
+        let Statement::Expression(body_stmt) = &function.body.statements[0] else {
+            panic!(
+                "function body stmt is not ast::ExpressionStatement. got={:?}",
+                function.body.statements[0]
             );
-            let Statement::Expression(body_stmt) = &body.statements[0] else {
-                panic!(
-                    "function body stmt is not ast::ExpressionStatement. got={:?}",
-                    body.statements[0]
-                );
-            };
-            test_infix_expression(&body_stmt.expression, &"x", "+", &"y");
-        } else {
-            panic!()
-        }
+        };
+        test_infix_expression(&body_stmt.expression, &"x", "+", &"y");
     }
     #[test]
     fn test_function_parameter_parsing() {
