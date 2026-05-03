@@ -139,6 +139,22 @@ impl Compiler {
                         self.emit(Opcode::GreaterThan, &[]);
                         return Ok(());
                     }
+                    // a >= b  is  !(a < b)  is  !(b > a)
+                    if infix_exp.operator == ">=" {
+                        self.compile(Node::Expression(*infix_exp.right))?;
+                        self.compile(Node::Expression(*infix_exp.left))?;
+                        self.emit(Opcode::GreaterThan, &[]);
+                        self.emit(Opcode::Bang, &[]);
+                        return Ok(());
+                    }
+                    // a <= b  is  !(a > b)
+                    if infix_exp.operator == "<=" {
+                        self.compile(Node::Expression(*infix_exp.left))?;
+                        self.compile(Node::Expression(*infix_exp.right))?;
+                        self.emit(Opcode::GreaterThan, &[]);
+                        self.emit(Opcode::Bang, &[]);
+                        return Ok(());
+                    }
                     self.compile(Node::Expression(*infix_exp.left))?;
                     self.compile(Node::Expression(*infix_exp.right))?;
                     match infix_exp.operator.as_str() {
@@ -292,7 +308,40 @@ impl Compiler {
                     // 4️⃣ Emit OpHash
                     self.emit(Opcode::Hash, &[(hash_lit.pairs.len() * 2) as i64]);
                 }
-                Exp::While(while_expression) => todo!(),
+                Exp::While(while_expression) => {
+                    // while (condition) { body }
+                    // compiles to:
+                    //   LOOP_START:
+                    //     <condition>
+                    //     JumpNotTruthy -> AFTER_LOOP
+                    //     <body>
+                    //     Jump -> LOOP_START
+                    //   AFTER_LOOP:
+                    //     Null         (while always evaluates to null)
+                    let loop_start_pos = self.current_instructions().len();
+
+                    // compile condition
+                    self.compile(Node::Expression(*while_expression.condition))?;
+
+                    // jump out if condition is falsy
+                    let jump_not_truthy_pos = self.emit(Opcode::JumpNotTruthy, &[9999]);
+
+                    // compile body — block statements handle their own Pop for expression stmts
+                    self.compile(Node::Statement(St::Block(*while_expression.loop_body)))?;
+
+                    // jump back to condition check
+                    self.emit(Opcode::Jump, &[loop_start_pos as i64]);
+
+                    // patch the exit jump to land here
+                    let after_loop_pos = self.current_instructions().len();
+                    self.change_operand(
+                        jump_not_truthy_pos,
+                        after_loop_pos.try_into().unwrap(),
+                    );
+
+                    // while always evaluates to null
+                    self.emit(Opcode::Null, &[]);
+                }
             },
         }
         Ok(())

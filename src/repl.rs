@@ -3,7 +3,6 @@ use crate::compiler::symbol_table::{SymbolTable, SymbolTableRef};
 use crate::compiler::Compiler;
 use crate::lexer::Lexer;
 use crate::object::builtins::BUILTINS;
-use crate::object::environment::Environment;
 use crate::object::{ObjectTrait, GARBAGEVALOBJ};
 use crate::parser::Parser;
 use crate::vm::{GLOBALSSIZE, VM};
@@ -95,17 +94,26 @@ pub fn execute_file(mut input: impl BufRead, mut output: impl Write) {
     input
         .read_to_string(&mut file)
         .expect("Failed to read whole file");
-    let env = Rc::new(RefCell::new(Environment::new()));
-    let l = Lexer::new(file);
+    let l = Lexer::new(&file);
     let mut p = Parser::new(l);
     let program = p.parse_program();
     if !p.errors().is_empty() {
         print_parser_errors(&mut output, p.errors());
         return;
     }
-    use crate::evaluator;
-    let evaluated = evaluator::eval(Node::Program(program), env.clone());
-    writeln!(output, "{}", evaluated.inspect()).unwrap();
+    let mut comp = Compiler::new();
+    if let Err(err) = comp.compile(Node::Program(program)) {
+        writeln!(output, "Compiler error: {}", err).unwrap();
+        return;
+    }
+    let code = comp.bytecode();
+    let mut machine = VM::new(code);
+    if let Err(err) = machine.run() {
+        writeln!(output, "VM error: {}", err).unwrap();
+        return;
+    }
+    let last_popped = machine.last_popped_stack_elem();
+    writeln!(output, "{}", last_popped.inspect()).unwrap();
 }
 
 fn print_parser_errors(mut output: impl Write, errors: &[String]) {

@@ -122,15 +122,18 @@ impl VM {
             (Object::Integer(left_val), Object::Integer(right_val)) => {
                 self.execute_binary_integer_operation(op, left_val.value, right_val.value)
             }
-            // TODO: maybe I should have let the other side free to allow string + int
             (Object::String(left_val), Object::String(right_val)) => {
                 self.execute_binary_string_operation(op, left_val.value, right_val.value)
             }
-            (left, right) => todo!(
+            (Object::String(left_val), Object::Integer(right_val)) if op == Opcode::Add => {
+                let result = format!("{}{}", left_val.value, right_val.value);
+                self.push(Object::new_str_var(&result))
+            }
+            (left, right) => Err(format!(
                 "unsupported types for binary operation: {} {}",
                 left.r#type(),
                 right.r#type()
-            ),
+            )),
         }
     }
     fn execute_binary_integer_operation(
@@ -398,10 +401,12 @@ impl VM {
             _ => panic!("unknown instruction"),
         }
     }
+    pub fn is_running(&self) -> bool {
+        self.current_frame().ip
+            < (self.current_frame().cl.comp_fn.instructions.len() as i64 - 1)
+    }
     pub fn run(&mut self) -> Result<(), String> {
-        while self.current_frame_mut().ip
-            < (self.current_frame_mut().instructions_mut().len() as i64 - 1)
-        {
+        while self.is_running() {
             self.step()?;
         }
         Ok(())
@@ -532,6 +537,15 @@ mod tests {
             VmTestCase::new("(1 < 2) == false", Box::new(false)),
             VmTestCase::new("(1 > 2) == true", Box::new(false)),
             VmTestCase::new("(1 > 2) == false", Box::new(true)),
+            // >= and <= operators
+            VmTestCase::new("1 >= 2", Box::new(false)),
+            VmTestCase::new("2 >= 2", Box::new(true)),
+            VmTestCase::new("3 >= 2", Box::new(true)),
+            VmTestCase::new("1 <= 2", Box::new(true)),
+            VmTestCase::new("2 <= 2", Box::new(true)),
+            VmTestCase::new("3 <= 2", Box::new(false)),
+            VmTestCase::new("(1 >= 1) == true", Box::new(true)),
+            VmTestCase::new("(1 <= 1) == true", Box::new(true)),
             VmTestCase::new("!true", Box::new(false)),
             VmTestCase::new("!false", Box::new(true)),
             VmTestCase::new("!5", Box::new(false)),
@@ -539,6 +553,28 @@ mod tests {
             VmTestCase::new("!!false", Box::new(false)),
             VmTestCase::new("!!5", Box::new(true)),
             VmTestCase::new("!(if (false) { 5; })", Box::new(true)),
+        ];
+        run_vm_tests(tests);
+    }
+    #[test]
+    fn test_while_expressions() {
+        let tests = vec![
+            VmTestCase::new(
+                "let x = 3; while (x > 0) { let x = x - 1; }; x",
+                Box::new(0i64),
+            ),
+            VmTestCase::new(
+                "let x = 0; while (x < 3) { let x = x + 1; }; x",
+                Box::new(3i64),
+            ),
+            VmTestCase::new(
+                "let x = 0; while (x <= 2) { let x = x + 1; }; x",
+                Box::new(3i64),
+            ),
+            VmTestCase::new(
+                "while (2 < 1) { 10 }",
+                Box::new(crate::object::Null),
+            ),
         ];
         run_vm_tests(tests);
     }

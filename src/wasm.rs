@@ -3,7 +3,6 @@ use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
 use crate::ast::Node;
-use crate::ast::Program;
 use crate::compiler::Compiler;
 use crate::evaluator;
 use crate::lexer::Lexer;
@@ -35,10 +34,11 @@ pub fn stream_output(text: &str) {
     });
 }
 
+/// Tree-walking interpreter exposed to WASM.
+/// Only supports blocking `evaluate()` — fine for short programs.
 #[wasm_bindgen]
 pub struct MonkeyInterpreter {
     env: Rc<RefCell<Environment>>,
-    prog: Option<Program>,
 }
 
 #[wasm_bindgen]
@@ -47,17 +47,11 @@ impl MonkeyInterpreter {
     pub fn new() -> MonkeyInterpreter {
         MonkeyInterpreter {
             env: Rc::new(RefCell::new(Environment::new())),
-            prog: None,
         }
     }
 
-    // FIX: DOM can't render while wasm is executing because call stack has to be empty
-    // so even though I can call JS from inside wasm as already done using OUTPUT_CALLBACK
-    // that is only good enough if we will use console.log as it doesn't need DOM rendering.
-    // to show the output through manipulating the DOM we need to yield control back
-    // which can be done by evaluating the program statement by statement. but turns out
-    // that doesn't work because I need to render even inside a single statement such as
-    // a function call that starts the program like main() or run()
+    /// Evaluate code using the tree-walking interpreter.
+    /// This blocks until completion — no incremental output for long programs.
     #[wasm_bindgen]
     pub fn evaluate(&mut self, code: &str) -> String {
         let lexer = Lexer::new(code);
@@ -77,7 +71,29 @@ impl MonkeyInterpreter {
     }
 
     #[wasm_bindgen]
-    pub fn set_program(&mut self, code: &str) {
+    pub fn reset(&mut self) {
+        self.env = Rc::new(RefCell::new(Environment::new()));
+    }
+}
+
+/// Bytecode VM exposed to WASM.
+/// Supports incremental execution via `compile()` + `step()` loop.
+#[wasm_bindgen]
+pub struct MonkeyVM {
+    vm: Option<VM>,
+}
+
+#[wasm_bindgen]
+impl MonkeyVM {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self { vm: None }
+    }
+
+    /// Parse and compile the code, creating the VM. Returns true on success.
+    /// On failure, streams error messages via the output callback and returns false.
+    #[wasm_bindgen]
+    pub fn compile(&mut self, code: &str) -> bool {
         let lexer = Lexer::new(code);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
@@ -87,211 +103,59 @@ impl MonkeyInterpreter {
             for error in parser.errors() {
                 error_msg.push_str(&format!("  {}\n", error));
             }
-            self.prog = None;
             stream_output(&error_msg);
-            return;
+            self.vm = None;
+            return false;
         }
-        self.prog = Some(program);
+
+        let mut compiler = Compiler::new();
+        if let Err(err) = compiler.compile(Node::Program(program)) {
+            stream_output(&format!("Compiler error: {}\n", err));
+            self.vm = None;
+            return false;
+        }
+
+        let bytecode = compiler.bytecode();
+        self.vm = Some(VM::new(bytecode));
+        true
     }
 
-    // this still doesn't work because the 1 function call is 1 statement
-    // but it can basically be the whole program like main() or run()
-    // maybe we can make it async but that requires a lot more changes so
-    // everything until reaching the puts function would be async and that
-    // sucks hard
+    /// Execute one bytecode instruction. Returns true on success, false on error.
+    /// Call `is_running()` to check if there are more instructions.
     #[wasm_bindgen]
-    pub fn evaluate_statement(&mut self) -> String {
-        if let Some(ref mut prog) = self.prog {
-            if prog.statements.is_empty() {
-                return String::from("Program completed");
+    pub fn step(&mut self) -> bool {
+        if let Some(ref mut vm) = self.vm {
+            if let Err(err) = vm.step() {
+                stream_output(&format!("VM error: {}\n", err));
+                return false;
             }
-            let stmt = prog.statements.remove(0);
-            if prog.statements.is_empty() {
-                self.prog = None;
-            }
-            let result = evaluator::eval(Node::Statement(stmt), Rc::clone(&self.env));
-            return result.inspect();
+            true
+        } else {
+            false
         }
-        String::from("No program set")
     }
 
+    /// Returns true if the VM has more instructions to execute.
     #[wasm_bindgen]
-    pub fn reset(&mut self) {
-        self.env = Rc::new(RefCell::new(Environment::new()));
-        self.prog = None;
-    }
-}
-
-// Function to get example code
-#[wasm_bindgen]
-pub fn get_example_code(example_name: &str) -> String {
-    match example_name {
-        "hello_world" => "puts(\"Hello, World!\")".to_string(),
-        "while_loop" => r#"
-# This is kind of a speed test for while loop
-
-let i = 1000000; # 1 million
-while (i > 0) {
-    let i = i - 1;
-}"#
-        .to_string(),
-        "game_of_life" => {
-            let mut code = String::new();
-            code.push_str("############################################################\n");
-            code.push_str("# Conway's Game of Life — Monkey implementation (finite grid)\n");
-            code.push_str("# - Live cell: 1\n");
-            code.push_str("# - Dead cell: 0\n");
-            code.push_str("# - Out-of-bounds neighbors count as 0 (no wraparound)\n");
-            code.push_str("############################################################\n\n");
-            code.push_str("# --- Grid utilities ---\n");
-            code.push_str("let rows = fn(g) { len(g) };\n\n");
-            code.push_str("let cols = fn(g) {\n");
-            code.push_str("    # assume first element exists\n");
-            code.push_str("    len(first(g))\n");
-            code.push_str("};\n\n");
-            code.push_str("# Safe cell access: returns 0 when (r,c) is out of bounds\n");
-            code.push_str("let cell = fn(g, r, c) {\n");
-            code.push_str("    if (r < 0) { 0 } \n");
-            code.push_str("    else {\n");
-            code.push_str("        if (r >= rows(g)) { 0 } \n");
-            code.push_str("        else {\n");
-            code.push_str("            let row = g[r];\n");
-            code.push_str("            if (c < 0) { 0 } \n");
-            code.push_str("            else {\n");
-            code.push_str("                if (c >= cols(g)) { 0 } else {row[c]}\n");
-            code.push_str("            }\n");
-            code.push_str("        }\n");
-            code.push_str("    }\n");
-            code.push_str("};\n\n");
-            code.push_str("# Count the 8 neighbors around (r, c)\n");
-            code.push_str("let neighbor_count = fn(g, r, c) {\n");
-            code.push_str("    cell(g, r-1, c-1) +\n");
-            code.push_str("    cell(g, r-1, c  ) +\n");
-            code.push_str("    cell(g, r-1, c+1) +\n");
-            code.push_str("    cell(g, r  , c-1) +\n");
-            code.push_str("    cell(g, r  , c+1) +\n");
-            code.push_str("    cell(g, r+1, c-1) +\n");
-            code.push_str("    cell(g, r+1, c  ) +\n");
-            code.push_str("    cell(g, r+1, c+1)\n");
-            code.push_str("};\n\n");
-            code.push_str("# Game of Life rule for a single cell\n");
-            code.push_str("let next_cell = fn(g, r, c) {\n");
-            code.push_str("    let alive = cell(g, r, c);\n");
-            code.push_str("    let n = neighbor_count(g, r, c);\n\n");
-            code.push_str("    if (alive == 1) {\n");
-            code.push_str("        # Survival on 2 or 3 neighbors\n");
-            code.push_str("        if (n == 2) { 1 } else {\n");
-            code.push_str("        if (n == 3) { 1 } else { 0 }}\n");
-            code.push_str("    } else {\n");
-            code.push_str("        # Birth on exactly 3 neighbors\n");
-            code.push_str("        if (n == 3) { 1 } else { 0 }\n");
-            code.push_str("    }\n");
-            code.push_str("};\n\n");
-            code.push_str("# Build next row r as a new array\n");
-            code.push_str("let evolve_row = fn(g, r) {\n");
-            code.push_str("    let c = 0;\n");
-            code.push_str("    let C = cols(g);\n");
-            code.push_str("    let acc = [];\n");
-            code.push_str("    while (c < C) {\n");
-            code.push_str("        let acc = push(acc, next_cell(g, r, c));\n");
-            code.push_str("        let c = c + 1;\n");
-            code.push_str("    };\n");
-            code.push_str("    acc\n");
-            code.push_str("};\n\n");
-            code.push_str("# Build next generation grid as a new array of arrays\n");
-            code.push_str("let evolve = fn(g) {\n");
-            code.push_str("    let r = 0;\n");
-            code.push_str("    let R = rows(g);\n");
-            code.push_str("    let acc = [];\n");
-            code.push_str("    while (r < R) {\n");
-            code.push_str("        let acc = push(acc, evolve_row(g, r));\n");
-            code.push_str("        let r = r + 1;\n");
-            code.push_str("    };\n");
-            code.push_str("    acc\n");
-            code.push_str("};\n\n");
-            code.push_str("# --- Pretty printer for the grid ---\n");
-            code.push_str("let row_to_string = fn(row) {\n");
-            code.push_str("    let i = 0;\n");
-            code.push_str("    let s = \"\";\n");
-            code.push_str("    let n = len(row);\n");
-            code.push_str("    while (i < n) {\n");
-            code.push_str("        let ch = if (row[i] == 1) { \"#\" } else { \".\" };\n");
-            code.push_str("        let s = s + ch;\n");
-            code.push_str("        let i = i + 1;\n");
-            code.push_str("    };\n");
-            code.push_str("    s\n");
-            code.push_str("};\n\n");
-            code.push_str("let print_grid = fn(g) {\n");
-            code.push_str("    let r = 0;\n");
-            code.push_str("    let R = rows(g);\n");
-            code.push_str("    while (r < R) {\n");
-            code.push_str("        puts(row_to_string(g[r]));\n");
-            code.push_str("        let r = r + 1;\n");
-            code.push_str("    };\n");
-            code.push_str("};\n\n");
-            code.push_str("############################################################\n");
-            code.push_str("# Demo: run a few generations of a glider on a 10x10 board\n");
-            code.push_str("############################################################\n\n");
-            code.push_str("# Place a small glider in the top-left\n");
-            code.push_str("let seed = [\n");
-            code.push_str("    [0,1,0,0,0,0,0,0,0,0],\n");
-            code.push_str("    [0,0,1,0,0,0,0,0,0,0],\n");
-            code.push_str("    [1,1,1,0,0,0,0,0,0,0],\n");
-            code.push_str("    [0,0,0,0,0,0,0,0,0,0],\n");
-            code.push_str("    [0,0,0,0,0,0,0,0,0,0],\n");
-            code.push_str("    [0,0,0,0,0,0,0,0,0,0],\n");
-            code.push_str("    [0,0,0,0,0,0,0,0,0,0],\n");
-            code.push_str("    [0,0,0,0,0,0,0,0,0,0],\n");
-            code.push_str("    [0,0,0,0,0,0,0,0,0,0],\n");
-            code.push_str("    [0,0,0,0,0,0,0,0,0,0]\n");
-            code.push_str("];\n\n");
-            code.push_str("# Run N generations, printing each\n");
-            code.push_str("let run = fn(g, gens) {\n");
-            code.push_str("    let i = 0;\n");
-            code.push_str("    while (i < gens+1) {\n");
-            code.push_str("        puts(\"Generation \" + i);\n");
-            code.push_str("        print_grid(g);\n");
-            code.push_str("        puts(\"\");  # blank line\n");
-            code.push_str("        let g = evolve(g);\n");
-            code.push_str("        let i = i + 1;\n");
-            code.push_str("    };\n");
-            code.push_str("};\n\n");
-            code.push_str("# --- Execute demo (change gens to taste) ---\n");
-            code.push_str("puts(\"starting\");\n");
-            code.push_str("run(seed, 5);");
-            code
-        }
-        _ => "puts(\"Unknown example\")".to_string(),
-    }
-}
-
-#[wasm_bindgen]
-pub fn get_available_examples() -> String {
-    // Return a JSON string that JavaScript can parse
-    r#"[
-        ["hello_world", "Hello World"],
-        ["while_loop", "While Loop Demo"],
-        ["game_of_life", "Conway's Game of Life"]
-    ]"#
-    .to_string()
-}
-
-#[wasm_bindgen]
-pub struct MonkeyVM {
-    // vm: Option<VM>,
-    // prog: Option<Program>,
-}
-
-#[wasm_bindgen]
-impl MonkeyVM {
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        Self {
-            // vm: None,
-            // prog: None,
+    pub fn is_running(&self) -> bool {
+        if let Some(ref vm) = self.vm {
+            vm.is_running()
+        } else {
+            false
         }
     }
 
+    /// Get the final result after execution completes.
+    #[wasm_bindgen]
+    pub fn result(&self) -> String {
+        if let Some(ref vm) = self.vm {
+            vm.last_popped_stack_elem().inspect()
+        } else {
+            "null".to_string()
+        }
+    }
+
+    /// Convenience method: compile and run the entire program in one call (blocking).
     #[wasm_bindgen]
     pub fn evaluate(&mut self, code: &str) -> String {
         let lexer = Lexer::new(code);
@@ -318,4 +182,33 @@ impl MonkeyVM {
         let result = machine.last_popped_stack_elem();
         result.inspect()
     }
+
+    /// Drop the inner VM.
+    #[wasm_bindgen]
+    pub fn reset(&mut self) {
+        self.vm = None;
+    }
+}
+
+/// Get example Monkey source code by name.
+/// Uses `include_str!` to embed files at compile time from `monkey_examples/`.
+#[wasm_bindgen]
+pub fn get_example_code(example_name: &str) -> String {
+    match example_name {
+        "hello_world" => include_str!("../monkey_examples/hello_world.monkey").to_string(),
+        "while_loop" => include_str!("../monkey_examples/while_loop.monkey").to_string(),
+        "game_of_life" => include_str!("../monkey_examples/game_of_life.monkey").to_string(),
+        _ => "puts(\"Unknown example\")".to_string(),
+    }
+}
+
+#[wasm_bindgen]
+pub fn get_available_examples() -> String {
+    // Return a JSON string that JavaScript can parse
+    r#"[
+        ["hello_world", "Hello World"],
+        ["while_loop", "While Loop Demo"],
+        ["game_of_life", "Conway's Game of Life"]
+    ]"#
+    .to_string()
 }

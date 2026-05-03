@@ -12,7 +12,7 @@ run:
 
 # run a Monkey script file
 run-file FILE:
-  cargo run -q -- {{FILE}}
+  cargo run --release -q -- {{FILE}}
 
 # run book's benchmark
 bench ENGINE="vm":

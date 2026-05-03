@@ -4,66 +4,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monkey Interpreter - WebAssembly</title>
+    <title>Monkey Language — Interactive WASM Playground</title>
+    <meta name="description"
+        content="Write and execute Monkey programming language code directly in your browser, powered by a Rust-compiled WebAssembly bytecode VM.">
     <link rel="stylesheet" href="styles.css">
     <link
-        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap"
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
 </head>
 
 <body>
+    <div class="backdrop"></div>
     <div class="container">
         <header>
-            <h1>🐒 Monkey Interpreter</h1>
-            <p>Run Monkey code in your browser using WebAssembly</p>
+            <h1>Monkey Language</h1>
+            <p class="subtitle">Interactive WASM Playground</p>
         </header>
 
+        <div class="toolbar">
+            <div class="engine-toggle" role="group" aria-label="Execution engine">
+                <button class="engine-btn active" data-engine="vm" id="engine-vm">VM (Bytecode)</button>
+                <button class="engine-btn" data-engine="interpreter" id="engine-tree-walker">Tree-Walker</button>
+            </div>
+            <div class="toolbar-right">
+                <select id="example-selector" aria-label="Load example">
+                    <option value="">Load example...</option>
+                </select>
+            </div>
+        </div>
+
         <div class="main-content">
-            <div class="editor-section">
-                <div class="editor-header">
-                    <h2>Code Editor</h2>
-                    <div class="controls">
-                        <select id="example-selector">
-                            <option value="">Choose an example...</option>
-                        </select>
-                        <button id="clear-editor" class="btn btn-secondary">Clear</button>
+            <div class="panel editor-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Editor</span>
+                    <div class="panel-actions">
+                        <span class="hint">Ctrl+Enter to run</span>
+                        <button id="clear-editor" class="btn btn-ghost" aria-label="Clear editor">Clear</button>
                     </div>
                 </div>
-                <textarea id="code-editor" placeholder="Enter your Monkey code here..."></textarea>
+                <textarea id="code-editor" spellcheck="false"
+                    placeholder="Write your Monkey code here..."></textarea>
             </div>
 
-            <div class="output-section">
-                <div class="output-header">
-                    <h2>Output</h2>
-                    <button id="run-code" class="btn btn-primary">▶ Run Code</button>
+            <div class="panel output-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Output</span>
+                    <div class="panel-actions">
+                        <button id="run-code" class="btn btn-run" aria-label="Run code">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                            Run
+                        </button>
+                        <button id="stop-code" class="btn btn-stop" style="display:none" aria-label="Stop execution">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <rect x="6" y="6" width="12" height="12" />
+                            </svg>
+                            Stop
+                        </button>
+                    </div>
                 </div>
                 <div id="output" class="output-container">
-                    <div class="output-placeholder">
-                        Click "Run Code" to execute your Monkey program
-                    </div>
+                    <div class="output-placeholder">Output will appear here...</div>
                 </div>
             </div>
         </div>
 
-        <div class="info-section">
-            <h3>About Monkey</h3>
-            <p>Monkey is a small, educational programming language that supports:</p>
-            <ul>
-                <li>Integers, booleans, and strings</li>
-                <li>Arithmetic and boolean expressions</li>
-                <li>Variable bindings with <code>let</code></li>
-                <li>First-class functions and closures</li>
-                <li>Conditionals and loops</li>
-                <li>Arrays and hashes</li>
-                <li>Built-in functions like <code>puts</code>, <code>len</code>, <code>first</code>, <code>last</code>
-                </li>
-            </ul>
+        <div class="info-bar">
+            <div class="info-items">
+                <span>Integers &amp; Strings</span>
+                <span class="dot"></span>
+                <span>First-class Functions</span>
+                <span class="dot"></span>
+                <span>Closures</span>
+                <span class="dot"></span>
+                <span>Arrays &amp; Hashes</span>
+                <span class="dot"></span>
+                <span>While Loops</span>
+                <span class="dot"></span>
+                <span>Built-ins: <code>puts</code> <code>len</code> <code>first</code> <code>last</code>
+                    <code>rest</code> <code>push</code></span>
+            </div>
         </div>
     </div>
 
-    <!-- what is the use of the following line? -->
-    <!-- <script src="https://unpkg.com/@wasm-tool/wasm-pack-plugin@1.6.0/wasm-pack-plugin.js"></script> -->
-    <script type="module" src="vm.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 
 </html>

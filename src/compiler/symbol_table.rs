@@ -50,11 +50,17 @@ impl SymbolTable {
         Rc::new(RefCell::new(s))
     }
     pub fn define(&mut self, ident: String) -> Symbol {
-        let mut symbol = Symbol::new(ident.clone(), SymbolScope::Global, self.num_definitions);
-        match self.outer {
-            None => symbol.scope = SymbolScope::Global,
-            Some(_) => symbol.scope = SymbolScope::Local,
+        let scope = match self.outer {
+            None => SymbolScope::Global,
+            Some(_) => SymbolScope::Local,
+        };
+        // If already defined in the current scope, reuse its index
+        if let Some(existing) = self.store.get(&ident) {
+            if existing.scope == scope {
+                return existing.clone();
+            }
         }
+        let symbol = Symbol::new(ident.clone(), scope, self.num_definitions);
         self.store.insert(ident, symbol.clone());
         self.num_definitions += 1;
         symbol

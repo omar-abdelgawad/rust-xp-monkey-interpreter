@@ -44,45 +44,19 @@ const fn builtin_len() -> BuiltinObj {
 const fn builtin_puts() -> BuiltinObj {
     BuiltinObj {
         function: |args: &[Object]| {
-            #[cfg(target_arch = "wasm32")]
-            {
-                let args_cloned = args.to_vec();
-                fn step(mut args: Vec<Object>) {
-                    if args.is_empty() {
-                        return;
-                    }
-
-                    let arg = args.remove(0);
-                    let output = arg.inspect();
-
-                    // Streaming output
+            for arg in args {
+                let output = arg.inspect();
+                #[cfg(target_arch = "wasm32")]
+                {
                     crate::wasm::stream_output(&output);
-                    if !output.ends_with('\n') {
-                        crate::wasm::stream_output("\n");
-                    }
-
-                    // Schedule the next step to let the DOM paint
-                    if !args.is_empty() {
-                        yield_to_paint(move || step(args));
-                    }
+                    crate::wasm::stream_output("\n");
                 }
-
-                step(args_cloned);
-                return NULL;
-            }
-            #[cfg(not(target_arch = "wasm32"))]
-            {
-                for arg in args {
-                    let output = arg.inspect();
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        // For native compilation, use standard println
-                        println!("{}", output);
-                    }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    println!("{}", output);
                 }
-
-                NULL
             }
+            NULL
         },
     }
 }
@@ -193,21 +167,4 @@ const fn builtin_push() -> BuiltinObj {
             Object::Arr(Array::new(new_elements))
         },
     }
-}
-#[cfg(target_arch = "wasm32")]
-pub fn yield_to_paint<F>(f: F)
-where
-    F: 'static + FnOnce(),
-{
-    use wasm_bindgen::closure::Closure;
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsCast;
-    use web_sys::window;
-
-    let closure = Closure::once_into_js(f);
-    window()
-        .unwrap()
-        .request_animation_frame(closure.as_ref().unchecked_ref())
-        .unwrap();
-    // closure consumed by once_into_js, no need to forget
 }

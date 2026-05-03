@@ -1,42 +1,32 @@
-# Monkey Interpreter - Web Interface
+# Monkey Language — Web Interface
 
-This directory contains the web interface for the Monkey programming language interpreter.
+Interactive web playground for the Monkey programming language, powered by Rust and WebAssembly.
 
 ## Files
 
-- `index.html` - Main web interface with code editor and output display
-- `styles.css` - Modern, responsive styling
-- `main.js` - JavaScript application logic and WebAssembly integration
-- `test.html` - Simple test page for verifying WebAssembly functionality
-- `monkey_rs.js` - Generated WebAssembly JavaScript bindings
-- `monkey_rs_bg.wasm` - Compiled WebAssembly binary
+- `index.html` — Single-page app with code editor, output display, and engine toggle
+- `styles.css` — Dark theme styling with glassmorphism
+- `app.js` — Unified JavaScript: async VM stepping, tree-walker fallback, stop button
+- `monkey_rs.js` — Generated WebAssembly JavaScript bindings
+- `monkey_rs_bg.wasm` — Compiled WebAssembly binary
+
+## Architecture
+
+The website supports two execution engines:
+
+- **VM (Bytecode)** — Compiles Monkey code to bytecode and executes it instruction-by-instruction via the `step()` API. JS calls `step()` in batches of 500, yielding to the browser event loop between batches so the DOM can paint. This enables **progressive output** for long-running programs.
+- **Tree-Walker** — Evaluates the AST directly via `evaluate()`. Blocks the browser until completion — fine for short programs but freezes the UI for long-running ones.
 
 ## Local Development
 
-To test the web interface locally:
-
 1. Build the WebAssembly module from the project root:
    ```bash
-   ./build.sh
+   just build_website
    ```
 
 2. Start a local HTTP server:
    ```bash
-   python3 -m http.server 8000
+   just serve
    ```
 
-3. Open your browser to:
-   - Main interface: http://localhost:8000/website/
-   - Test page: http://localhost:8000/website/test.html
-
-## Deployment
-
-The website is automatically deployed to GitHub Pages when you push to the main branch. The GitHub Actions workflow builds the WebAssembly module and deploys the contents of this directory.
-
-## Features
-
-- Interactive Monkey code editor
-- Real-time code execution via WebAssembly
-- Example programs (Hello World, While Loop, Game of Life)
-- Error handling and output display
-- Responsive design for desktop and mobile
+3. Open your browser to: http://localhost:8000/
