@@ -8,7 +8,7 @@ test:
 
 # run interactive shell
 run:
-  cargo run -q
+  cargo run --release -q
 
 # run a Monkey script file
 run-file FILE:

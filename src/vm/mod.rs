@@ -12,9 +12,9 @@ use crate::parser::Parser;
 use std::array;
 use std::collections::HashMap;
 
-const STACKSIZE: usize = 2048;
-pub const GLOBALSSIZE: usize = 65536;
-const MAXFRAMES: usize = 1024;
+const STACKSIZE: usize = 1 << 11;
+pub const GLOBALSSIZE: usize = 1 << 16;
+const MAXFRAMES: usize = 1 << 10;
 
 #[derive(Debug, Clone)]
 struct Frame {
@@ -33,7 +33,7 @@ impl Frame {
             bp: -1,
         }
     }
-    fn instructions(&mut self) -> &mut Instructions {
+    fn instructions_mut(&mut self) -> &mut Instructions {
         &mut self.cl.comp_fn.instructions
     }
 }
@@ -41,6 +41,7 @@ impl Frame {
 #[derive(Debug)]
 pub struct VM {
     constants: Vec<Object>,
+    // TODO: make stack and its sp one struct to encapsulate their function
     stack: Vec<Object>,
     sp: usize, // always points to next value. top of stack is stack[sp -1]
     //pc: usize // TODO: implement in future
@@ -49,7 +50,6 @@ pub struct VM {
     // size to be stored on the stack and object is on the heap from what I understand
     globals: Vec<Object>,
     frames: Vec<Frame>,
-    frames_index: usize,
 }
 
 impl VM {
@@ -66,7 +66,7 @@ impl VM {
         let main_closure = ClosureObj::new(main_fn, vec![]);
         let main_frame = Frame::new(main_closure, 0);
 
-        let mut frames = vec![Frame::garbage_value(); MAXFRAMES];
+        let mut frames = vec![Frame::garbage_value(); 1];
         frames[0] = main_frame;
         Self {
             constants,
@@ -74,22 +74,27 @@ impl VM {
             sp: 0,
             globals: vec![GARBAGEVALOBJ; GLOBALSSIZE],
             frames: frames,
-            frames_index: 1,
         }
     }
+
+    pub fn last_popped_stack_elem(&self) -> Object {
+        self.stack[self.sp].clone()
+    }
+
     fn current_frame_mut(&mut self) -> &mut Frame {
-        &mut self.frames[self.frames_index - 1]
+        self.frames.last_mut().expect("at least main exists")
     }
     fn current_frame(&self) -> &Frame {
-        &self.frames[self.frames_index - 1]
+        self.frames.last().expect("at least main exists")
     }
     fn push_frame(&mut self, f: Frame) {
-        self.frames[self.frames_index] = f;
-        self.frames_index += 1;
+        if self.frames.len() >= MAXFRAMES {
+            panic!("frame stack overflow, trying to push_frame while having max number")
+        }
+        self.frames.push(f);
     }
     fn pop_frame(&mut self) -> Frame {
-        self.frames_index -= 1;
-        self.frames[self.frames_index].clone()
+        self.frames.pop().expect("at least main exists")
     }
     fn push_closure(&mut self, const_ind: usize, num_free: usize) -> Result<(), String> {
         let constant = self.constants[const_ind].clone();
@@ -106,10 +111,7 @@ impl VM {
         }
     }
 
-    pub fn last_popped_stack_elem(&self) -> Object {
-        self.stack[self.sp].clone()
-    }
-    pub fn pop(&mut self) -> Object {
+    fn pop(&mut self) -> Object {
         let o = self.stack[self.sp - 1].clone();
         self.sp -= 1;
         o
@@ -259,12 +261,12 @@ impl VM {
         let mut ins;
         let mut op: Opcode;
         while self.current_frame_mut().ip
-            < (self.current_frame_mut().instructions().len() as i64 - 1)
+            < (self.current_frame_mut().instructions_mut().len() as i64 - 1)
         {
             self.current_frame_mut().ip += 1;
 
             ip = self.current_frame_mut().ip;
-            ins = self.current_frame_mut().instructions();
+            ins = self.current_frame_mut().instructions_mut();
             op = TryFrom::try_from(ins[ip as usize])?;
             match op {
                 Opcode::Constant => {
