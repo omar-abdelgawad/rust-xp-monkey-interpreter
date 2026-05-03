@@ -1,18 +1,18 @@
 # list all commands
 default:
-  @just --list
+  just --list
 
 # run all tests
 test:
-  @cargo test -q --lib
+  cargo test -q
 
 # run interactive shell
 run:
-  @cargo run -q
+  cargo run -q
 
 # run a Monkey script file
 run-file FILE:
-  @cargo run -q -- {{FILE}}
+  cargo run -q -- {{FILE}}
 
 # run book's benchmark
 bench ENGINE="vm":
@@ -20,16 +20,17 @@ bench ENGINE="vm":
 
 # records an interactive shells
 record:
-  @script -c "just run" run.log
+  script -c "just run" run.log
 
 # for testing wasm
 [working-directory: 'website']
 serve: build_website
-  @python -m http.server 8000
+  python -m http.server 8000
 
 # running script for building website
 build_website:
   ./scripts/build.sh
 
-git_clean_dry_run:
-  git clean -fxfd --dry-run
+[doc('dry run of git clean. use clean force to delete')]
+clean mode="dry":
+    git clean -fxfd -e '*venv' -e '.env' {{ if mode == "force" { "" } else { "--dry-run" } }}
