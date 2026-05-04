@@ -168,22 +168,21 @@ fn eval_plus_prefix_operator_exprssion(right: Object) -> Object {
 }
 
 fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object {
-    use Object as Obj;
     match (operator, left, right) {
-        ("==", Obj::Boolean(left), Obj::Boolean(right)) => {
+        ("==", Object::Boolean(left), Object::Boolean(right)) => {
             native_bool_to_boolean_object(left == right)
         }
-        ("!=", Obj::Boolean(left), Obj::Boolean(right)) => {
+        ("!=", Object::Boolean(left), Object::Boolean(right)) => {
             native_bool_to_boolean_object(left != right)
         }
-        (_, Obj::Integer(left), Obj::Integer(right)) => {
-            eval_integer_infix_expression(operator, left, right)
+        (op, Object::Integer(left), Object::Integer(right)) => {
+            eval_integer_infix_expression(op, left, right)
         }
-        (_, Obj::String(left), right) => eval_string_infix_expression(operator, left, right),
+        (op, Object::String(left), right) => eval_string_infix_expression(op, left, right),
         (op, l, r) if l.r#type() != r.r#type() => new_error(format!(
             "type mismatch: {} {} {}",
             l.r#type(),
-            operator,
+            op,
             r.r#type()
         )),
         (op, l, r) => new_error(format!(

@@ -176,9 +176,7 @@ impl Hashable for Object {
 impl IsHashable for Object {
     fn is_hashable(&self) -> Result<(), String> {
         match self {
-            Object::Boolean(b) => Ok(()),
-            Object::Integer(i) => Ok(()),
-            Object::String(s) => Ok(()),
+            Object::Boolean(_) | Object::Integer(_) | Object::String(_) => Ok(()),
             _ => Err(format!("unusable as hash key: {}", self.r#type())),
         }
     }

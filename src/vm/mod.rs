@@ -1,13 +1,10 @@
-use crate::ast;
-use crate::code::{read_u16, read_u8, Instructions, Opcode};
+use crate::code::{read_u16, Instructions, Opcode};
 use crate::compiler::Bytecode;
 use crate::object::builtins::BUILTINS;
 use crate::object::{
     native_bool_to_boolean_object, Array, BuiltinObj, ClosureObj, CompiledFunctionObj, HashObj,
-    HashPair, Hashable, Integer, IsHashable, Null, Object, ObjectTrait, FALSE, GARBAGEVALOBJ, NULL,
-    TRUE,
+    HashPair, Hashable, Integer, IsHashable, Object, ObjectTrait, FALSE, GARBAGEVALOBJ, NULL, TRUE,
 };
-use crate::parser::Parser;
 use std::collections::HashMap;
 
 const STACKSIZE: usize = 1 << 11;
@@ -53,6 +50,7 @@ impl VM {
     pub fn globals(&self) -> Vec<Object> {
         self.globals.clone()
     }
+
     pub fn new(
         Bytecode {
             constants,
@@ -70,7 +68,7 @@ impl VM {
             stack: vec![GARBAGEVALOBJ; STACKSIZE],
             sp: 0,
             globals: vec![GARBAGEVALOBJ; GLOBALSSIZE],
-            frames: frames,
+            frames,
         }
     }
 
@@ -84,23 +82,27 @@ impl VM {
     fn current_frame(&self) -> &Frame {
         self.frames.last().expect("at least main exists")
     }
+
     fn push_frame(&mut self, f: Frame) {
         if self.frames.len() >= MAXFRAMES {
             panic!("frame stack overflow, trying to push_frame while having max number")
         }
         self.frames.push(f);
     }
+
     fn pop_frame(&mut self) -> Frame {
         self.frames.pop().expect("at least main exists")
     }
+
     fn push_closure(&mut self, const_ind: usize, num_free: usize) -> Result<(), String> {
         let constant = self.constants[const_ind].clone();
         if let Object::CompiledFunction(function) = constant {
             let mut free = vec![GARBAGEVALOBJ; num_free];
-            for i in 0..num_free {
-                free[i] = self.stack[self.sp - num_free + i].clone();
+            // TODO: a lot of unnecessary cloning here
+            for (i, free_ele) in free.iter_mut().enumerate() {
+                *free_ele = self.stack[self.sp - num_free + i].clone();
             }
-            self.sp = self.sp - num_free;
+            self.sp -= num_free;
             let closure = ClosureObj::new(function, free);
             self.push(Object::Closure(closure))
         } else {
@@ -113,6 +115,7 @@ impl VM {
         self.sp -= 1;
         o
     }
+
     fn execute_binary_operation(&mut self, op: Opcode) -> Result<(), String> {
         let right = self.pop();
         let left = self.pop();
@@ -134,6 +137,7 @@ impl VM {
             )),
         }
     }
+
     fn execute_binary_integer_operation(
         &mut self,
         op: Opcode,
@@ -149,6 +153,7 @@ impl VM {
         };
         self.push(Object::new_int_var(result))
     }
+
     fn execute_binary_string_operation(
         &mut self,
         op: Opcode,
@@ -161,6 +166,7 @@ impl VM {
         };
         self.push(Object::new_str_var(&result))
     }
+
     fn execute_comparison(&mut self, op: Opcode) -> Result<(), String> {
         let right = self.pop();
         let left = self.pop();
@@ -178,6 +184,7 @@ impl VM {
             ),
         }
     }
+
     fn execute_integer_comparison(
         &mut self,
         op: Opcode,
@@ -192,6 +199,7 @@ impl VM {
         };
         self.push(native_bool_to_boolean_object(val))
     }
+
     fn execute_boolean_comparison(
         &mut self,
         op: Opcode,
@@ -205,22 +213,25 @@ impl VM {
         };
         self.push(native_bool_to_boolean_object(val))
     }
+
     fn execute_bang_operator(&mut self) -> Result<(), String> {
         let right = self.pop();
-        match (right) {
+        match right {
             TRUE => self.push(FALSE),
             FALSE => self.push(TRUE),
             NULL => self.push(TRUE), // negation of NULL is true now even though it is still truthy
             _ => self.push(FALSE),   // anything other than false is "truthy"
         }
     }
+
     fn execute_minus_operator(&mut self) -> Result<(), String> {
         let right = self.pop();
-        match (right) {
+        match right {
             Object::Integer(right_val) => self.push(Object::new_int_var(-right_val.value)),
             _ => todo!("unsupported type for negation: {}", right.r#type()),
         }
     }
+
     fn execute_index_expression(&mut self, left: Object, index: Object) -> Result<(), String> {
         match (left, index) {
             (Object::Arr(arr_obj), Object::Integer(int_obj)) => {
@@ -234,6 +245,7 @@ impl VM {
             ),
         }
     }
+
     fn execute_array_index(&mut self, arr_obj: Array, int_obj: Integer) -> Result<(), String> {
         let i = int_obj.value;
         let max = arr_obj.elements.len() as i64 - 1;
@@ -243,22 +255,25 @@ impl VM {
             self.push(arr_obj.elements[i as usize].clone())
         }
     }
+
     fn execute_hash_index(&mut self, hash_obj: HashObj, index: Object) -> Result<(), String> {
         index.is_hashable()?;
         let pair = hash_obj
             .pairs
             .get(&index.hash_key())
             .ok_or("key doesn't exist");
+        // TODO: this seems like a good place to have an error type
         match pair {
             Ok(pair) => self.push(pair.val.clone()),
-            Err(err) => self.push(NULL),
+            Err(_err) => self.push(NULL),
         }
     }
+
     pub fn step(&mut self) -> Result<(), String> {
         self.current_frame_mut().ip += 1;
-        let mut ip: i64 = self.current_frame_mut().ip;
-        let mut ins = self.current_frame_mut().instructions_mut();
-        let mut op: Opcode = TryFrom::try_from(ins[ip as usize])?;
+        let ip: i64 = self.current_frame_mut().ip;
+        let ins = self.current_frame_mut().instructions_mut();
+        let op: Opcode = TryFrom::try_from(ins[ip as usize])?;
         match op {
             Opcode::Constant => {
                 let const_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]);
@@ -315,7 +330,7 @@ impl VM {
                 self.current_frame_mut().ip += 2;
 
                 let array = self.build_array(self.sp - num_elements, self.sp);
-                self.sp = self.sp - num_elements;
+                self.sp -= num_elements;
                 self.push(array)
             }
             Opcode::Hash => {
@@ -323,7 +338,7 @@ impl VM {
                 self.current_frame_mut().ip += 2;
 
                 let hash = self.build_hash(self.sp - num_elements, self.sp)?;
-                self.sp = self.sp - num_elements;
+                self.sp -= num_elements;
                 self.push(hash)
             }
             Opcode::Index => {
@@ -395,19 +410,20 @@ impl VM {
                 let current_closure = self.current_frame().cl.clone();
                 self.push(Object::Closure(current_closure))
             }
-
-            _ => panic!("unknown instruction"),
         }
     }
+
     pub fn is_running(&self) -> bool {
         self.current_frame().ip < (self.current_frame().cl.comp_fn.instructions.len() as i64 - 1)
     }
+
     pub fn run(&mut self) -> Result<(), String> {
         while self.is_running() {
             self.step()?;
         }
         Ok(())
     }
+
     fn execute_call(&mut self, num_args: usize) -> Result<(), String> {
         let callee = self.stack[self.sp - 1 - num_args].clone();
         match callee {
@@ -416,6 +432,7 @@ impl VM {
             _ => Err("calling non-closure and non-built-in".to_string()),
         }
     }
+
     fn call_closure(&mut self, cl: ClosureObj, num_args: usize) -> Result<(), String> {
         if num_args != cl.comp_fn.num_parameters {
             return Err(format!(
@@ -430,6 +447,7 @@ impl VM {
         self.sp = next_sp;
         Ok(())
     }
+
     fn call_builtin(&mut self, builtin_obj: BuiltinObj, num_args: usize) -> Result<(), String> {
         let args = &self.stack[self.sp - num_args..self.sp];
         let result = (builtin_obj.function)(args);
@@ -446,6 +464,7 @@ impl VM {
             Ok(())
         }
     }
+
     pub fn new_with_globals_store(bytecode: Bytecode, s: Vec<Object>) -> Self {
         let mut vm = VM::new(bytecode);
         vm.globals = s;
@@ -461,6 +480,7 @@ impl VM {
         }
         Object::new_array_var(elements)
     }
+
     fn build_hash(&mut self, start_ind: usize, end_ind: usize) -> Result<Object, String> {
         let mut hashed_pairs = HashMap::new();
         let mut i = start_ind;
@@ -486,8 +506,10 @@ mod tests {
     use std::{any::Any, collections::HashMap};
 
     use crate::{
-        compiler::{self, Compiler},
-        object::{Error, HashKey, Hashable},
+        ast::Node,
+        compiler::Compiler,
+        object::{Error, HashKey, Hashable, Null},
+        parser::Parser,
     };
 
     use super::*;
@@ -505,6 +527,7 @@ mod tests {
             }
         }
     }
+
     #[test]
     fn test_boolean_expression() {
         let tests = vec![
@@ -546,6 +569,7 @@ mod tests {
         ];
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_while_expressions() {
         let tests = vec![
@@ -565,6 +589,7 @@ mod tests {
         ];
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_integer_arithmetic() {
         let tests = vec![
@@ -587,11 +612,12 @@ mod tests {
         ];
         run_vm_tests(tests);
     }
+
     fn run_vm_tests(tests: Vec<VmTestCase>) {
         for (i, VmTestCase { input, expected }) in tests.into_iter().enumerate() {
             let program = Parser::parse(input);
             let mut comp = Compiler::new();
-            comp.compile(ast::Node::Program(program))
+            comp.compile(Node::Program(program))
                 .unwrap_or_else(|e| panic!("compiler error: {e:?}"));
             println!("test {}:", i + 1);
             for (i, constant) in comp.bytecode().constants.iter().enumerate() {
@@ -600,7 +626,7 @@ mod tests {
                     Object::CompiledFunction(constant) => {
                         print!(" Instructions:\n{}", constant.instructions)
                     }
-                    Object::Integer(constant) => print!(" Value: {}\n", constant.value),
+                    Object::Integer(constant) => println!(" Value: {}", constant.value),
                     _ => {}
                 }
                 println!()
@@ -620,23 +646,24 @@ mod tests {
             test_boolean_object(*expec, actual)
                 .unwrap_or_else(|e| panic!("test_boolean_object failed: {e}"));
         } else if let Some(expec) = expected.downcast_ref::<&str>() {
-            test_string_object(*expec, actual)
+            test_string_object(expec, actual)
                 .unwrap_or_else(|e| panic!("test_string_object failed: {e}"));
-        } else if let Some(expec) = expected.downcast_ref::<Null>() {
+        } else if let Some(_expec) = expected.downcast_ref::<Null>() {
             test_null_object(actual).unwrap_or_else(|e| panic!("test_null_object failed: {e}"));
         } else if let Some(expec) = expected.downcast_ref::<Vec<i64>>() {
-            test_arr_ints_object(&expec, actual)
+            test_arr_ints_object(expec, actual)
                 .unwrap_or_else(|e| panic!("test_arr_object failed: {e}"));
         } else if let Some(expec) = expected.downcast_ref::<HashMap<HashKey, i64>>() {
-            test_hash_ints_object(&expec, actual)
+            test_hash_ints_object(expec, actual)
                 .unwrap_or_else(|e| panic!("test_arr_object failed: {e}"));
         } else if let Some(expec) = expected.downcast_ref::<Error>() {
-            test_error_object(&expec, actual)
+            test_error_object(expec, actual)
                 .unwrap_or_else(|e| panic!("test_arr_object failed: {e}"));
         } else {
             panic!("unknown dyn object: {:?}", expected);
         }
     }
+
     pub fn test_error_object(expected: &Error, actual: &Object) -> Result<(), String> {
         if let Object::Err(err_obj) = actual {
             if err_obj.message != expected.message {
@@ -651,6 +678,7 @@ mod tests {
             Err(format!("object is not Error: {actual:?}"))
         }
     }
+
     pub fn test_hash_ints_object(
         expected: &HashMap<HashKey, i64>,
         actual: &Object,
@@ -676,6 +704,7 @@ mod tests {
             Err(format!("object not Hash. got=({:?})", actual))
         }
     }
+
     pub fn test_arr_ints_object(expected: &[i64], actual: &Object) -> Result<(), String> {
         if let Object::Arr(result) = actual {
             if result.elements.len() != expected.len() {
@@ -694,6 +723,7 @@ mod tests {
             Err(format!("object not Array. got=({:?})", actual))
         }
     }
+
     // TODO: remove one of duplicated function
     pub fn test_integer_object(expected: i64, actual: &Object) -> Result<(), String> {
         if let Object::Integer(result) = actual {
@@ -709,6 +739,7 @@ mod tests {
             Err(format!("object is not Integer. got=({:?})", actual))
         }
     }
+
     // TODO: remove one of duplicated function
     pub fn test_string_object(expected: &str, actual: &Object) -> Result<(), String> {
         if let Object::String(result) = actual {
@@ -724,6 +755,7 @@ mod tests {
             Err(format!("object is not String. got=({:?})", actual))
         }
     }
+
     pub fn test_boolean_object(expected: bool, actual: &Object) -> Result<(), String> {
         if let Object::Boolean(result) = actual {
             if result.value != expected {
@@ -738,8 +770,9 @@ mod tests {
             Err(format!("object is not Boolean. got=({:?})", actual))
         }
     }
+
     pub fn test_null_object(actual: &Object) -> Result<(), String> {
-        if let Object::Null(result) = actual {
+        if let Object::Null(_result) = actual {
             Ok(())
         } else {
             Err(format!("object is not Null. got=({:?})", actual))
@@ -766,6 +799,7 @@ mod tests {
         ];
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_global_let_statements() {
         let tests = vec![
@@ -780,6 +814,7 @@ mod tests {
         //dbg!(std::mem::size_of::<Rc<RefCell<Object>>>()); /8 bytes
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_string_expressions() {
         let tests = vec![
@@ -789,15 +824,17 @@ mod tests {
         ];
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_array_literals() {
         let tests = vec![
-            VmTestCase::new("[]", Box::new(vec![0 as i64; 0])),
+            VmTestCase::new("[]", Box::new(vec![0_i64; 0])),
             VmTestCase::new("[1, 2, 3]", Box::new(vec![1i64, 2, 3])),
             VmTestCase::new("[1 + 2, 3 * 4, 5 + 6]", Box::new(vec![3i64, 12, 11])),
         ];
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_hash_literals() {
         let tests = vec![
@@ -819,6 +856,7 @@ mod tests {
         ];
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_index_expressions() {
         let tests = vec![
@@ -835,6 +873,7 @@ mod tests {
         ];
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_calling_functions_without_arguments() {
         let tests = vec![
@@ -859,6 +898,7 @@ c();",
         ];
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_functions_with_return_statement() {
         let tests = vec![
@@ -875,6 +915,7 @@ earlyExit();",
         ];
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_functions_without_return_value() {
         let tests = vec![
@@ -893,6 +934,7 @@ noReturnTwo();",
         ];
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_first_class_functions() {
         let tests = vec![
@@ -1029,7 +1071,7 @@ outer() + globalNum;",
             let program = Parser::parse(input);
 
             let mut comp = Compiler::new();
-            comp.compile(ast::Node::Program(program))
+            comp.compile(Node::Program(program))
                 .unwrap_or_else(|e| panic!("compiler error: {e}"));
 
             let mut vm = VM::new(comp.bytecode());

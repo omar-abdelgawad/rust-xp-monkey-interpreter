@@ -3,7 +3,7 @@ use super::{Array, BuiltinObj, Error, Object, ObjectTrait, ObjectType, NULL};
 fn new_error(formt: String) -> Object {
     Object::Err(Error::new(formt))
 }
-pub static BUILTINS: &[(&'static str, BuiltinObj)] = &[
+pub static BUILTINS: &[(&str, BuiltinObj)] = &[
     ("len", builtin_len()),     // 0
     ("puts", builtin_puts()),   // 1
     ("first", builtin_first()), // 2
@@ -11,6 +11,7 @@ pub static BUILTINS: &[(&'static str, BuiltinObj)] = &[
     ("rest", builtin_rest()),   // 4
     ("push", builtin_push()),   // 5
 ];
+
 pub fn get_builtin_by_name(name: &str) -> Option<BuiltinObj> {
     for (def_name, def_builtin) in BUILTINS {
         if *def_name == name {

@@ -139,7 +139,7 @@ mod test {
             expected["b"], b
         );
 
-        let mut first_local = SymbolTable::new_enclosed_symbol_table(Rc::clone(&global));
+        let first_local = SymbolTable::new_enclosed_symbol_table(Rc::clone(&global));
         let c = first_local.borrow_mut().define("c".to_string());
         assert_eq!(
             c, expected["c"],
@@ -153,7 +153,7 @@ mod test {
             expected["d"], d
         );
 
-        let mut second_local = SymbolTable::new_enclosed_symbol_table(Rc::clone(&first_local));
+        let second_local = SymbolTable::new_enclosed_symbol_table(Rc::clone(&first_local));
         let e = second_local.borrow_mut().define("e".to_string());
         assert_eq!(
             e, expected["e"],
@@ -191,11 +191,11 @@ mod test {
     }
     #[test]
     fn test_resolve_local() {
-        let mut global = Rc::new(RefCell::new(SymbolTable::new()));
+        let global = Rc::new(RefCell::new(SymbolTable::new()));
         global.borrow_mut().define("a".to_string());
         global.borrow_mut().define("b".to_string());
 
-        let mut local = SymbolTable::new_enclosed_symbol_table(Rc::clone(&global));
+        let local = SymbolTable::new_enclosed_symbol_table(Rc::clone(&global));
         local.borrow_mut().define("c".to_string());
         local.borrow_mut().define("d".to_string());
 
@@ -227,7 +227,7 @@ mod test {
         first_local.borrow_mut().define("c".to_string());
         first_local.borrow_mut().define("d".to_string());
 
-        let mut second_local = SymbolTable::new_enclosed_symbol_table(first_local.clone());
+        let second_local = SymbolTable::new_enclosed_symbol_table(first_local.clone());
         second_local.borrow_mut().define("e".to_string());
         second_local.borrow_mut().define("f".to_string());
 
@@ -267,11 +267,11 @@ mod test {
     }
     #[test]
     fn test_define_resolve_builtins() {
-        let mut global = Rc::new(RefCell::new(SymbolTable::new()));
-        let mut first_local = SymbolTable::new_enclosed_symbol_table(Rc::clone(&global));
-        let mut second_local = SymbolTable::new_enclosed_symbol_table(Rc::clone(&first_local));
+        let global = Rc::new(RefCell::new(SymbolTable::new()));
+        let first_local = SymbolTable::new_enclosed_symbol_table(Rc::clone(&global));
+        let second_local = SymbolTable::new_enclosed_symbol_table(Rc::clone(&first_local));
 
-        let expected = vec![
+        let expected = [
             Symbol::new("a", SymbolScope::Builtin, 0),
             Symbol::new("c", SymbolScope::Builtin, 1),
             Symbol::new("e", SymbolScope::Builtin, 2),
@@ -304,7 +304,7 @@ mod test {
         first_local.borrow_mut().define("c".to_string());
         first_local.borrow_mut().define("d".to_string());
 
-        let mut second_local = SymbolTable::new_enclosed_symbol_table(first_local.clone());
+        let second_local = SymbolTable::new_enclosed_symbol_table(first_local.clone());
         second_local.borrow_mut().define("e".to_string());
         second_local.borrow_mut().define("f".to_string());
 
@@ -372,7 +372,7 @@ mod test {
         let first_local = SymbolTable::new_enclosed_symbol_table(global.clone());
         first_local.borrow_mut().define("c".to_string());
 
-        let mut second_local = SymbolTable::new_enclosed_symbol_table(first_local.clone());
+        let second_local = SymbolTable::new_enclosed_symbol_table(first_local.clone());
         second_local.borrow_mut().define("e".to_string());
         second_local.borrow_mut().define("f".to_string());
 

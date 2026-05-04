@@ -1,9 +1,9 @@
 use crate::{
     ast::{
-        self, ArrayLiteral, BlockStatement, Boolean, CallExpression, Expression,
-        ExpressionStatement, FunctionLiteral, HashLiteral, Identifier, IfExpression,
-        IndexExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program,
-        ReturnStatement, Statement, StringLiteral, WhileExpression,
+        ArrayLiteral, BlockStatement, Boolean, CallExpression, Expression, ExpressionStatement,
+        FunctionLiteral, HashLiteral, Identifier, IfExpression, IndexExpression, InfixExpression,
+        IntegerLiteral, LetStatement, PrefixExpression, Program, ReturnStatement, Statement,
+        StringLiteral, WhileExpression,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -13,14 +13,14 @@ use std::collections::HashMap;
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 #[repr(u8)]
 enum Precedence {
-    LOWEST = 1,
-    EQUALS,      // ==
-    LESSGREATER, // > or <
-    SUM,         // +
-    PRODUCT,     // *
-    PREFIX,      // -X or !X
-    CALL,        // myFunction(X)
-    INDEX,       // myArray[ind]
+    Lowest = 1,
+    Equals,      // ==
+    LessGreater, // > or <
+    Sum,         // +
+    Product,     // *
+    Prefix,      // -X or !X
+    Call,        // myFunction(X)
+    Index,       // myArray[ind]
 }
 type PrefixParseFn = fn(&mut Parser) -> Option<Box<Expression>>;
 type InfixParseFn = fn(&mut Parser, Box<Expression>) -> Option<Box<Expression>>;
@@ -106,7 +106,7 @@ impl Parser {
             return None;
         }
         self.next_token();
-        let cond_tmp = self.parse_expression(Precedence::LOWEST).unwrap();
+        let cond_tmp = self.parse_expression(Precedence::Lowest).unwrap();
         if !self.expect_peek(TokenType::RPAREN) {
             return None;
         }
@@ -123,12 +123,12 @@ impl Parser {
         let mut tmp_pairs = HashMap::new();
         while !self.peek_token_is(TokenType::RBRACE) {
             self.next_token();
-            let key = self.parse_expression(Precedence::LOWEST).unwrap();
+            let key = self.parse_expression(Precedence::Lowest).unwrap();
             if !self.expect_peek(TokenType::COLON) {
                 return None;
             }
             self.next_token();
-            let value = self.parse_expression(Precedence::LOWEST).unwrap();
+            let value = self.parse_expression(Precedence::Lowest).unwrap();
             tmp_pairs.insert(*key, *value);
             if !self.peek_token_is(TokenType::RBRACE) && !self.expect_peek(TokenType::COMMA) {
                 return None;
@@ -144,7 +144,7 @@ impl Parser {
     fn parse_index_expression(&mut self, left: Box<Expression>) -> Option<Box<Expression>> {
         let tmp_tok = self.cur_token.clone();
         self.next_token();
-        let exp = IndexExpression::new(tmp_tok, left, self.parse_expression(Precedence::LOWEST)?);
+        let exp = IndexExpression::new(tmp_tok, left, self.parse_expression(Precedence::Lowest)?);
         if !self.expect_peek(TokenType::RBRACKET) {
             return None;
         }
@@ -167,11 +167,11 @@ impl Parser {
             return Some(list);
         }
         self.next_token();
-        list.push(*self.parse_expression(Precedence::LOWEST)?);
+        list.push(*self.parse_expression(Precedence::Lowest)?);
         while self.peek_token_is(TokenType::COMMA) {
             self.next_token();
             self.next_token();
-            list.push(*self.parse_expression(Precedence::LOWEST)?);
+            list.push(*self.parse_expression(Precedence::Lowest)?);
         }
         if !self.expect_peek(end.clone()) {
             return None;
@@ -198,11 +198,11 @@ impl Parser {
             return Some(args);
         }
         self.next_token();
-        args.push(*self.parse_expression(Precedence::LOWEST)?);
+        args.push(*self.parse_expression(Precedence::Lowest)?);
         while self.peek_token_is(TokenType::COMMA) {
             self.next_token();
             self.next_token();
-            args.push(*self.parse_expression(Precedence::LOWEST)?);
+            args.push(*self.parse_expression(Precedence::Lowest)?);
         }
         if !self.expect_peek(TokenType::RPAREN) {
             return None;
@@ -247,7 +247,7 @@ impl Parser {
             return None;
         }
         self.next_token();
-        let cond_tmp = self.parse_expression(Precedence::LOWEST).unwrap();
+        let cond_tmp = self.parse_expression(Precedence::Lowest).unwrap();
         if !self.expect_peek(TokenType::RPAREN) {
             return None;
         }
@@ -282,7 +282,7 @@ impl Parser {
     }
     fn parse_grouped_expression(&mut self) -> Option<Box<Expression>> {
         self.next_token();
-        let exp = self.parse_expression(Precedence::LOWEST);
+        let exp = self.parse_expression(Precedence::Lowest);
         if !self.expect_peek(TokenType::RPAREN) {
             return None;
         }
@@ -312,7 +312,7 @@ impl Parser {
         let exp = PrefixExpression::new(
             cur_token_tmp,
             operator_tmp,
-            self.parse_expression(Precedence::PREFIX)?,
+            self.parse_expression(Precedence::Prefix)?,
         );
         Some(Box::new(Expression::Prefix(exp)))
     }
@@ -362,7 +362,7 @@ impl Parser {
     fn parse_expression_statement(&mut self) -> Option<Box<Statement>> {
         let cur_token_tmp = self.cur_token.clone();
         let stmt =
-            ExpressionStatement::new(cur_token_tmp, self.parse_expression(Precedence::LOWEST)?);
+            ExpressionStatement::new(cur_token_tmp, self.parse_expression(Precedence::Lowest)?);
         // check for optional SEMICOLON
         if self.peek_token_is(TokenType::SEMICOLON) {
             self.next_token();
@@ -378,7 +378,7 @@ impl Parser {
         }
         let mut left_exp = prefix.unwrap()(self)?;
         // note that SEMICOLON check is not necessary
-        // since default precedence if not found is LOWEST
+        // since default precedence if not found is Lowest
         // but this is more explicit and clear
         while !self.peek_token_is(TokenType::SEMICOLON) && precedence < self.peek_precedence() {
             // Get infix function *first*, clone or copy the reference to drop the immutable borrow
@@ -400,7 +400,7 @@ impl Parser {
     fn parse_return_statement(&mut self) -> Option<Box<Statement>> {
         let cur_token_tmp = self.cur_token.clone();
         self.next_token();
-        let ret_val_tmp = self.parse_expression(Precedence::LOWEST)?;
+        let ret_val_tmp = self.parse_expression(Precedence::Lowest)?;
         if self.peek_token_is(TokenType::SEMICOLON) {
             self.next_token();
         }
@@ -420,7 +420,7 @@ impl Parser {
         let mut stmt = LetStatement::new(
             cur_token_tmp,
             name_tmp,
-            self.parse_expression(Precedence::LOWEST)?,
+            self.parse_expression(Precedence::Lowest)?,
         );
         // Added for recursive functions
         if let Expression::Function(ref mut fn_lit) = &mut *stmt.value {
@@ -463,19 +463,19 @@ impl Parser {
     }
     fn precedences(token: &TokenType) -> Precedence {
         match token {
-            TokenType::EQ => Precedence::EQUALS,
-            TokenType::NOT_EQ => Precedence::EQUALS,
-            TokenType::LT => Precedence::LESSGREATER,
-            TokenType::GT => Precedence::LESSGREATER,
-            TokenType::LT_OR_EQ => Precedence::LESSGREATER,
-            TokenType::GT_OR_EQ => Precedence::LESSGREATER,
-            TokenType::PLUS => Precedence::SUM,
-            TokenType::MINUS => Precedence::SUM,
-            TokenType::SLASH => Precedence::PRODUCT,
-            TokenType::ASTERISK => Precedence::PRODUCT,
-            TokenType::LPAREN => Precedence::CALL,
-            TokenType::LBRACKET => Precedence::INDEX,
-            _ => Precedence::LOWEST,
+            TokenType::EQ => Precedence::Equals,
+            TokenType::NOT_EQ => Precedence::Equals,
+            TokenType::LT => Precedence::LessGreater,
+            TokenType::GT => Precedence::LessGreater,
+            TokenType::LT_OR_EQ => Precedence::LessGreater,
+            TokenType::GT_OR_EQ => Precedence::LessGreater,
+            TokenType::PLUS => Precedence::Sum,
+            TokenType::MINUS => Precedence::Sum,
+            TokenType::SLASH => Precedence::Product,
+            TokenType::ASTERISK => Precedence::Product,
+            TokenType::LPAREN => Precedence::Call,
+            TokenType::LBRACKET => Precedence::Index,
+            _ => Precedence::Lowest,
         }
     }
 }

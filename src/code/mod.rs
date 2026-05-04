@@ -40,7 +40,7 @@ impl Instructions {
             );
         }
         match operand_count {
-            0 => format!("{}", def.name),
+            0 => def.name.to_string(),
             1 => format!("{} {}", def.name, operands[0]),
             2 => format!("{} {} {}", def.name, operands[0], operands[1]),
             _ => format!("ERROR: unhandled operand_count for {\n}", def.name),

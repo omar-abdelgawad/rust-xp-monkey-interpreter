@@ -23,19 +23,6 @@ struct CompilationScope {
     last_instruction: EmittedInstruction,
     previous_instruction: EmittedInstruction,
 }
-impl CompilationScope {
-    fn new(
-        instructions: Instructions,
-        last_instruction: EmittedInstruction,
-        previous_instruction: EmittedInstruction,
-    ) -> Self {
-        Self {
-            instructions,
-            last_instruction,
-            previous_instruction,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 struct EmittedInstruction {
@@ -53,6 +40,12 @@ impl Default for EmittedInstruction {
             opcode: Opcode::Pop,
             position: Default::default(),
         }
+    }
+}
+
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -126,7 +119,7 @@ impl Compiler {
                     }
                 }
                 St::Return(ret_stmt) => {
-                    self.compile(Node::Expression(*ret_stmt.return_value));
+                    self.compile(Node::Expression(*ret_stmt.return_value))?;
                     self.emit(Opcode::ReturnValue, &[]);
                 }
                 St::Block(block_stmt) => {
@@ -238,7 +231,7 @@ impl Compiler {
                     self.enter_scope();
 
                     // define the functions own name if it has one
-                    if fn_lit.name != "" {
+                    if !fn_lit.name.is_empty() {
                         self.symbol_table
                             .borrow_mut()
                             .define_function_name(fn_lit.name);
@@ -264,7 +257,7 @@ impl Compiler {
                     let num_locals = self.symbol_table.borrow().num_definitions;
                     let instructions = self.leave_scope();
                     for s in free_symbols {
-                        self.load_symbol(&s);
+                        self.load_symbol(s);
                     }
                     let compiled_fn =
                         CompiledFunctionObj::new(instructions, num_locals, num_parameters);
@@ -305,7 +298,7 @@ impl Compiler {
                     // 1️⃣ Collect keys
                     let mut keys: Vec<_> = hash_lit.pairs.keys().cloned().collect();
                     // 2️⃣ Sort by string representation (like Go's String())
-                    keys.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+                    keys.sort_by_key(|a| a.to_string());
                     // 3️⃣ Compile key/value pairs
                     for key in keys {
                         let value = hash_lit.pairs.get(&key).unwrap().clone();
@@ -485,7 +478,7 @@ impl Bytecode {
 
 #[cfg(test)]
 mod tests {
-    use std::{any::Any, cell::RefCell, rc::Rc};
+    use std::any::Any;
 
     use crate::{
         code::{make, Opcode as Op},
@@ -745,7 +738,7 @@ mod tests {
                     return Err(format!("constant {} - test_integer_object failed", i));
                 }
             } else if let Some(expected_constant) = constant.downcast_ref::<&str>() {
-                if !test_string_object(&actual[i], *expected_constant) {
+                if !test_string_object(&actual[i], expected_constant) {
                     return Err(format!("constant {} - test_string_object failed", i));
                 }
             } else if let Some(expected_constant) = constant.downcast_ref::<Vec<Instructions>>() {

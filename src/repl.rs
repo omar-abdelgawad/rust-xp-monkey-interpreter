@@ -66,7 +66,7 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
 
         let mut comp = Compiler::new_with_state(symbol_table.clone(), constants.clone());
         if let Err(err) = comp.compile(Node::Program(program)) {
-            writeln!(output, "Woops! Compilation failed:\n {err}\n");
+            writeln!(output, "Woops! Compilation failed:\n {err}\n").unwrap();
             continue;
         }
         let code = comp.bytecode();
@@ -76,11 +76,12 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
             output,
             "===compiled prog===\n{}===prog end===\n",
             code.instructions
-        );
+        )
+        .unwrap();
 
         let mut machine = VM::new_with_globals_store(code, globals.clone());
         if let Err(err) = machine.run() {
-            writeln!(output, "Woops! Executing bytecode failed:\n {err}\n");
+            writeln!(output, "Woops! Executing bytecode failed:\n {err}\n").unwrap();
             continue;
         }
         globals = machine.globals();

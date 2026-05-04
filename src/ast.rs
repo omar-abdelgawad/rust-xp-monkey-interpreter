@@ -429,8 +429,8 @@ impl Display for FunctionLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let params: Vec<String> = self.parameters.iter().map(|p| p.to_string()).collect();
         write!(f, "{}", self.token.literal)?;
-        if self.name != "" {
-            write!(f, "<{}>", self.name);
+        if !self.name.is_empty() {
+            write!(f, "<{}>", self.name)?;
         }
         write!(f, "({})", params.join(", "))?;
         write!(f, " {}", self.body)

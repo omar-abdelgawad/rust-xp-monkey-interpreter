@@ -1,9 +1,7 @@
 //use lazy_static::lazy_static;
 
 use crate::object::builtins::get_builtin_by_name;
-use crate::object::{Array, BuiltinObj, Object, ObjectTrait, ObjectType, NULL};
-
-use super::new_error;
+use crate::object::BuiltinObj;
 
 //static BUILTINS: HashMap<String, String> = HashMap::new();
 //lazy_static! {
