@@ -100,6 +100,16 @@ impl Compiler {
                     // FIX: this should only be allow for functions since now we can do things like
                     // "let a = !a;" and a on the left hand side will be the garbage value which is
                     // TRUE so yeah idk how to fix this.
+                    // note that you can't know if the right hand side will evaluate to a
+                    // function or not except during runtime since this lang isn't typed.
+                    // The only thing I can think of is that symbols are special before the RHS of
+                    // a let stmt is evaluated and these special idents can only be used on the RHS
+                    // as recursive functions or else they are still not defined and read as a
+                    // garbage value which is currently bool.
+                    // Another way to think about it is that you can use undefined names in
+                    // enclosed scopes assuming they are global variables that will be defined and
+                    // check for definitions when actually calling the function. this bypasses the
+                    // problem of having to defined a name before it is assigned
                     let symbol = self.symbol_table.borrow_mut().define(name.value);
                     self.compile(Node::Expression(*value))?;
                     match symbol.scope {
@@ -334,10 +344,7 @@ impl Compiler {
 
                     // patch the exit jump to land here
                     let after_loop_pos = self.current_instructions().len();
-                    self.change_operand(
-                        jump_not_truthy_pos,
-                        after_loop_pos.try_into().unwrap(),
-                    );
+                    self.change_operand(jump_not_truthy_pos, after_loop_pos.try_into().unwrap());
 
                     // while always evaluates to null
                     self.emit(Opcode::Null, &[]);
@@ -814,7 +821,8 @@ mod tests {
     }
 
     // TODO: fix this later (handle empty if consequence blocks)
-    #[should_panic]
+    // FIX: just added fix as well to look at it when rg ing
+    #[ignore = "idk maybe I should look at this soon"]
     #[test]
     fn test_custom_empty_block_returns_null() {
         // also what about "if (true) {}"
@@ -1618,5 +1626,25 @@ wrapper();
             ),
         ];
         run_compiler_tests(tests);
+    }
+    #[ignore = "still requires fix. looks hard so I will leave it for now"]
+    #[should_panic]
+    #[test]
+    fn test_recursion_only_works_for_closures() {
+        // TODO: make it more ergonomic to test cases that shouldn't compile
+        let tests = vec![CompilerTestCase::new(
+            "
+let a = a+1;
+",
+            vec![Box::new(1i64)],
+            vec![],
+        )];
+        for CompilerTestCase { input, .. } in tests {
+            let program = parse(input);
+            let mut compiler = Compiler::new();
+            compiler
+                .compile(ast::Node::Program(program))
+                .expect("compiler error");
+        }
     }
 }

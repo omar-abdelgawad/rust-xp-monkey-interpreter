@@ -74,7 +74,7 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
         symbol_table = comp.symbol_table();
         write!(
             output,
-            "compiled prog:\n{}===prog end===\n",
+            "===compiled prog===\n{}===prog end===\n",
             code.instructions
         );
 
