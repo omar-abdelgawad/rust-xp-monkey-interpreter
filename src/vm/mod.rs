@@ -31,6 +31,10 @@ impl Frame {
     fn instructions_mut(&mut self) -> &mut Instructions {
         &mut self.cl.comp_fn.instructions
     }
+
+    fn instructions(&self) -> &Instructions {
+        &self.cl.comp_fn.instructions
+    }
 }
 
 #[derive(Debug)]
@@ -97,10 +101,10 @@ impl VM {
     fn push_closure(&mut self, const_ind: usize, num_free: usize) -> Result<(), String> {
         let constant = self.constants[const_ind].clone();
         if let Object::CompiledFunction(function) = constant {
-            let mut free = vec![GARBAGEVALOBJ; num_free];
+            let mut free = Vec::with_capacity(num_free);
             // TODO: a lot of unnecessary cloning here
-            for (i, free_ele) in free.iter_mut().enumerate() {
-                *free_ele = self.stack[self.sp - num_free + i].clone();
+            for i in 0..num_free {
+                free.push(self.stack[self.sp - num_free + i].clone());
             }
             self.sp -= num_free;
             let closure = ClosureObj::new(function, free);
@@ -271,8 +275,8 @@ impl VM {
 
     pub fn step(&mut self) -> Result<(), String> {
         self.current_frame_mut().ip += 1;
-        let ip: i64 = self.current_frame_mut().ip;
-        let ins = self.current_frame_mut().instructions_mut();
+        let ip: i64 = self.current_frame().ip;
+        let ins = self.current_frame().instructions();
         let op: Opcode = TryFrom::try_from(ins[ip as usize])?;
         match op {
             Opcode::Constant => {
@@ -308,12 +312,8 @@ impl VM {
             }
             Opcode::Null => self.push(NULL),
             Opcode::SetGlobal => {
-                // FIX: new globals override old ones;e.g. "let a=1;leta=2;" then old a is
-                // still stored but never referenced. try to make a test case for it;
-                // this is not only a problem of memory efficiency but also of behavious since
-                // now compiled functions reference old index values of the global. e.g.
-                // "let a =1; let my_fn(){a}; let a =2; my_fn()" -> returns 1 not 2 because a's
-                // index changed from 0 to something else.
+                // FIX: refer to test_redeclaring_globals_still_doesnt_shadow_old_ones for
+                // documentation
                 let glob_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
                 self.current_frame_mut().ip += 2;
                 self.globals[glob_ind] = self.pop();
@@ -397,7 +397,6 @@ impl VM {
                 let const_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
                 let num_free = ins[usize::try_from(ip + 3).unwrap()] as usize;
                 self.current_frame_mut().ip += 3;
-
                 self.push_closure(const_ind, num_free)
             }
             Opcode::GetFree => {
@@ -1217,6 +1216,7 @@ closure();
 
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_recursive_closures() {
         let tests = vec![
@@ -1269,6 +1269,7 @@ wrapper();
 
         run_vm_tests(tests);
     }
+
     #[test]
     fn test_recursive_fibonacci() {
         let tests = vec![
@@ -1320,6 +1321,78 @@ let wrapper = fn() {
 wrapper();
 ",
                 Box::new(0i64),
+            ),
+        ];
+
+        run_vm_tests(tests);
+    }
+
+    /// Update: the test case passes now and all the ranting below is outdated
+    /// they are good notes though if I ever want to comback later and understand
+    /// new globals override old ones;e.g. "let a=1;leta=2;" then old a is
+    /// still stored but never referenced. try to make a test case for it;
+    /// this is not only a problem of memory efficiency but also of behavious since
+    /// now compiled functions reference old index values of the global. e.g.
+    /// "let a =1; let my_fn(){a}; let a =2; my_fn()" -> returns 1 not 2 because a's
+    /// index changed from 0 to something else.
+    /// this is related to capturing free variables.
+    /// note that this problem is complicated since it is only with global variables
+    /// local variables that are on a higher scope should just be captured and saved so that when
+    /// you call the closure inside another function that defined the variable a with the same name
+    /// it should use the captured old value not the new one.
+    #[test]
+    fn test_global_variables_shouldnt_be_captures_as_free() {
+        let tests = vec![
+            VmTestCase::new(
+                "
+let a = 1;
+let my_fn = fn(){a};
+let a = 2;
+my_fn()
+",
+                Box::new(2i64),
+            ),
+            VmTestCase::new(
+                "
+let my_fn = fn(){
+    let a = 1;
+    fn(){a}
+};
+let another_fn = my_fn();
+let a = 2;
+another_fn()
+",
+                Box::new(1i64),
+            ),
+            VmTestCase::new(
+                "
+let global = 55;
+let my_fn = fn() {
+    let a = 66;
+    fn() {
+        let b = 77;
+        fn() {
+            let c = 88;
+            global + a + b + c;
+        }
+    }
+}
+let global = 0;
+let a = 0; # doesn't matter
+let b = 0; # doesn't matter
+let c = 0; # doesn't matter
+my_fn()()()
+",
+                Box::new(0_i64 + 66 + 77 + 88),
+            ),
+            VmTestCase::new(
+                "
+let a = 1;
+let my_fn = fn() { let a = 2; a};
+let a = 3;
+my_fn()
+",
+                Box::new(2i64),
             ),
         ];
 

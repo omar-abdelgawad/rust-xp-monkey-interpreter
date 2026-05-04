@@ -90,7 +90,7 @@ impl Compiler {
                 St::Let(let_stmt) => {
                     let LetStatement { name, value, .. } = let_stmt;
                     // define the symbol first to allow recursive functions;
-                    // FIX: this should only be allow for functions since now we can do things like
+                    // HARD FIX: this should only be allow for functions since now we can do things like
                     // "let a = !a;" and a on the left hand side will be the garbage value which is
                     // TRUE so yeah idk how to fix this.
                     // note that you can't know if the right hand side will evaluate to a
@@ -809,7 +809,7 @@ mod tests {
     }
 
     // TODO: fix this later (handle empty if consequence blocks)
-    // FIX: just added fix as well to look at it when rg ing
+    // HARD FIX: just added fix as well to look at it when rg ing
     #[ignore = "idk maybe I should look at this soon"]
     #[test]
     fn test_custom_empty_block_returns_null() {

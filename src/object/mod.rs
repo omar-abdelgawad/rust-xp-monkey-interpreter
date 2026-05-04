@@ -468,7 +468,8 @@ impl ObjectTrait for CompiledFunctionObj {
         ObjectType::Compiled_Function_OBJ
     }
     fn inspect(&self) -> String {
-        format!("CompiledFunction[{:p}]", self)
+        let ins = self.instructions.to_string();
+        format!("CompiledFunction[{:p}]\n{}", self, ins)
     }
 }
 
@@ -488,7 +489,14 @@ impl ObjectTrait for ClosureObj {
         ObjectType::Closure_OBJ
     }
     fn inspect(&self) -> String {
-        format!("Closure[{:p}]", self)
+        let comp_fn_indented = self
+            .comp_fn
+            .inspect()
+            .lines()
+            .map(|line| format!("\t{line}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("Closure[{:p}]\n{comp_fn_indented}", self)
     }
 }
 
