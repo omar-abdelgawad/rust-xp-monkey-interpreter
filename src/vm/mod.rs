@@ -1,7 +1,6 @@
 use crate::ast;
 use crate::code::{read_u16, read_u8, Instructions, Opcode};
 use crate::compiler::Bytecode;
-use crate::lexer::Lexer;
 use crate::object::builtins::BUILTINS;
 use crate::object::{
     native_bool_to_boolean_object, Array, BuiltinObj, ClosureObj, CompiledFunctionObj, HashObj,
@@ -9,7 +8,6 @@ use crate::object::{
     TRUE,
 };
 use crate::parser::Parser;
-use std::array;
 use std::collections::HashMap;
 
 const STACKSIZE: usize = 1 << 11;
@@ -402,8 +400,7 @@ impl VM {
         }
     }
     pub fn is_running(&self) -> bool {
-        self.current_frame().ip
-            < (self.current_frame().cl.comp_fn.instructions.len() as i64 - 1)
+        self.current_frame().ip < (self.current_frame().cl.comp_fn.instructions.len() as i64 - 1)
     }
     pub fn run(&mut self) -> Result<(), String> {
         while self.is_running() {
@@ -482,13 +479,6 @@ impl VM {
         }
         Ok(Object::new_hash_var(hashed_pairs))
     }
-}
-
-// TODO: remove this copied function
-fn parse(input: String) -> ast::Program {
-    let l = Lexer::new(input);
-    let mut p = Parser::new(l);
-    p.parse_program()
 }
 
 #[cfg(test)]
@@ -571,10 +561,7 @@ mod tests {
                 "let x = 0; while (x <= 2) { let x = x + 1; }; x",
                 Box::new(3i64),
             ),
-            VmTestCase::new(
-                "while (2 < 1) { 10 }",
-                Box::new(crate::object::Null),
-            ),
+            VmTestCase::new("while (2 < 1) { 10 }", Box::new(crate::object::Null)),
         ];
         run_vm_tests(tests);
     }
@@ -602,7 +589,7 @@ mod tests {
     }
     fn run_vm_tests(tests: Vec<VmTestCase>) {
         for (i, VmTestCase { input, expected }) in tests.into_iter().enumerate() {
-            let program = parse(input);
+            let program = Parser::parse(input);
             let mut comp = Compiler::new();
             comp.compile(ast::Node::Program(program))
                 .unwrap_or_else(|e| panic!("compiler error: {e:?}"));
@@ -1039,7 +1026,7 @@ outer() + globalNum;",
             ),
         ];
         for VmTestCase { input, expected } in tests {
-            let program = parse(input);
+            let program = Parser::parse(input);
 
             let mut comp = Compiler::new();
             comp.compile(ast::Node::Program(program))

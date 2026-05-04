@@ -490,7 +490,6 @@ mod tests {
     use crate::{
         code::{make, Opcode as Op},
         evaluator::tests::test_integer_object,
-        lexer::Lexer,
         parser::Parser,
     };
     pub fn test_string_object(obj: &Object, expected: &str) -> bool {
@@ -694,7 +693,7 @@ mod tests {
             expected_instructions,
         } in tests
         {
-            let program = parse(input);
+            let program = Parser::parse(input);
             let mut compiler = Compiler::new();
             compiler
                 .compile(ast::Node::Program(program))
@@ -707,11 +706,7 @@ mod tests {
                 .unwrap_or_else(|e| panic!("test constants failed: {e}"));
         }
     }
-    fn parse(input: String) -> ast::Program {
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
-        p.parse_program()
-    }
+
     fn test_instructions(expected: Vec<Instructions>, actual: &Instructions) -> Result<(), String> {
         let concatted = concat_instructions(expected);
         if actual.len() != concatted.len() {
@@ -1640,7 +1635,7 @@ let a = a+1;
             vec![],
         )];
         for CompilerTestCase { input, .. } in tests {
-            let program = parse(input);
+            let program = Parser::parse(input);
             let mut compiler = Compiler::new();
             compiler
                 .compile(ast::Node::Program(program))

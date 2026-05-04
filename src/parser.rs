@@ -2,18 +2,17 @@ use crate::{
     ast::{
         self, ArrayLiteral, BlockStatement, Boolean, CallExpression, Expression,
         ExpressionStatement, FunctionLiteral, HashLiteral, Identifier, IfExpression,
-        IndexExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression,
+        IndexExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program,
         ReturnStatement, Statement, StringLiteral, WhileExpression,
     },
-    lexer,
-    token::{self, TokenType},
+    lexer::Lexer,
+    token::{Token, TokenType},
 };
-use ast::Program;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 #[repr(u8)]
-pub enum Precedence {
+enum Precedence {
     LOWEST = 1,
     EQUALS,      // ==
     LESSGREATER, // > or <
@@ -26,19 +25,19 @@ pub enum Precedence {
 type PrefixParseFn = fn(&mut Parser) -> Option<Box<Expression>>;
 type InfixParseFn = fn(&mut Parser, Box<Expression>) -> Option<Box<Expression>>;
 pub struct Parser {
-    l: lexer::Lexer,
-    cur_token: token::Token,
-    peek_token: token::Token,
+    l: Lexer,
+    cur_token: Token,
+    peek_token: Token,
     errors: Vec<String>,
-    prefix_parse_fns: HashMap<token::TokenType, PrefixParseFn>,
-    infix_parse_fns: HashMap<token::TokenType, InfixParseFn>,
+    prefix_parse_fns: HashMap<TokenType, PrefixParseFn>,
+    infix_parse_fns: HashMap<TokenType, InfixParseFn>,
 }
 impl Parser {
-    pub fn new(l: lexer::Lexer) -> Self {
+    pub fn new(l: Lexer) -> Self {
         let mut parser = Parser {
             l,
-            cur_token: token::Token::default(),
-            peek_token: token::Token::default(),
+            cur_token: Token::default(),
+            peek_token: Token::default(),
             errors: vec![],
             prefix_parse_fns: HashMap::new(),
             infix_parse_fns: HashMap::new(),
@@ -76,6 +75,29 @@ impl Parser {
         parser.register_infix(TokenType::LBRACKET, Parser::parse_index_expression);
 
         parser
+    }
+
+    pub fn parse_program(&mut self) -> Program {
+        let mut program = Program::new(vec![]);
+        while !self.cur_token_is(TokenType::EOF) {
+            let stmt = self.parse_statement();
+            if let Some(stmt) = stmt {
+                program.statements.push(*stmt);
+            }
+            self.next_token();
+        }
+        program
+    }
+
+    /// Encapsulating Function for both lexer and parser structs
+    pub fn parse(input: String) -> Program {
+        let l = Lexer::new(input);
+        let mut p = Parser::new(l);
+        p.parse_program()
+    }
+
+    pub fn errors(&self) -> &[String] {
+        &self.errors // Returns a reference to the vector as a slice
     }
 
     fn parse_while_expression(&mut self) -> Option<Box<Expression>> {
@@ -312,9 +334,7 @@ impl Parser {
             None
         }
     }
-    pub fn errors(&self) -> &[String] {
-        &self.errors // Returns a reference to the vector as a slice
-    }
+
     fn peek_error(&mut self, t: TokenType) {
         let msg = format!(
             "expected next token to be {:?}, got {:?} instead",
@@ -427,22 +447,12 @@ impl Parser {
             false
         }
     }
-    pub fn parse_program(&mut self) -> Program {
-        let mut program = Program::new(vec![]);
-        while !self.cur_token_is(TokenType::EOF) {
-            let stmt = self.parse_statement();
-            if let Some(stmt) = stmt {
-                program.statements.push(*stmt);
-            }
-            self.next_token();
-        }
-        program
-    }
-    fn register_prefix(&mut self, token_type: token::TokenType, func: PrefixParseFn) {
+
+    fn register_prefix(&mut self, token_type: TokenType, func: PrefixParseFn) {
         self.prefix_parse_fns.insert(token_type, func);
     }
 
-    fn register_infix(&mut self, token_type: token::TokenType, func: InfixParseFn) {
+    fn register_infix(&mut self, token_type: TokenType, func: InfixParseFn) {
         self.infix_parse_fns.insert(token_type, func);
     }
     fn peek_precedence(&self) -> Precedence {
@@ -469,12 +479,11 @@ impl Parser {
         }
     }
 }
+
 #[cfg(test)]
 mod test {
     use super::*;
 
-    use crate::ast::Statement;
-    use crate::lexer::Lexer;
     use std::any::Any;
 
     #[test]
@@ -485,7 +494,7 @@ mod test {
             ("let foobar = y;", "foobar", &"y"),
         ];
         for (input, expected_ident, expected_val) in tests {
-            let l = lexer::Lexer::new(input);
+            let l = Lexer::new(input);
             let mut p = Parser::new(l);
             let program = p.parse_program();
             check_parser_errors(p);
@@ -561,7 +570,7 @@ mod test {
             ("return foobar;", &"foobar"),
         ];
         for (input, expected_val) in tests {
-            let l = lexer::Lexer::new(input);
+            let l = Lexer::new(input);
             let mut p = Parser::new(l);
             let program = p.parse_program();
             check_parser_errors(p);
@@ -590,7 +599,7 @@ mod test {
     fn test_identifier_expression() {
         let input = "foobar;";
 
-        let l = lexer::Lexer::new(input);
+        let l = Lexer::new(input);
         let mut p = Parser::new(l);
         let program = p.parse_program();
         check_parser_errors(p);
@@ -618,7 +627,7 @@ mod test {
     #[test]
     fn test_integer_literal_exp() {
         let input = "5;";
-        let l = lexer::Lexer::new(input);
+        let l = Lexer::new(input);
         let mut p = Parser::new(l);
         let program = p.parse_program();
         check_parser_errors(p);
@@ -657,7 +666,7 @@ mod test {
     #[test]
     fn test_boolean_exp() {
         let input = "true;";
-        let l = lexer::Lexer::new(input);
+        let l = Lexer::new(input);
         let mut p = Parser::new(l);
         let program = p.parse_program();
         check_parser_errors(p);
@@ -700,7 +709,7 @@ mod test {
             ("+15;", "+", &15i64),
         ];
         for (input, operator, integer_value) in prefix_tests {
-            let l = lexer::Lexer::new(input);
+            let l = Lexer::new(input);
             let mut p = Parser::new(l);
             let program = p.parse_program();
             check_parser_errors(p);
@@ -768,7 +777,7 @@ mod test {
             ("false == false", &false, "==", &false),
         ];
         for (input, left_val, op, right_val) in infix_tests {
-            let l = lexer::Lexer::new(input);
+            let l = Lexer::new(input);
             let mut p = Parser::new(l);
             let program = p.parse_program();
             check_parser_errors(p);
@@ -850,7 +859,7 @@ mod test {
             ),
         ];
         for (input, expected) in tests {
-            let l = lexer::Lexer::new(input);
+            let l = Lexer::new(input);
             let mut p = Parser::new(l);
             let program = p.parse_program();
             check_parser_errors(p);
@@ -1460,7 +1469,7 @@ mod test {
             y # trailing comment
         "#;
 
-        let l = lexer::Lexer::new(input);
+        let l = Lexer::new(input);
         let mut p = Parser::new(l);
         let program = p.parse_program();
         check_parser_errors(p);
@@ -1503,7 +1512,7 @@ mod test {
     fn test_function_literal_with_name() {
         let input = "let myFunction = fn() { };";
 
-        let l = lexer::Lexer::new(input);
+        let l = Lexer::new(input);
         let mut p = Parser::new(l);
         let program = p.parse_program();
         check_parser_errors(p);

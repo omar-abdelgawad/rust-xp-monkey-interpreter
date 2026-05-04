@@ -425,7 +425,6 @@ pub mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::lexer::Lexer;
     use crate::object::HashKey;
     use crate::object::Hashable;
     use crate::object::Object;
@@ -459,9 +458,7 @@ pub mod tests {
         }
     }
     fn test_eval(input: &str) -> Object {
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
-        let program = p.parse_program();
+        let program = Parser::parse(input.into());
         let env = Environment::new();
         eval(Node::Program(program), Rc::new(RefCell::new(env)))
     }
