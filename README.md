@@ -26,24 +26,25 @@ While implementing I had a lot of TODOs and FIXes that I couldn't really think a
 - [Writing a 16-bit VM in rust](https://www.youtube.com/watch?v=oArXOAhzOdY&list=PLUkZG7_4JtUL22HycWYR_J-1xJo7rQGhr)
 
 examples of TODOs in future:
-- Add history for repl
-- reduce cloning as much as possible.
-- reduce cloning objects by making them Rc<Object>
-- remove all warnings.
-- refactor the stack into standalone struct
-- add more monkey code examples like map
-- better benchmarking with criterion
-- Write a better API for executing more than one compiled input. the current one is too ugly with new_with_state constructors.
-- Refactor objects into single files and maybe implement Into<Object> trait for ergonomic use later.
-- Add a halt instruction and exit builtin?
-- Use enumKind or Write your own macros for repetitive blocks.
-- I don't like the token field but removing it will break many tests unfortunately.
-- Empty code blocks should return NULL.
-- how to have global mappings without a function at runtime?
-- make an assembler?
-- the wasm interactive stuff ofc (prob hard maybe I can vibe code it)
-- Also clean up the wasm module its currently really bad because it was mainly ai-generated
-- trust me when I say there is much more stuff to do but I forgot.
+- [x] make step() function for executing a single instruction.
+- [x] reduce cloning objects by making them Rc<Object>
+- [x] remove all clippy warnings.
+- [x] the wasm interactive stuff ofc (prob too much web work, maybe I can vibe code it)
+- [ ] Add history for repl
+- [ ] how to have global mappings without a function at runtime?
+- [ ] reduce cloning as much as possible.
+- [ ] refactor the stack into standalone struct
+- [ ] add more monkey code examples like map
+- [ ] better benchmarking with criterion
+- [ ] Write a better API for executing more than one compiled input. the current one is too ugly with new_with_state constructors.
+- [ ] Refactor objects into single files and maybe implement Into<Object> trait for ergonomic use later.
+- [ ] Add a halt instruction and exit builtin?
+- [ ] Use enumKind or Write your own macros for repetitive blocks.
+- [ ] I don't like the token field but removing it will break many tests unfortunately.
+- [ ] Empty code blocks should return NULL like python.
+- [ ] make an assembler?
+- [ ] Also clean up the wasm module its currently really bad because it was mainly ai-generated
+- [ ] trust me when I say there is much more stuff to do but I forgot.
 
 ## 🚀 Getting Started
 

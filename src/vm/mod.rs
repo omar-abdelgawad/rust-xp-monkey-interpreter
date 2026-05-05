@@ -52,6 +52,8 @@ pub struct VM {
 }
 
 impl VM {
+    // this function could be removed once we make an interpreter struct and remove the ugly way we
+    // are currently doing interactive repl
     pub fn globals(&self) -> Vec<ObjRef> {
         self.globals.clone()
     }
@@ -128,12 +130,9 @@ impl VM {
             (Object::Integer(left_val), Object::Integer(right_val)) => {
                 self.execute_binary_integer_operation(op, left_val.value, right_val.value)
             }
-            (Object::String(left_val), Object::String(right_val)) => self
-                .execute_binary_string_operation(
-                    op,
-                    left_val.value.clone(),
-                    right_val.value.clone(),
-                ),
+            (Object::String(left_val), Object::String(right_val)) => {
+                self.execute_binary_string_operation(op, &left_val.value, &right_val.value)
+            }
             (Object::String(left_val), Object::Integer(right_val)) if op == Opcode::Add => {
                 let result = format!("{}{}", left_val.value, right_val.value);
                 self.push(Object::new_str_var(&result))
@@ -165,8 +164,8 @@ impl VM {
     fn execute_binary_string_operation(
         &mut self,
         op: Opcode,
-        left: String,
-        right: String,
+        left: &str,
+        right: &str,
     ) -> Result<(), String> {
         let result = match op {
             Opcode::Add => format!("{}{}", left, right),
@@ -273,7 +272,7 @@ impl VM {
         // TODO: this seems like a good place to have an error type
         match pair {
             Ok(pair) => self.push(pair.val.clone()),
-            Err(_err) => self.push(null_obj()),
+            Err(err_str) => self.push(Object::new_error_var(err_str)),
         }
     }
 
@@ -869,8 +868,14 @@ mod tests {
             VmTestCase::new("[1][-1]", Box::new(Null)),
             VmTestCase::new("{1: 1, 2: 2}[1]", Box::new(1i64)),
             VmTestCase::new("{1: 1, 2: 2}[2]", Box::new(2i64)),
-            VmTestCase::new("{1: 1}[0]", Box::new(Null)),
-            VmTestCase::new("{}[0]", Box::new(Null)),
+            VmTestCase::new(
+                "{1: 1}[0]",
+                Box::new(Error::new("key doesn't exist".to_string())),
+            ),
+            VmTestCase::new(
+                "{}[0]",
+                Box::new(Error::new("key doesn't exist".to_string())),
+            ),
         ];
         run_vm_tests(tests);
     }

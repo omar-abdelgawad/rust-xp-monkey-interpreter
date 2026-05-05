@@ -139,6 +139,9 @@ impl Object {
     pub fn new_hash_var(value: HashMap<HashKey, HashPair>) -> ObjRef {
         Rc::new(Object::Hash(HashObj::new(value)))
     }
+    pub fn new_error_var(value: &str) -> ObjRef {
+        Rc::new(Object::Err(Error::new(value.to_string())))
+    }
     pub fn is_truthy(&self) -> bool {
         match self {
             Object::Boolean(bool_struct) => bool_struct.value,
