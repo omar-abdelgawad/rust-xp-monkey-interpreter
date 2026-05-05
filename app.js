@@ -180,11 +180,14 @@ class MonkeyWebApp {
     }
 
     stopExecution() {
+        if (!this.isRunning) return;
         this.isRunning = false;
         if (this.stepHandle) {
             clearTimeout(this.stepHandle);
             this.stepHandle = null;
         }
+        this.appendStatus('⏹ Execution stopped');
+        this.setRunningState(false);
     }
 
     setRunningState(running) {
