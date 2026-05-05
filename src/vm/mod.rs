@@ -2,10 +2,10 @@ use crate::code::{read_u16, Instructions, Opcode};
 use crate::compiler::Bytecode;
 use crate::object::builtins::BUILTINS;
 use crate::object::{
-    native_bool_to_boolean_object, Array, BuiltinObj, ClosureObj, CompiledFunctionObj, HashObj,
-    HashPair, Hashable, Integer, IsHashable, Object, ObjectTrait, FALSE, GARBAGEVALOBJ, NULL, TRUE,
+    false_obj, garbage_obj, native_bool_to_boolean_object, null_obj, true_obj, Array, BuiltinObj,
+    ClosureObj, CompiledFunctionObj, HashObj, HashPair, Hashable, Integer, IsHashable, ObjRef, Object, ObjectTrait,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 const STACKSIZE: usize = 1 << 11;
 pub const GLOBALSSIZE: usize = 1 << 16;
@@ -39,19 +39,19 @@ impl Frame {
 
 #[derive(Debug)]
 pub struct VM {
-    constants: Vec<Object>,
+    constants: Vec<ObjRef>,
     // TODO: make stack and its sp one struct to encapsulate their function
-    stack: Vec<Object>,
+    stack: Vec<ObjRef>,
     sp: usize, // always points to next value. top of stack is stack[sp -1]
     // TODO: so I should probably use Rc<Refcell<Object>> more often becaue I am just cloning
     // everything a lot but I am too lazy. I had to use it here since I need a pointer with small
     // size to be stored on the stack and object is on the heap from what I understand
-    globals: Vec<Object>,
+    globals: Vec<ObjRef>,
     frames: Vec<Frame>,
 }
 
 impl VM {
-    pub fn globals(&self) -> Vec<Object> {
+    pub fn globals(&self) -> Vec<ObjRef> {
         self.globals.clone()
     }
 
@@ -69,14 +69,14 @@ impl VM {
         frames[0] = main_frame;
         Self {
             constants,
-            stack: vec![GARBAGEVALOBJ; STACKSIZE],
+            stack: vec![garbage_obj(); STACKSIZE],
             sp: 0,
-            globals: vec![GARBAGEVALOBJ; GLOBALSSIZE],
+            globals: vec![garbage_obj(); GLOBALSSIZE],
             frames,
         }
     }
 
-    pub fn last_popped_stack_elem(&self) -> Object {
+    pub fn last_popped_stack_elem(&self) -> ObjRef {
         self.stack[self.sp].clone()
     }
 
@@ -100,21 +100,21 @@ impl VM {
 
     fn push_closure(&mut self, const_ind: usize, num_free: usize) -> Result<(), String> {
         let constant = self.constants[const_ind].clone();
-        if let Object::CompiledFunction(function) = constant {
+        if let Object::CompiledFunction(function) = &*constant {
             let mut free = Vec::with_capacity(num_free);
             // TODO: a lot of unnecessary cloning here
             for i in 0..num_free {
                 free.push(self.stack[self.sp - num_free + i].clone());
             }
             self.sp -= num_free;
-            let closure = ClosureObj::new(function, free);
-            self.push(Object::Closure(closure))
+            let closure = ClosureObj::new(function.clone(), free);
+            self.push(Rc::new(Object::Closure(closure)))
         } else {
             Err(format!("not a function: {constant:?}"))
         }
     }
 
-    fn pop(&mut self) -> Object {
+    fn pop(&mut self) -> ObjRef {
         let o = self.stack[self.sp - 1].clone();
         self.sp -= 1;
         o
@@ -123,13 +123,12 @@ impl VM {
     fn execute_binary_operation(&mut self, op: Opcode) -> Result<(), String> {
         let right = self.pop();
         let left = self.pop();
-        match (left, right) {
+        match (&*left, &*right) {
             (Object::Integer(left_val), Object::Integer(right_val)) => {
                 self.execute_binary_integer_operation(op, left_val.value, right_val.value)
             }
-            (Object::String(left_val), Object::String(right_val)) => {
-                self.execute_binary_string_operation(op, left_val.value, right_val.value)
-            }
+            (Object::String(left_val), Object::String(right_val)) => self
+                .execute_binary_string_operation(op, left_val.value.clone(), right_val.value.clone()),
             (Object::String(left_val), Object::Integer(right_val)) if op == Opcode::Add => {
                 let result = format!("{}{}", left_val.value, right_val.value);
                 self.push(Object::new_str_var(&result))
@@ -174,7 +173,7 @@ impl VM {
     fn execute_comparison(&mut self, op: Opcode) -> Result<(), String> {
         let right = self.pop();
         let left = self.pop();
-        match (&left, &right) {
+        match (&*left, &*right) {
             (Object::Integer(left_val), Object::Integer(right_val)) => {
                 self.execute_integer_comparison(op, left_val.value, right_val.value)
             }
@@ -220,28 +219,28 @@ impl VM {
 
     fn execute_bang_operator(&mut self) -> Result<(), String> {
         let right = self.pop();
-        match right {
-            TRUE => self.push(FALSE),
-            FALSE => self.push(TRUE),
-            NULL => self.push(TRUE), // negation of NULL is true now even though it is still truthy
-            _ => self.push(FALSE),   // anything other than false is "truthy"
+        match &*right {
+            Object::Boolean(b) if b.value == true => self.push(false_obj()),
+            Object::Boolean(b) if b.value == false => self.push(true_obj()),
+            Object::Null(_) => self.push(true_obj()), // negation of NULL is true now even though it is still truthy
+            _ => self.push(false_obj()),   // anything other than false is "truthy"
         }
     }
 
     fn execute_minus_operator(&mut self) -> Result<(), String> {
         let right = self.pop();
-        match right {
+        match &*right {
             Object::Integer(right_val) => self.push(Object::new_int_var(-right_val.value)),
             _ => todo!("unsupported type for negation: {}", right.r#type()),
         }
     }
 
-    fn execute_index_expression(&mut self, left: Object, index: Object) -> Result<(), String> {
-        match (left, index) {
+    fn execute_index_expression(&mut self, left: ObjRef, index: ObjRef) -> Result<(), String> {
+        match (&*left, &*index) {
             (Object::Arr(arr_obj), Object::Integer(int_obj)) => {
                 self.execute_array_index(arr_obj, int_obj)
             }
-            (Object::Hash(hash_obj), index) => self.execute_hash_index(hash_obj, index),
+            (Object::Hash(hash_obj), _index) => self.execute_hash_index(hash_obj, index.clone()),
             (left, right) => todo!(
                 "unsupported types for index operation: {} {}",
                 left.r#type(),
@@ -250,17 +249,17 @@ impl VM {
         }
     }
 
-    fn execute_array_index(&mut self, arr_obj: Array, int_obj: Integer) -> Result<(), String> {
+    fn execute_array_index(&mut self, arr_obj: &Array, int_obj: &Integer) -> Result<(), String> {
         let i = int_obj.value;
         let max = arr_obj.elements.len() as i64 - 1;
         if i < 0 || i > max {
-            self.push(NULL)
+            self.push(null_obj())
         } else {
             self.push(arr_obj.elements[i as usize].clone())
         }
     }
 
-    fn execute_hash_index(&mut self, hash_obj: HashObj, index: Object) -> Result<(), String> {
+    fn execute_hash_index(&mut self, hash_obj: &HashObj, index: ObjRef) -> Result<(), String> {
         index.is_hashable()?;
         let pair = hash_obj
             .pairs
@@ -269,7 +268,7 @@ impl VM {
         // TODO: this seems like a good place to have an error type
         match pair {
             Ok(pair) => self.push(pair.val.clone()),
-            Err(_err) => self.push(NULL),
+            Err(_err) => self.push(null_obj()),
         }
     }
 
@@ -291,8 +290,8 @@ impl VM {
                 self.pop();
                 Ok(())
             }
-            Opcode::True => self.push(TRUE),
-            Opcode::False => self.push(FALSE),
+            Opcode::True => self.push(true_obj()),
+            Opcode::False => self.push(false_obj()),
             Opcode::Equal | Opcode::NotEqual | Opcode::GreaterThan => self.execute_comparison(op),
             Opcode::Bang => self.execute_bang_operator(),
             Opcode::Minus => self.execute_minus_operator(),
@@ -310,7 +309,7 @@ impl VM {
                 }
                 Ok(())
             }
-            Opcode::Null => self.push(NULL),
+            Opcode::Null => self.push(null_obj()),
             Opcode::SetGlobal => {
                 // FIX: refer to test_redeclaring_globals_still_doesnt_shadow_old_ones for
                 // documentation
@@ -365,7 +364,7 @@ impl VM {
                 let frame = self.pop_frame();
                 self.sp = usize::try_from(frame.bp).unwrap() - 1; // - 1 instead of popping the function obj
 
-                self.push(NULL)
+                self.push(null_obj())
             }
             Opcode::SetLocal => {
                 let local_ind = ins[usize::try_from(ip + 1).unwrap()] as usize;
@@ -391,7 +390,7 @@ impl VM {
                     .get(builtin_ind)
                     .expect("index is always valid from compiler");
                 // TODO: try to remove the clone by storing Rc<BuiltinObj>
-                self.push(Object::Builtin(definition.1.clone()))
+                self.push(Rc::new(Object::Builtin(definition.1.clone())))
             }
             Opcode::Closure => {
                 let const_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
@@ -407,7 +406,7 @@ impl VM {
             }
             Opcode::CurrentClosure => {
                 let current_closure = self.current_frame().cl.clone();
-                self.push(Object::Closure(current_closure))
+                self.push(Rc::new(Object::Closure(current_closure)))
             }
         }
     }
@@ -425,9 +424,9 @@ impl VM {
 
     fn execute_call(&mut self, num_args: usize) -> Result<(), String> {
         let callee = self.stack[self.sp - 1 - num_args].clone();
-        match callee {
-            Object::Closure(closure_obj) => self.call_closure(closure_obj, num_args),
-            Object::Builtin(builtin_obj) => self.call_builtin(builtin_obj, num_args),
+        match &*callee {
+            Object::Closure(closure_obj) => self.call_closure(closure_obj.clone(), num_args),
+            Object::Builtin(builtin_obj) => self.call_builtin(builtin_obj.clone(), num_args),
             _ => Err("calling non-closure and non-built-in".to_string()),
         }
     }
@@ -454,7 +453,7 @@ impl VM {
         self.push(result)
     }
 
-    pub fn push(&mut self, o: Object) -> Result<(), String> {
+    pub fn push(&mut self, o: ObjRef) -> Result<(), String> {
         if self.sp >= STACKSIZE {
             Err("woops! stack overflow".to_string())
         } else {
@@ -464,14 +463,14 @@ impl VM {
         }
     }
 
-    pub fn new_with_globals_store(bytecode: Bytecode, s: Vec<Object>) -> Self {
+    pub fn new_with_globals_store(bytecode: Bytecode, s: Vec<ObjRef>) -> Self {
         let mut vm = VM::new(bytecode);
         vm.globals = s;
         vm
     }
 
-    fn build_array(&mut self, start_ind: usize, end_ind: usize) -> Object {
-        let mut elements = vec![NULL; end_ind - start_ind];
+    fn build_array(&mut self, start_ind: usize, end_ind: usize) -> ObjRef {
+        let mut elements = vec![null_obj(); end_ind - start_ind];
         let mut i = start_ind;
         while i < end_ind {
             elements[i - start_ind] = self.stack[i].clone();
@@ -480,7 +479,7 @@ impl VM {
         Object::new_array_var(elements)
     }
 
-    fn build_hash(&mut self, start_ind: usize, end_ind: usize) -> Result<Object, String> {
+    fn build_hash(&mut self, start_ind: usize, end_ind: usize) -> Result<ObjRef, String> {
         let mut hashed_pairs = HashMap::new();
         let mut i = start_ind;
         while i < end_ind {
@@ -621,7 +620,7 @@ mod tests {
             println!("test {}:", i + 1);
             for (i, constant) in comp.bytecode().constants.iter().enumerate() {
                 println!("CONSTANT {i} {constant:p} {}", constant.inspect());
-                match constant {
+                match &**constant {
                     Object::CompiledFunction(constant) => {
                         print!(" Instructions:\n{}", constant.instructions)
                     }
@@ -637,7 +636,7 @@ mod tests {
         }
     }
 
-    fn test_expected_object(expected: &dyn Any, actual: &Object) {
+    fn test_expected_object(expected: &dyn Any, actual: &ObjRef) {
         if let Some(expec) = expected.downcast_ref::<i64>() {
             test_integer_object(*expec, actual)
                 .unwrap_or_else(|e| panic!("test_integer_object failed: {e}"));
@@ -663,8 +662,8 @@ mod tests {
         }
     }
 
-    pub fn test_error_object(expected: &Error, actual: &Object) -> Result<(), String> {
-        if let Object::Err(err_obj) = actual {
+    pub fn test_error_object(expected: &Error, actual: &ObjRef) -> Result<(), String> {
+        if let Object::Err(err_obj) = &**actual {
             if err_obj.message != expected.message {
                 Err(format!(
                     "wrong error message. expected={}, got={}",
@@ -680,9 +679,9 @@ mod tests {
 
     pub fn test_hash_ints_object(
         expected: &HashMap<HashKey, i64>,
-        actual: &Object,
+        actual: &ObjRef,
     ) -> Result<(), String> {
-        if let Object::Hash(result) = actual {
+        if let Object::Hash(result) = &**actual {
             if result.pairs.len() != expected.len() {
                 Err(format!(
                     "hash has wrong number of pairs. want={}, got={}",
@@ -704,8 +703,8 @@ mod tests {
         }
     }
 
-    pub fn test_arr_ints_object(expected: &[i64], actual: &Object) -> Result<(), String> {
-        if let Object::Arr(result) = actual {
+    pub fn test_arr_ints_object(expected: &[i64], actual: &ObjRef) -> Result<(), String> {
+        if let Object::Arr(result) = &**actual {
             if result.elements.len() != expected.len() {
                 Err(format!(
                     "wrong num of elements. want={}, got={}",
@@ -724,8 +723,8 @@ mod tests {
     }
 
     // TODO: remove one of duplicated function
-    pub fn test_integer_object(expected: i64, actual: &Object) -> Result<(), String> {
-        if let Object::Integer(result) = actual {
+    pub fn test_integer_object(expected: i64, actual: &ObjRef) -> Result<(), String> {
+        if let Object::Integer(result) = &**actual {
             if result.value != expected {
                 Err(format!(
                     "object has wrong value. got={}, want={}",
@@ -740,8 +739,8 @@ mod tests {
     }
 
     // TODO: remove one of duplicated function
-    pub fn test_string_object(expected: &str, actual: &Object) -> Result<(), String> {
-        if let Object::String(result) = actual {
+    pub fn test_string_object(expected: &str, actual: &ObjRef) -> Result<(), String> {
+        if let Object::String(result) = &**actual {
             if result.value != expected {
                 Err(format!(
                     "object has wrong value. got={}, want={}",
@@ -755,8 +754,8 @@ mod tests {
         }
     }
 
-    pub fn test_boolean_object(expected: bool, actual: &Object) -> Result<(), String> {
-        if let Object::Boolean(result) = actual {
+    pub fn test_boolean_object(expected: bool, actual: &ObjRef) -> Result<(), String> {
+        if let Object::Boolean(result) = &**actual {
             if result.value != expected {
                 Err(format!(
                     "object has wrong value. got={}, want={}",
@@ -770,8 +769,8 @@ mod tests {
         }
     }
 
-    pub fn test_null_object(actual: &Object) -> Result<(), String> {
-        if let Object::Null(_result) = actual {
+    pub fn test_null_object(actual: &ObjRef) -> Result<(), String> {
+        if let Object::Null(_result) = &**actual {
             Ok(())
         } else {
             Err(format!("object is not Null. got=({:?})", actual))

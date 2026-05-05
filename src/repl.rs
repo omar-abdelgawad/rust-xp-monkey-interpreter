@@ -3,7 +3,7 @@ use crate::compiler::symbol_table::{SymbolTable, SymbolTableRef};
 use crate::compiler::Compiler;
 use crate::lexer::Lexer;
 use crate::object::builtins::BUILTINS;
-use crate::object::{ObjectTrait, GARBAGEVALOBJ};
+use crate::object::{garbage_obj, ObjectTrait};
 use crate::parser::Parser;
 use crate::vm::{GLOBALSSIZE, VM};
 use std::cell::RefCell;
@@ -31,7 +31,7 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
     // too lazy to thing about this now. I don't like this api anyways and I should change it in
     // the future and add a test case as well.
     let mut constants = vec![];
-    let mut globals = vec![GARBAGEVALOBJ; GLOBALSSIZE];
+    let mut globals = vec![garbage_obj(); GLOBALSSIZE];
     let mut symbol_table: SymbolTableRef = Rc::new(RefCell::new(SymbolTable::new()));
     for (i, (name, _)) in BUILTINS.iter().enumerate() {
         symbol_table

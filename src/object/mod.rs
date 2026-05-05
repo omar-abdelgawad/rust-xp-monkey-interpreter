@@ -19,13 +19,31 @@ pub const FALSE: Object = Object::Boolean(Boolean::new(false));
 pub const NULL: Object = Object::Null(Null::new());
 pub const GARBAGEVALOBJ: Object = TRUE;
 
-type BuiltinFunction = fn(args: &[Object]) -> Object;
+pub type ObjRef = Rc<Object>;
 
-pub fn native_bool_to_boolean_object(input: bool) -> Object {
+pub fn true_obj() -> ObjRef {
+    Rc::new(TRUE)
+}
+
+pub fn false_obj() -> ObjRef {
+    Rc::new(FALSE)
+}
+
+pub fn null_obj() -> ObjRef {
+    Rc::new(NULL)
+}
+
+pub fn garbage_obj() -> ObjRef {
+    Rc::new(GARBAGEVALOBJ)
+}
+
+type BuiltinFunction = fn(args: &[ObjRef]) -> ObjRef;
+
+pub fn native_bool_to_boolean_object(input: bool) -> ObjRef {
     if input {
-        TRUE
+        true_obj()
     } else {
-        FALSE
+        false_obj()
     }
 }
 
@@ -105,21 +123,21 @@ pub enum Object {
     Closure(ClosureObj),
 }
 impl Object {
-    pub fn new_int_var(value: i64) -> Object {
-        Object::Integer(Integer::new(value))
+    pub fn new_int_var(value: i64) -> ObjRef {
+        Rc::new(Object::Integer(Integer::new(value)))
     }
-    pub fn new_str_var(value: &str) -> Object {
-        Object::String(StringObj::new(value))
+    pub fn new_str_var(value: &str) -> ObjRef {
+        Rc::new(Object::String(StringObj::new(value)))
     }
 
-    pub fn new_ret_var(value: Object) -> Object {
-        Object::Ret(ReturnValue::new(Box::new(value)))
+    pub fn new_ret_var(value: ObjRef) -> ObjRef {
+        Rc::new(Object::Ret(ReturnValue::new(value)))
     }
-    pub fn new_array_var(value: Vec<Object>) -> Object {
-        Object::Arr(Array::new(value))
+    pub fn new_array_var(value: Vec<ObjRef>) -> ObjRef {
+        Rc::new(Object::Arr(Array::new(value)))
     }
-    pub fn new_hash_var(value: HashMap<HashKey, HashPair>) -> Object {
-        Object::Hash(HashObj::new(value))
+    pub fn new_hash_var(value: HashMap<HashKey, HashPair>) -> ObjRef {
+        Rc::new(Object::Hash(HashObj::new(value)))
     }
     pub fn is_truthy(&self) -> bool {
         match self {
@@ -262,10 +280,10 @@ impl ObjectTrait for Null {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ReturnValue {
-    pub value: Box<Object>,
+    pub value: ObjRef,
 }
 impl ReturnValue {
-    pub fn new(value: Box<Object>) -> Self {
+    pub fn new(value: ObjRef) -> Self {
         ReturnValue { value }
     }
 }
@@ -384,10 +402,10 @@ impl ObjectTrait for BuiltinObj {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Array {
-    pub elements: Vec<Object>,
+    pub elements: Vec<ObjRef>,
 }
 impl Array {
-    pub fn new(elements: Vec<Object>) -> Self {
+    pub fn new(elements: Vec<ObjRef>) -> Self {
         Self { elements }
     }
 }
@@ -404,11 +422,11 @@ impl ObjectTrait for Array {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct HashPair {
-    pub key: Object,
-    pub val: Object,
+    pub key: ObjRef,
+    pub val: ObjRef,
 }
 impl HashPair {
-    pub fn new(key: Object, val: Object) -> Self {
+    pub fn new(key: ObjRef, val: ObjRef) -> Self {
         Self { key, val }
     }
 }
@@ -423,10 +441,10 @@ impl HashObj {
     }
 
     // FIX: this should return a reference but for now we just clone.
-    pub fn get(&self, index: &Object) -> Object {
+    pub fn get(&self, index: &Object) -> ObjRef {
         let pair = self.pairs.get(&index.hash_key());
         match pair {
-            None => NULL,
+            None => null_obj(),
             Some(p) => p.val.clone(), // should be a reference
         }
     }
@@ -476,10 +494,10 @@ impl ObjectTrait for CompiledFunctionObj {
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct ClosureObj {
     pub comp_fn: CompiledFunctionObj, // may need to be a reference
-    pub free: Vec<Object>,
+    pub free: Vec<ObjRef>,
 }
 impl ClosureObj {
-    pub fn new(comp_fn: CompiledFunctionObj, free: Vec<Object>) -> Self {
+    pub fn new(comp_fn: CompiledFunctionObj, free: Vec<ObjRef>) -> Self {
         Self { comp_fn, free }
     }
 }

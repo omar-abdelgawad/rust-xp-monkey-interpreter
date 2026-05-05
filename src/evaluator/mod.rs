@@ -7,8 +7,8 @@ use crate::object::{
     native_bool_to_boolean_object, Array, Error, Function, HashObj, HashPair, Hashable,
     ObjectTrait, ObjectType, StringObj,
 };
-use crate::object::{Integer, Object};
-use crate::object::{FALSE, NULL, TRUE};
+use crate::object::{Integer, ObjRef, Object};
+use crate::object::{false_obj, null_obj, true_obj, FALSE, NULL, TRUE};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -17,7 +17,7 @@ use std::rc::Rc;
 // TODO: in order to return Objects from the environment without cloning it we should
 // maybe return Cow<'a,Object> or Rc<RefCell<Object>> but that changes all function signatures
 // and some of the logic as well and it seems ugly unfortunately.
-pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
+pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> ObjRef {
     use Expression as Exp;
     use Statement as St;
     match node {
@@ -40,11 +40,12 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
                 if is_error(&val) {
                     return val;
                 }
-                env.borrow_mut().set(tmp_name_value, val)
+                env.borrow_mut().set(tmp_name_value, val.clone());
+                val
             }
         },
         Node::Expression(exp) => match exp {
-            Exp::Integer(int_lit) => Object::Integer(Integer::new(int_lit.value)),
+            Exp::Integer(int_lit) => Object::new_int_var(int_lit.value),
             Exp::Boolean(bool_lit) => native_bool_to_boolean_object(bool_lit.value),
             Exp::Prefix(prefix_exp) => {
                 let right = eval(Node::Expression(*prefix_exp.right), Rc::clone(&env));
@@ -69,7 +70,7 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
             Exp::Function(fun_exp) => {
                 let params = fun_exp.parameters;
                 let body = *fun_exp.body;
-                Object::Func(Function::new(params, body, Rc::clone(&env)))
+                Rc::new(Object::Func(Function::new(params, body, Rc::clone(&env))))
             }
             Exp::Call(call_exp) => {
                 let func = eval(Node::Expression(*call_exp.function), Rc::clone(&env));
@@ -82,13 +83,13 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
                 }
                 apply_function(&func, &args)
             }
-            Exp::Str(str_lit) => Object::String(StringObj::new(str_lit.value)),
+            Exp::Str(str_lit) => Object::new_str_var(&str_lit.value),
             Exp::Arr(arr_lit) => {
                 let mut elems = eval_expressions(arr_lit.elements, Rc::clone(&env));
                 if elems.len() == 1 && is_error(&elems[0]) {
                     return elems.remove(0);
                 }
-                Object::Arr(Array::new(elems))
+                Object::new_array_var(elems)
             }
             Exp::Ind(ind_exp) => {
                 let left = eval(Node::Expression(*ind_exp.left), Rc::clone(&env));
@@ -106,12 +107,12 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> Object {
         },
     }
 }
-fn eval_program(stmts: Vec<Statement>, env: Rc<RefCell<Environment>>) -> Object {
-    let mut result = NULL;
+fn eval_program(stmts: Vec<Statement>, env: Rc<RefCell<Environment>>) -> ObjRef {
+    let mut result = null_obj();
     for statement in stmts {
         result = eval(Node::Statement(statement), Rc::clone(&env));
-        match result {
-            Object::Ret(ret_obj) => return *ret_obj.value,
+        match &*result {
+            Object::Ret(ret_obj) => return ret_obj.value.clone(),
             Object::Err(ref _err_obj) => return result,
             _ => {}
         }
@@ -119,11 +120,11 @@ fn eval_program(stmts: Vec<Statement>, env: Rc<RefCell<Environment>>) -> Object 
     result
 }
 
-fn eval_block_statement(stmts: Vec<Statement>, env: Rc<RefCell<Environment>>) -> Object {
-    let mut result = NULL;
+fn eval_block_statement(stmts: Vec<Statement>, env: Rc<RefCell<Environment>>) -> ObjRef {
+    let mut result = null_obj();
     for statement in stmts {
         result = eval(Node::Statement(statement), Rc::clone(&env));
-        match result {
+        match &*result {
             Object::Ret(_) | Object::Err(_) => return result,
             _ => {}
         }
@@ -131,7 +132,7 @@ fn eval_block_statement(stmts: Vec<Statement>, env: Rc<RefCell<Environment>>) ->
     result
 }
 
-fn eval_prefix_expression(operator: &str, right: Object) -> Object {
+fn eval_prefix_expression(operator: &str, right: ObjRef) -> ObjRef {
     match operator {
         "!" => eval_bang_operator_expression(right),
         "-" => eval_minus_prefix_operator_exprssion(right),
@@ -140,35 +141,35 @@ fn eval_prefix_expression(operator: &str, right: Object) -> Object {
     }
 }
 
-fn eval_bang_operator_expression(right: Object) -> Object {
-    match right {
-        TRUE => FALSE,
-        FALSE => TRUE,
-        NULL => TRUE,
+fn eval_bang_operator_expression(right: ObjRef) -> ObjRef {
+    match &*right {
+        Object::Boolean(b) if b.value == true => false_obj(),
+        Object::Boolean(b) if b.value == false => true_obj(),
+        Object::Null(_) => true_obj(),
         // TODO: remove this false or make it panic?
         // this default means that all objects are "truthy"
-        _ => FALSE,
+        _ => false_obj(),
     }
 }
 
-fn eval_minus_prefix_operator_exprssion(right: Object) -> Object {
-    match right {
+fn eval_minus_prefix_operator_exprssion(right: ObjRef) -> ObjRef {
+    match &*right {
         Object::Integer(integer) => Object::new_int_var(-integer.value),
         // I REALLY HATE THIS
         _ => new_error(format!("unknown operator: -{}", right.r#type())),
     }
 }
 
-fn eval_plus_prefix_operator_exprssion(right: Object) -> Object {
-    match right {
+fn eval_plus_prefix_operator_exprssion(right: ObjRef) -> ObjRef {
+    match &*right {
         Object::Integer(integer) => Object::new_int_var(integer.value),
         // I REALLY HATE THIS
         _ => new_error(format!("unknown operator: -{}", right.r#type())),
     }
 }
 
-fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object {
-    match (operator, left, right) {
+fn eval_infix_expression(operator: &str, left: ObjRef, right: ObjRef) -> ObjRef {
+    match (operator, &*left, &*right) {
         ("==", Object::Boolean(left), Object::Boolean(right)) => {
             native_bool_to_boolean_object(left == right)
         }
@@ -194,15 +195,15 @@ fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object 
     }
 }
 
-fn eval_string_infix_expression(operator: &str, left: StringObj, right: Object) -> Object {
+fn eval_string_infix_expression(operator: &str, left: &StringObj, right: &Object) -> ObjRef {
     match (operator, right) {
         ("+", Object::String(right)) => {
             let new_str = format!("{}{}", left.value, right.value);
-            Object::String(StringObj::new(new_str))
+            Object::new_str_var(&new_str)
         }
         ("+", Object::Integer(right)) => {
             let new_str = format!("{}{}", left.value, right.value);
-            Object::String(StringObj::new(new_str))
+            Object::new_str_var(&new_str)
         }
         // ("+", Object::Boolean(right)) => {
         //     let new_str = format!("{}{}", left.value, right.value);
@@ -217,7 +218,7 @@ fn eval_string_infix_expression(operator: &str, left: StringObj, right: Object) 
     }
 }
 
-fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) -> Object {
+fn eval_integer_infix_expression(operator: &str, left: &Integer, right: &Integer) -> ObjRef {
     let left_val = left.value;
     let right_val = right.value;
     match operator {
@@ -241,7 +242,7 @@ fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) 
     }
 }
 
-fn eval_if_exp(ie: IfExpression, env: Rc<RefCell<Environment>>) -> Object {
+fn eval_if_exp(ie: IfExpression, env: Rc<RefCell<Environment>>) -> ObjRef {
     let cond = eval(Node::Expression(*ie.condition), Rc::clone(&env));
     if is_error(&cond) {
         return cond;
@@ -254,16 +255,16 @@ fn eval_if_exp(ie: IfExpression, env: Rc<RefCell<Environment>>) -> Object {
             env,
         )
     } else {
-        NULL
+        null_obj()
     }
 }
 
-fn eval_while_exp(ie: WhileExpression, env: Rc<RefCell<Environment>>) -> Object {
+fn eval_while_exp(ie: WhileExpression, env: Rc<RefCell<Environment>>) -> ObjRef {
     let mut cond = eval(Node::Expression(*ie.condition.clone()), Rc::clone(&env));
     if is_error(&cond) {
         return cond;
     }
-    while is_truthy(cond) {
+    while is_truthy(cond.clone()) {
         let _ = eval(
             Node::Statement(Statement::Block(*ie.loop_body.clone())),
             env.clone(),
@@ -273,26 +274,26 @@ fn eval_while_exp(ie: WhileExpression, env: Rc<RefCell<Environment>>) -> Object 
             return cond;
         }
     }
-    NULL
+    null_obj()
 }
 
-fn is_truthy(obj: Object) -> bool {
-    match obj {
-        NULL => false,
-        TRUE => true,
-        FALSE => false,
+fn is_truthy(obj: ObjRef) -> bool {
+    match &*obj {
+        Object::Null(_) => false,
+        Object::Boolean(b) if b.value == true => true,
+        Object::Boolean(b) if b.value == false => false,
         _ => true,
     }
 }
 
-fn new_error(formt: String) -> Object {
-    Object::Err(Error::new(formt))
+fn new_error(formt: String) -> ObjRef {
+    Rc::new(Object::Err(Error::new(formt)))
 }
 
-fn is_error(obj: &Object) -> bool {
+fn is_error(obj: &ObjRef) -> bool {
     obj.r#type() == ObjectType::ERROR_OBJ
 }
-fn eval_identifier(ident: ast::Identifier, env: Rc<RefCell<Environment>>) -> Object {
+fn eval_identifier(ident: ast::Identifier, env: Rc<RefCell<Environment>>) -> ObjRef {
     let val = env.borrow().get(&ident.value);
     if let Some(obj) = val {
         return obj;
@@ -301,13 +302,13 @@ fn eval_identifier(ident: ast::Identifier, env: Rc<RefCell<Environment>>) -> Obj
     // Use builtins (which now handle WebAssembly vs native compilation internally)
     let val = builtins(&ident.value);
     if let Some(built_obj) = val {
-        return Object::Builtin(built_obj);
+        return Rc::new(Object::Builtin(built_obj));
     }
 
     new_error(format!("identifier not found: {}", ident.value))
 }
 
-fn eval_expressions(exps: Vec<Expression>, env: Rc<RefCell<Environment>>) -> Vec<Object> {
+fn eval_expressions(exps: Vec<Expression>, env: Rc<RefCell<Environment>>) -> Vec<ObjRef> {
     let mut res = Vec::new();
     for e in exps {
         let evaluated = eval(Node::Expression(e), Rc::clone(&env));
@@ -319,19 +320,19 @@ fn eval_expressions(exps: Vec<Expression>, env: Rc<RefCell<Environment>>) -> Vec
     res
 }
 
-fn apply_function(fn_obj: &Object, args: &[Object]) -> Object {
-    match fn_obj {
-        Object::Func(fn_obj) => {
-            if fn_obj.parameters.len() != args.len() {
+fn apply_function(fn_obj: &ObjRef, args: &[ObjRef]) -> ObjRef {
+    match &**fn_obj {
+        Object::Func(func) => {
+            if func.parameters.len() != args.len() {
                 return new_error(format!(
                     "non matching number of arguments. function takes {}, got={}.",
-                    fn_obj.parameters.len(),
+                    func.parameters.len(),
                     args.len()
                 ));
             }
-            let extended_env = extend_function_env(fn_obj, args);
+            let extended_env = extend_function_env(func, args);
             let evaluated = eval(
-                Node::Statement(Statement::Block(fn_obj.body.clone())),
+                Node::Statement(Statement::Block(func.body.clone())),
                 Rc::new(RefCell::new(extended_env)),
             );
 
@@ -342,7 +343,7 @@ fn apply_function(fn_obj: &Object, args: &[Object]) -> Object {
     }
 }
 
-fn extend_function_env(fn_obj: &Function, args: &[Object]) -> Environment {
+fn extend_function_env(fn_obj: &Function, args: &[ObjRef]) -> Environment {
     // FIX: this clones a snapshot of enclosing environment but
     // it should take a reference instead?? so maybe make
     // fn_obj already have an Rc<RefCell<Environment>>
@@ -353,22 +354,22 @@ fn extend_function_env(fn_obj: &Function, args: &[Object]) -> Environment {
     env
 }
 
-fn unwrap_return_value(obj: Object) -> Object {
-    if let Object::Ret(ret_obj) = obj {
-        return *ret_obj.value;
+fn unwrap_return_value(obj: ObjRef) -> ObjRef {
+    if let Object::Ret(ret_obj) = &*obj {
+        return ret_obj.value.clone();
     }
     obj
 }
 
-fn eval_index_expression(left: Object, index: Object) -> Object {
-    match (left, index) {
+fn eval_index_expression(left: ObjRef, index: ObjRef) -> ObjRef {
+    match (&*left, &*index) {
         (Object::Arr(arr), Object::Integer(ind)) => eval_array_index_expresssion(arr, ind),
-        (Object::Hash(hash_obj), right_obj) => eval_hash_index_expression(&hash_obj, right_obj),
+        (Object::Hash(hash_obj), _) => eval_hash_index_expression(&hash_obj, index.clone()),
         (left, _) => new_error(format!("index operator not supported: {}", left.r#type())),
     }
 }
 
-fn eval_array_index_expresssion(arr: Array, index: Integer) -> Object {
+fn eval_array_index_expresssion(arr: &Array, index: &Integer) -> ObjRef {
     let idx = if index.value < 0 {
         (arr.elements.len() as i64 + index.value) as usize
     } else {
@@ -389,22 +390,26 @@ fn eval_array_index_expresssion(arr: Array, index: Integer) -> Object {
     arr.elements[idx].clone()
 }
 
-fn eval_hash_index_expression(hash: &HashObj, index: Object) -> Object {
-    match index {
+fn eval_hash_index_expression(hash: &HashObj, index: ObjRef) -> ObjRef {
+    match &*index {
         Object::Boolean(_) | Object::Integer(_) | Object::String(_) => {}
         _ => return new_error(format!("unusable as hash key: {}", index.r#type())),
     }
-    hash.get(&index)
+    let pair = hash.get(&index);
+    if let Object::Null(_) = &*pair {
+        return null_obj();
+    }
+    pair
 }
 
-fn eval_hash_litral(node: HashLiteral, env: Rc<RefCell<Environment>>) -> Object {
+fn eval_hash_litral(node: HashLiteral, env: Rc<RefCell<Environment>>) -> ObjRef {
     let mut pairs = HashMap::new();
     for (key_node, value_node) in node.pairs {
         let key = eval(Node::Expression(key_node), Rc::clone(&env));
         if is_error(&key) {
             return key;
         }
-        match key {
+        match &*key {
             Object::Boolean(_) | Object::Integer(_) | Object::String(_) => {}
             _ => return new_error(format!("unusable as hash key: {}", key.r#type())),
         }
@@ -416,7 +421,7 @@ fn eval_hash_litral(node: HashLiteral, env: Rc<RefCell<Environment>>) -> Object 
         let hashed = key.hash_key();
         pairs.insert(hashed, HashPair::new(key, value));
     }
-    Object::Hash(HashObj::new(pairs))
+    Rc::new(Object::Hash(HashObj::new(pairs)))
 }
 
 #[cfg(test)]
@@ -456,13 +461,13 @@ pub mod tests {
             assert!(test_integer_object(&evaluated, expected));
         }
     }
-    fn test_eval(input: &str) -> Object {
+    fn test_eval(input: &str) -> ObjRef {
         let program = Parser::parse(input.into());
         let env = Environment::new();
         eval(Node::Program(program), Rc::new(RefCell::new(env)))
     }
-    pub fn test_integer_object(obj: &Object, expected: i64) -> bool {
-        if let Object::Integer(result) = obj {
+    pub fn test_integer_object(obj: &ObjRef, expected: i64) -> bool {
+        if let Object::Integer(result) = &**obj {
             if result.value != expected {
                 eprintln!(
                     "object has wrong value. got={}, want{}",
@@ -509,8 +514,8 @@ pub mod tests {
             assert!(test_boolean_object(&evaluated, expected));
         }
     }
-    fn test_boolean_object(obj: &Object, expected: bool) -> bool {
-        let Object::Boolean(result) = obj else {
+    fn test_boolean_object(obj: &ObjRef, expected: bool) -> bool {
+        let Object::Boolean(result) = &**obj else {
             eprintln!("object is not Boolean. got={:?} ({:?})", obj, obj);
             return false;
         };
@@ -596,8 +601,8 @@ pub mod tests {
         }
     }
 
-    fn test_null_object(obj: &Object) -> bool {
-        match obj {
+    fn test_null_object(obj: &ObjRef) -> bool {
+        match &**obj {
             Object::Null(_) => true,
             _ => {
                 eprintln!("object is not NULL. got={:?} ({:?})", obj, obj);
@@ -606,8 +611,8 @@ pub mod tests {
         }
     }
 
-    fn test_err_object(obj: &Object) -> bool {
-        match obj {
+    fn test_err_object(obj: &ObjRef) -> bool {
+        match &**obj {
             Object::Err(_) => true,
             _ => {
                 eprintln!("object is not Err. got={:?} ({:?})", obj, obj);
@@ -677,7 +682,7 @@ pub mod tests {
         let mut errors = vec![];
         for (input, expected_message) in tests {
             let evaluated = test_eval(input);
-            let Object::Err(err_obj) = evaluated else {
+            let Object::Err(err_obj) = &*evaluated else {
                 errors.push((
                     input,
                     format!("no error object returned. got={:?}", evaluated),
@@ -712,7 +717,7 @@ pub mod tests {
         let input = "fn(x) {x+2;};";
         let evaluated = test_eval(input);
         //println!("{:?}", evaluated);
-        let Object::Func(func_obj) = evaluated else {
+        let Object::Func(func_obj) = &*evaluated else {
             panic!(
                 "object is not Function. got={:?} ({:?})",
                 evaluated, evaluated
@@ -763,7 +768,7 @@ addTwo(2);";
         let input = "\"Hello World!\"";
 
         let evaluated = test_eval(input);
-        let Object::String(str_obj) = evaluated else {
+        let Object::String(str_obj) = &*evaluated else {
             panic!("object is not String. got={:?}", evaluated);
         };
         assert_eq!(
@@ -777,7 +782,7 @@ addTwo(2);";
     fn test_string_concat() {
         let input = "\"Hello\" + \" \" + \"World!\"";
         let evaluated = test_eval(input);
-        let Object::String(str_obj) = evaluated else {
+        let Object::String(str_obj) = &*evaluated else {
             panic!("object is not String. got={:?}", evaluated);
         };
         assert_eq!(
@@ -832,7 +837,7 @@ addTwo(2);";
                 Expec::Null => assert!(test_null_object(&evaluated)),
                 Expec::Val(val) => assert!(test_integer_object(&evaluated, val)),
                 Expec::Mess(mess) => {
-                    let Object::Err(err_obj) = evaluated else {
+                    let Object::Err(err_obj) = &*evaluated else {
                         panic!("object is not Error. got={:?}", evaluated);
                     };
                     assert_eq!(
@@ -849,7 +854,7 @@ addTwo(2);";
     fn test_array_literals() {
         let input = "[1, 2 * 2, 3 + 3]";
         let evaluated = test_eval(input);
-        let Object::Arr(arr_obj) = evaluated else {
+        let Object::Arr(arr_obj) = &*evaluated else {
             panic!("object is not Array. got={:?}", evaluated);
         };
         assert_eq!(
@@ -929,7 +934,7 @@ addTwo(2);";
             let double = fn(x) { x * 2 };
 map(a, double);";
         let evaluated = test_eval(input);
-        let Object::Arr(arr_obj) = evaluated else {
+        let Object::Arr(arr_obj) = &*evaluated else {
             panic!("object is not Array. got={:?}", evaluated);
         };
         assert_eq!(
@@ -978,7 +983,7 @@ map(a, double);";
                 false: 6,
             }";
         let evaluated = test_eval(input);
-        let Object::Hash(hash_obj) = evaluated else {
+        let Object::Hash(hash_obj) = &*evaluated else {
             panic!("object is not Hash. got={:?}", evaluated);
         };
         let mut expected: HashMap<HashKey, i64> = HashMap::new();

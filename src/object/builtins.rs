@@ -1,7 +1,8 @@
-use super::{Array, BuiltinObj, Error, Object, ObjectTrait, ObjectType, NULL};
+use super::{null_obj, Array, BuiltinObj, Error, ObjRef, Object, ObjectTrait, ObjectType};
+use std::rc::Rc;
 
-fn new_error(formt: String) -> Object {
-    Object::Err(Error::new(formt))
+fn new_error(formt: String) -> ObjRef {
+    Rc::new(Object::Err(Error::new(formt)))
 }
 pub static BUILTINS: &[(&str, BuiltinObj)] = &[
     ("len", builtin_len()),     // 0
@@ -23,14 +24,14 @@ pub fn get_builtin_by_name(name: &str) -> Option<BuiltinObj> {
 }
 const fn builtin_len() -> BuiltinObj {
     BuiltinObj {
-        function: |args: &[Object]| {
+        function: |args: &[ObjRef]| {
             if args.len() != 1 {
                 return new_error(format!(
                     "wrong number of arguments. got={}, want=1",
                     args.len()
                 ));
             }
-            match &args[0] {
+            match &*args[0] {
                 Object::String(str_obj) => Object::new_int_var(str_obj.value.len() as i64),
                 Object::Arr(arr_obj) => Object::new_int_var(arr_obj.elements.len() as i64),
                 Object::Hash(hash_obj) => Object::new_int_var(hash_obj.pairs.len() as i64),
@@ -44,7 +45,7 @@ const fn builtin_len() -> BuiltinObj {
 }
 const fn builtin_puts() -> BuiltinObj {
     BuiltinObj {
-        function: |args: &[Object]| {
+        function: |args: &[ObjRef]| {
             for arg in args {
                 let output = arg.inspect();
                 #[cfg(target_arch = "wasm32")]
@@ -57,14 +58,14 @@ const fn builtin_puts() -> BuiltinObj {
                     println!("{}", output);
                 }
             }
-            NULL
+            null_obj()
         },
     }
 }
 
 const fn builtin_first() -> BuiltinObj {
     BuiltinObj {
-        function: |args: &[Object]| {
+        function: |args: &[ObjRef]| {
             if args.len() != 1 {
                 return new_error(format!(
                     "wrong number of arguments. got={}, want=1",
@@ -77,20 +78,20 @@ const fn builtin_first() -> BuiltinObj {
                     args[0].r#type()
                 ));
             }
-            let Object::Arr(arr) = &args[0] else {
+            let Object::Arr(arr) = &*args[0] else {
                 panic!();
             };
             if !arr.elements.is_empty() {
                 arr.elements[0].clone()
             } else {
-                NULL
+                null_obj()
             }
         },
     }
 }
 const fn builtin_last() -> BuiltinObj {
     BuiltinObj {
-        function: |args: &[Object]| {
+        function: |args: &[ObjRef]| {
             if args.len() != 1 {
                 return new_error(format!(
                     "wrong number of arguments. got={}, want=1",
@@ -103,21 +104,21 @@ const fn builtin_last() -> BuiltinObj {
                     args[0].r#type()
                 ));
             }
-            let Object::Arr(arr) = &args[0] else {
+            let Object::Arr(arr) = &*args[0] else {
                 panic!();
             };
             let length = arr.elements.len();
             if length > 0 {
                 arr.elements[length - 1].clone()
             } else {
-                NULL
+                null_obj()
             }
         },
     }
 }
 const fn builtin_rest() -> BuiltinObj {
     BuiltinObj {
-        function: |args: &[Object]| {
+        function: |args: &[ObjRef]| {
             if args.len() != 1 {
                 return new_error(format!(
                     "wrong number of arguments. got={}, want=1",
@@ -130,22 +131,22 @@ const fn builtin_rest() -> BuiltinObj {
                     args[0].r#type()
                 ));
             }
-            let Object::Arr(arr) = &args[0] else {
+            let Object::Arr(arr) = &*args[0] else {
                 panic!();
             };
             let length = arr.elements.len();
             if length > 0 {
                 let new_elements = arr.elements[1..].to_vec();
-                Object::Arr(Array::new(new_elements))
+                Object::new_array_var(new_elements)
             } else {
-                NULL
+                null_obj()
             }
         },
     }
 }
 const fn builtin_push() -> BuiltinObj {
     BuiltinObj {
-        function: |args: &[Object]| {
+        function: |args: &[ObjRef]| {
             if args.len() != 2 {
                 return new_error(format!(
                     "wrong number of arguments. got={}, want=2",
@@ -158,14 +159,14 @@ const fn builtin_push() -> BuiltinObj {
                     args[0].r#type()
                 ));
             }
-            let Object::Arr(arr) = &args[0] else {
+            let Object::Arr(arr) = &*args[0] else {
                 panic!("first argument has to be an array object.");
             };
             //let length = arr.elements.len();
             let mut new_elements = arr.elements.clone();
             new_elements.push(args[1].clone());
 
-            Object::Arr(Array::new(new_elements))
+            Object::new_array_var(new_elements)
         },
     }
 }

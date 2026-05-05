@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use super::{Object, NULL};
+use super::{null_obj, ObjRef, Object};
 use std::cell::RefCell;
 use std::rc::Rc;
 
 // WARNING: never try to print struct as it can loop infinitely
 #[derive(Debug, PartialEq, Clone)]
 pub struct Environment {
-    store: HashMap<String, Object>,
+    store: HashMap<String, ObjRef>,
     outer: Option<Rc<RefCell<Environment>>>,
 }
 
@@ -25,7 +25,7 @@ impl Environment {
             outer: None,
         }
     }
-    pub fn get(&self, name: &str) -> Option<Object> {
+    pub fn get(&self, name: &str) -> Option<ObjRef> {
         // TODO: cloned should be removed
         // and eval() should return Option<&Object>
         // since the actual values are owned by the env
@@ -38,9 +38,9 @@ impl Environment {
         obj
     }
     /// Always returns NULL
-    pub fn set(&mut self, name: String, val: Object) -> Object {
+    pub fn set(&mut self, name: String, val: ObjRef) -> ObjRef {
         let _old_val = self.store.insert(name, val);
-        NULL
+        null_obj()
     }
 
     pub fn new_enclosed_environment(outer: Rc<RefCell<Environment>>) -> Self {

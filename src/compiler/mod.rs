@@ -3,14 +3,14 @@ pub mod symbol_table;
 use crate::{
     ast::{self, LetStatement},
     code::{make, Instructions, Opcode},
-    object::{builtins::BUILTINS, CompiledFunctionObj, Object},
+    object::{builtins::BUILTINS, CompiledFunctionObj, ObjRef, Object},
 };
 use std::{cell::RefCell, rc::Rc};
 use symbol_table::{Symbol, SymbolScope, SymbolTable, SymbolTableRef};
 
 #[derive(Debug)]
 pub struct Compiler {
-    constants: Vec<Object>,
+    constants: Vec<ObjRef>,
     symbol_table: SymbolTableRef, // note that symbol_table and scopes are related
     scopes: Vec<CompilationScope>,
     scope_index: usize, // TODO: does this variable actually need to exist?
@@ -261,7 +261,8 @@ impl Compiler {
                     }
                     let compiled_fn =
                         CompiledFunctionObj::new(instructions, num_locals, num_parameters);
-                    let fn_const_index = self.add_constant(Object::CompiledFunction(compiled_fn));
+                    let fn_const_index =
+                        self.add_constant(Rc::new(Object::CompiledFunction(compiled_fn)));
                     self.emit(
                         Opcode::Closure,
                         &[fn_const_index as i64, free_symbols.len() as i64],
@@ -355,7 +356,7 @@ impl Compiler {
         )
     }
 
-    fn add_constant(&mut self, obj: Object) -> usize {
+    fn add_constant(&mut self, obj: ObjRef) -> usize {
         self.constants.push(obj);
         self.constants.len() - 1
     }
@@ -413,7 +414,7 @@ impl Compiler {
         ins.0[pos..end].copy_from_slice(new_instruction);
     }
     // TODO: I don't like this api for remembering previous compilations. is there any other way?
-    pub fn new_with_state(s: SymbolTableRef, constants: Vec<Object>) -> Self {
+    pub fn new_with_state(s: SymbolTableRef, constants: Vec<ObjRef>) -> Self {
         let mut compiler = Compiler::new();
         compiler.symbol_table = s;
         compiler.constants = constants;
@@ -464,11 +465,11 @@ impl Compiler {
 #[derive(Debug)]
 pub struct Bytecode {
     pub instructions: Instructions,
-    pub constants: Vec<Object>,
+    pub constants: Vec<ObjRef>,
 }
 
 impl Bytecode {
-    pub fn new(instructions: Instructions, constants: Vec<Object>) -> Self {
+    pub fn new(instructions: Instructions, constants: Vec<ObjRef>) -> Self {
         Self {
             instructions,
             constants,
@@ -485,8 +486,8 @@ mod tests {
         evaluator::tests::test_integer_object,
         parser::Parser,
     };
-    pub fn test_string_object(obj: &Object, expected: &str) -> bool {
-        if let Object::String(result) = obj {
+    pub fn test_string_object(obj: &ObjRef, expected: &str) -> bool {
+        if let Object::String(result) = &**obj {
             if result.value != expected {
                 eprintln!(
                     "object has wrong value. got={}, want{}",
@@ -724,7 +725,7 @@ mod tests {
         let ret: Vec<u8> = s.into_iter().flat_map(|instr| instr.0).collect();
         Instructions(ret)
     }
-    fn test_constants(expected: Vec<Box<dyn Any>>, actual: Vec<Object>) -> Result<(), String> {
+    fn test_constants(expected: Vec<Box<dyn Any>>, actual: Vec<ObjRef>) -> Result<(), String> {
         if expected.len() != actual.len() {
             return Err(format!(
                 "wrong number of constants. got={}, want={}",
@@ -742,7 +743,7 @@ mod tests {
                     return Err(format!("constant {} - test_string_object failed", i));
                 }
             } else if let Some(expected_constant) = constant.downcast_ref::<Vec<Instructions>>() {
-                if let Object::CompiledFunction(actual_fn) = &actual[i] {
+                if let Object::CompiledFunction(actual_fn) = &*actual[i] {
                     if let Err(err) =
                         test_instructions(expected_constant.to_vec(), &actual_fn.instructions)
                     {
