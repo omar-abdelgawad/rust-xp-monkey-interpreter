@@ -226,8 +226,7 @@ header h1 {
    ============================ */
 #code-editor {
     width: 100%;
-    flex: 1;
-    min-height: 380px;
+    height: 480px;
     padding: 16px;
     border: none;
     font-family: var(--font-mono);
@@ -255,8 +254,7 @@ header h1 {
    Output
    ============================ */
 .output-container {
-    flex: 1;
-    min-height: 380px;
+    height: 480px;
     padding: 16px;
     overflow-y: auto;
     background: var(--bg-output);
@@ -490,7 +488,7 @@ select option {
 
     #code-editor,
     .output-container {
-        min-height: 280px;
+        height: 350px;
     }
 
     .info-items {
