@@ -18,6 +18,9 @@ run-file FILE:
 bench ENGINE="vm":
   cargo run --release -q --bin benchmark -- --engine {{ENGINE}}
 
+flame:
+  cargo flamegraph --bin benchmark -- --engine v
+
 # records an interactive shells
 record:
   script -c "just run" run.log

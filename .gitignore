@@ -5,3 +5,5 @@ run.log
 # custom
 website/monkey_rs.js
 website/monkey_rs_bg.wasm
+flamegraph.svg
+perf.data

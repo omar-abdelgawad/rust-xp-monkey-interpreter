@@ -51,7 +51,7 @@ examples of TODOs in future:
 Download the repo:
 
 ```bash
-$ git clone https://github.com/omar-abdelgawad/rust-xp-monkey-interpreter.git monkey-rs
+$ git clone git@github.com:omar-abdelgawad/monkey-interpreter.git monkey-rs
 $ cd monkey-rs
 $ just run
 >> let people = [{"name": "Omar", "age": 22}, {"name": "Ahmed", "age": 44}];
@@ -68,7 +68,7 @@ null
 
 This project includes a web-based Monkey interpreter powered by WebAssembly! 
 
-- **Live Demo**: [GitHub Pages](https://your-username.github.io/rust-xp-monkey-interpreter)
+- **Live Demo**: [GitHub Pages](https://omar-abdelgawad.github.io/monkey-interpreter/)
 - **Local Testing**: Run `./build.sh` then open `website/index.html` in your browser
 
 See `website/README.md` for web interface details.
