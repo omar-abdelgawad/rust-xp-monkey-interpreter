@@ -3,12 +3,12 @@ use builtins::builtins;
 
 use crate::ast::{self, Expression, HashLiteral, IfExpression, Node, Statement, WhileExpression};
 use crate::object::environment::Environment;
+use crate::object::{false_obj, null_obj, true_obj};
 use crate::object::{
     native_bool_to_boolean_object, Array, Error, Function, HashObj, HashPair, Hashable,
     ObjectTrait, ObjectType, StringObj,
 };
 use crate::object::{Integer, ObjRef, Object};
-use crate::object::{false_obj, null_obj, true_obj, FALSE, NULL, TRUE};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -143,8 +143,8 @@ fn eval_prefix_expression(operator: &str, right: ObjRef) -> ObjRef {
 
 fn eval_bang_operator_expression(right: ObjRef) -> ObjRef {
     match &*right {
-        Object::Boolean(b) if b.value == true => false_obj(),
-        Object::Boolean(b) if b.value == false => true_obj(),
+        Object::Boolean(b) if b.value => false_obj(),
+        Object::Boolean(b) if !b.value => true_obj(),
         Object::Null(_) => true_obj(),
         // TODO: remove this false or make it panic?
         // this default means that all objects are "truthy"
@@ -280,8 +280,8 @@ fn eval_while_exp(ie: WhileExpression, env: Rc<RefCell<Environment>>) -> ObjRef 
 fn is_truthy(obj: ObjRef) -> bool {
     match &*obj {
         Object::Null(_) => false,
-        Object::Boolean(b) if b.value == true => true,
-        Object::Boolean(b) if b.value == false => false,
+        Object::Boolean(b) if b.value => true,
+        Object::Boolean(b) if !b.value => false,
         _ => true,
     }
 }
@@ -364,7 +364,7 @@ fn unwrap_return_value(obj: ObjRef) -> ObjRef {
 fn eval_index_expression(left: ObjRef, index: ObjRef) -> ObjRef {
     match (&*left, &*index) {
         (Object::Arr(arr), Object::Integer(ind)) => eval_array_index_expresssion(arr, ind),
-        (Object::Hash(hash_obj), _) => eval_hash_index_expression(&hash_obj, index.clone()),
+        (Object::Hash(hash_obj), _) => eval_hash_index_expression(hash_obj, index.clone()),
         (left, _) => new_error(format!("index operator not supported: {}", left.r#type())),
     }
 }
@@ -991,8 +991,8 @@ map(a, double);";
         expected.insert(Object::new_str_var("two").hash_key(), 2);
         expected.insert(Object::new_str_var("three").hash_key(), 3);
         expected.insert(Object::new_int_var(4).hash_key(), 4);
-        expected.insert(TRUE.hash_key(), 5);
-        expected.insert(FALSE.hash_key(), 6);
+        expected.insert(true_obj().hash_key(), 5);
+        expected.insert(false_obj().hash_key(), 6);
 
         assert_eq!(
             hash_obj.pairs.len(),

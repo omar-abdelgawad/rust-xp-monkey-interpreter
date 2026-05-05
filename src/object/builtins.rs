@@ -1,4 +1,4 @@
-use super::{null_obj, Array, BuiltinObj, Error, ObjRef, Object, ObjectTrait, ObjectType};
+use super::{null_obj, BuiltinObj, Error, ObjRef, Object, ObjectTrait, ObjectType};
 use std::rc::Rc;
 
 fn new_error(formt: String) -> ObjRef {

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{null_obj, ObjRef, Object};
+use super::{null_obj, ObjRef};
 use std::cell::RefCell;
 use std::rc::Rc;
 

@@ -3,7 +3,8 @@ use crate::compiler::Bytecode;
 use crate::object::builtins::BUILTINS;
 use crate::object::{
     false_obj, garbage_obj, native_bool_to_boolean_object, null_obj, true_obj, Array, BuiltinObj,
-    ClosureObj, CompiledFunctionObj, HashObj, HashPair, Hashable, Integer, IsHashable, ObjRef, Object, ObjectTrait,
+    ClosureObj, CompiledFunctionObj, HashObj, HashPair, Hashable, Integer, IsHashable, ObjRef,
+    Object, ObjectTrait,
 };
 use std::{collections::HashMap, rc::Rc};
 
@@ -28,9 +29,9 @@ impl Frame {
             bp: -1,
         }
     }
-    fn instructions_mut(&mut self) -> &mut Instructions {
-        &mut self.cl.comp_fn.instructions
-    }
+    //fn instructions_mut(&mut self) -> &mut Instructions {
+    //    &mut self.cl.comp_fn.instructions
+    //}
 
     fn instructions(&self) -> &Instructions {
         &self.cl.comp_fn.instructions
@@ -128,7 +129,11 @@ impl VM {
                 self.execute_binary_integer_operation(op, left_val.value, right_val.value)
             }
             (Object::String(left_val), Object::String(right_val)) => self
-                .execute_binary_string_operation(op, left_val.value.clone(), right_val.value.clone()),
+                .execute_binary_string_operation(
+                    op,
+                    left_val.value.clone(),
+                    right_val.value.clone(),
+                ),
             (Object::String(left_val), Object::Integer(right_val)) if op == Opcode::Add => {
                 let result = format!("{}{}", left_val.value, right_val.value);
                 self.push(Object::new_str_var(&result))
@@ -220,10 +225,10 @@ impl VM {
     fn execute_bang_operator(&mut self) -> Result<(), String> {
         let right = self.pop();
         match &*right {
-            Object::Boolean(b) if b.value == true => self.push(false_obj()),
-            Object::Boolean(b) if b.value == false => self.push(true_obj()),
+            Object::Boolean(b) if b.value => self.push(false_obj()),
+            Object::Boolean(b) if !b.value => self.push(true_obj()),
             Object::Null(_) => self.push(true_obj()), // negation of NULL is true now even though it is still truthy
-            _ => self.push(false_obj()),   // anything other than false is "truthy"
+            _ => self.push(false_obj()),              // anything other than false is "truthy"
         }
     }
 
@@ -1374,13 +1379,13 @@ let my_fn = fn() {
         }
     }
 }
-let global = 0;
+let global = 1;
 let a = 0; # doesn't matter
 let b = 0; # doesn't matter
 let c = 0; # doesn't matter
 my_fn()()()
 ",
-                Box::new(0_i64 + 66 + 77 + 88),
+                Box::new(1_i64 + 66 + 77 + 88),
             ),
             VmTestCase::new(
                 "
