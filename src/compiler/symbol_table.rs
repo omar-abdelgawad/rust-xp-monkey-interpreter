@@ -26,9 +26,9 @@ impl Symbol {
 }
 pub type SymbolTableRef = Rc<RefCell<SymbolTable>>;
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SymbolTable {
-    pub outer: Option<Rc<RefCell<SymbolTable>>>,
+    pub outer: Option<SymbolTableRef>,
 
     store: HashMap<String, Symbol>,
     pub num_definitions: usize,

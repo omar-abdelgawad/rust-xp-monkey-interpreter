@@ -809,8 +809,6 @@ mod tests {
                 Box::new(3i64),
             ),
         ];
-        //dbg!(std::mem::size_of::<Object>()); // 88 bytes
-        //dbg!(std::mem::size_of::<Rc<RefCell<Object>>>()); /8 bytes
         run_vm_tests(tests);
     }
 
