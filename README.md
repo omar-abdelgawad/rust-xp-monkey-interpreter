@@ -30,6 +30,8 @@ examples of TODOs in future:
 - [x] reduce cloning objects by making them Rc<Object>
 - [x] remove all clippy warnings.
 - [x] the wasm interactive stuff ofc (prob too much web work, maybe I can vibe code it)
+- [ ] I think there is still work to be done when using the stack. popping should just give up ownership not clone
+- [ ] make both engines (tree walking evaluator and VM) pluggable through an Engine Trait or a Type that is Generic
 - [ ] Add history for repl
 - [ ] how to have global mappings without a function at runtime?
 - [ ] reduce cloning as much as possible.
