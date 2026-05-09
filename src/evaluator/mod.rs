@@ -529,21 +529,17 @@ pub mod tests {
             true
         }
     }
-    // TODO: FIX copying later.
-    #[ignore = "this test should be fixed once we switch to using reference counting pointers"]
     #[test]
     fn test_object_identity() {
         let obj1 = native_bool_to_boolean_object(true);
         let obj2 = native_bool_to_boolean_object(true);
 
-        // Pointers will be different because `Object` is Copy, so we get new values each time.
-        let addr1 = &obj1 as *const _;
-        let addr2 = &obj2 as *const _;
-
-        println!("obj1 addr: {:p}", addr1);
-        println!("obj2 addr: {:p}", addr2);
-
-        assert_eq!(addr1, addr2, "Objects should have different addresses");
+        // Verify that both Rc pointers point to the exact same heap allocation
+        assert!(Rc::ptr_eq(&obj1, &obj2), "True objects should point to the same heap allocation");
+        
+        let null1 = null_obj();
+        let null2 = null_obj();
+        assert!(Rc::ptr_eq(&null1, &null2), "Null objects should point to the same heap allocation");
     }
     #[test]
     fn test_bang_operator() {

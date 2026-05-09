@@ -12,29 +12,34 @@ use std::rc::Rc;
 use crate::ast::{BlockStatement, Identifier};
 use crate::code::Instructions;
 
-//TODO: make all of the values below singletons with no copies
-// which should be done with static.
-pub const TRUE: Object = Object::Boolean(Boolean::new(true));
-pub const FALSE: Object = Object::Boolean(Boolean::new(false));
-pub const NULL: Object = Object::Null(Null::new());
-pub const GARBAGEVALOBJ: Object = TRUE;
+// `thread_local!` variables are initialized once per thread. If the VM ever
+// becomes strictly multi-threaded, each thread will have its own instance of the
+// singleton. However, this is perfectly fine since thread-local singletons still
+// preserve the identity comparison and single-allocation benefit within each
+// execution context.
+thread_local! {
+    pub static TRUE_OBJ: ObjRef = Rc::new(Object::Boolean(Boolean::new(true)));
+    pub static FALSE_OBJ: ObjRef = Rc::new(Object::Boolean(Boolean::new(false)));
+    pub static NULL_OBJ: ObjRef = Rc::new(Object::Null(Null::new()));
+    pub static GARBAGE_OBJ: ObjRef = Rc::new(Object::Boolean(Boolean::new(true)));
+}
 
 pub type ObjRef = Rc<Object>;
 
 pub fn true_obj() -> ObjRef {
-    Rc::new(TRUE)
+    TRUE_OBJ.with(|obj| obj.clone())
 }
 
 pub fn false_obj() -> ObjRef {
-    Rc::new(FALSE)
+    FALSE_OBJ.with(|obj| obj.clone())
 }
 
 pub fn null_obj() -> ObjRef {
-    Rc::new(NULL)
+    NULL_OBJ.with(|obj| obj.clone())
 }
 
 pub fn garbage_obj() -> ObjRef {
-    Rc::new(GARBAGEVALOBJ)
+    GARBAGE_OBJ.with(|obj| obj.clone())
 }
 
 type BuiltinFunction = fn(args: &[ObjRef]) -> ObjRef;
