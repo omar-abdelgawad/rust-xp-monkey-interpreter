@@ -1,14 +1,14 @@
-use crate::{
-    ast::{
-        ArrayLiteral, BlockStatement, Boolean, CallExpression, Expression, ExpressionStatement,
-        FunctionLiteral, HashLiteral, Identifier, IfExpression, IndexExpression, InfixExpression,
-        IntegerLiteral, LetStatement, PrefixExpression, Program, ReturnStatement, Statement,
-        StringLiteral, WhileExpression,
-    },
-    token::{Token, TokenType},
+use crate::ast::{
+    ArrayLiteral, BlockStatement, Boolean, CallExpression, Expression, ExpressionStatement,
+    FunctionLiteral, HashLiteral, Identifier, IfExpression, IndexExpression, InfixExpression,
+    IntegerLiteral, LetStatement, PrefixExpression, Program, ReturnStatement, Statement,
+    StringLiteral, WhileExpression,
 };
 mod lexer;
+mod token;
 use lexer::Lexer;
+use token::{Token, TokenType};
+
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
@@ -106,7 +106,7 @@ impl Parser {
     }
 
     fn parse_while_expression(&mut self) -> Option<Box<Expression>> {
-        let cur_token_tmp = self.cur_token.clone();
+        //let cur_token_tmp = self.cur_token.clone();
         if !self.expect_peek(TokenType::LPAREN) {
             return None;
         }
@@ -119,12 +119,12 @@ impl Parser {
             return None;
         }
         let loop_body = self.parse_block_statement();
-        let exp = WhileExpression::new(cur_token_tmp, cond_tmp, loop_body);
+        let exp = WhileExpression::new(cond_tmp, loop_body);
         Some(Box::new(Expression::While(exp)))
     }
 
     fn parse_hash_literal(&mut self) -> Option<Box<Expression>> {
-        let tmp_tok = self.cur_token.clone();
+        //let tmp_tok = self.cur_token.clone();
         let mut tmp_pairs = HashMap::new();
         while !self.peek_token_is(TokenType::RBRACE) {
             self.next_token();
@@ -142,14 +142,12 @@ impl Parser {
         if !self.expect_peek(TokenType::RBRACE) {
             return None;
         }
-        Some(Box::new(Expression::Hash(HashLiteral::new(
-            tmp_tok, tmp_pairs,
-        ))))
+        Some(Box::new(Expression::Hash(HashLiteral::new(tmp_pairs))))
     }
     fn parse_index_expression(&mut self, left: Box<Expression>) -> Option<Box<Expression>> {
-        let tmp_tok = self.cur_token.clone();
+        //let tmp_tok = self.cur_token.clone();
         self.next_token();
-        let exp = IndexExpression::new(tmp_tok, left, self.parse_expression(Precedence::Lowest)?);
+        let exp = IndexExpression::new(left, self.parse_expression(Precedence::Lowest)?);
         if !self.expect_peek(TokenType::RBRACKET) {
             return None;
         }
@@ -157,11 +155,9 @@ impl Parser {
     }
 
     fn parse_array_literal(&mut self) -> Option<Box<Expression>> {
-        let tmp_tok = self.cur_token.clone();
+        //let tmp_tok = self.cur_token.clone();
         let tmp_elems = self.parse_expression_list(TokenType::RBRACKET)?;
-        Some(Box::new(Expression::Arr(ArrayLiteral::new(
-            tmp_tok, tmp_elems,
-        ))))
+        Some(Box::new(Expression::Arr(ArrayLiteral::new(tmp_elems))))
     }
 
     fn parse_expression_list(&mut self, end: TokenType) -> Option<Vec<Expression>> {
@@ -185,13 +181,14 @@ impl Parser {
     }
 
     fn parse_string_literal(&mut self) -> Option<Box<Expression>> {
-        let str_lit = StringLiteral::new(self.cur_token.clone(), self.cur_token.literal.clone());
+        //let token_tmp = self.cur_token.clone();
+        let str_lit = StringLiteral::new(self.cur_token.literal.clone());
         let exp = Expression::Str(str_lit);
         Some(Box::new(exp))
     }
     fn parse_call_expression(&mut self, function: Box<Expression>) -> Option<Box<Expression>> {
-        let cur_token_tmp = self.cur_token.clone();
-        let exp = CallExpression::new(cur_token_tmp, function, self.parse_call_arguments()?);
+        //let cur_token_tmp = self.cur_token.clone();
+        let exp = CallExpression::new(function, self.parse_call_arguments()?);
         Some(Box::new(Expression::Call(exp)))
     }
     // remove this function and replace callsite with parse_expression_list but you need to change
@@ -215,7 +212,7 @@ impl Parser {
         Some(args)
     }
     fn parse_function_literal(&mut self) -> Option<Box<Expression>> {
-        let cur_token_tmp = self.cur_token.clone();
+        //let cur_token_tmp = self.cur_token.clone();
         if !self.expect_peek(TokenType::LPAREN) {
             return None;
         }
@@ -223,7 +220,7 @@ impl Parser {
         if !self.expect_peek(TokenType::LBRACE) {
             return None;
         }
-        let lit = FunctionLiteral::new(cur_token_tmp, param_tmp, self.parse_block_statement());
+        let lit = FunctionLiteral::new(param_tmp, self.parse_block_statement());
         Some(Box::new(Expression::Function(lit)))
     }
     fn parse_function_parameters(&mut self) -> Option<Vec<Identifier>> {
@@ -233,12 +230,14 @@ impl Parser {
             return Some(identifiers);
         }
         self.next_token();
-        let ident = Identifier::new(self.cur_token.clone(), self.cur_token.literal.clone());
+        //let cur_token_tmp = self.cur_token.clone();
+        let ident = Identifier::new(self.cur_token.literal.clone());
         identifiers.push(ident);
         while self.peek_token_is(TokenType::COMMA) {
             self.next_token();
             self.next_token();
-            let ident = Identifier::new(self.cur_token.clone(), self.cur_token.literal.clone());
+            //let self.cur_token_tmp = self.cur_token.clone();
+            let ident = Identifier::new(self.cur_token.literal.clone());
             identifiers.push(ident);
         }
         if !self.expect_peek(TokenType::RPAREN) {
@@ -247,7 +246,7 @@ impl Parser {
         Some(identifiers)
     }
     fn parse_if_expression(&mut self) -> Option<Box<Expression>> {
-        let cur_token_tmp = self.cur_token.clone();
+        //let cur_token_tmp = self.cur_token.clone();
         if !self.expect_peek(TokenType::LPAREN) {
             return None;
         }
@@ -268,11 +267,11 @@ impl Parser {
             }
             alt_tmp = Some(self.parse_block_statement());
         }
-        let exp = IfExpression::new(cur_token_tmp, cond_tmp, consq_tmp, alt_tmp);
+        let exp = IfExpression::new(cond_tmp, consq_tmp, alt_tmp);
         Some(Box::new(Expression::If(exp)))
     }
     fn parse_block_statement(&mut self) -> Box<BlockStatement> {
-        let cur_token_tmp = self.cur_token.clone();
+        //let cur_token_tmp = self.cur_token.clone();
         let mut stmts_tmp: Vec<Statement> = vec![];
         self.next_token();
         while !self.cur_token_is(TokenType::RBRACE) && !self.cur_token_is(TokenType::EOF) {
@@ -282,7 +281,7 @@ impl Parser {
             }
             self.next_token();
         }
-        let block = BlockStatement::new(cur_token_tmp, stmts_tmp);
+        let block = BlockStatement::new(stmts_tmp);
         Box::new(block)
     }
     fn parse_grouped_expression(&mut self) -> Option<Box<Expression>> {
@@ -294,47 +293,36 @@ impl Parser {
         exp
     }
     fn parse_boolean(&mut self) -> Option<Box<Expression>> {
-        let exp = Boolean::new(self.cur_token.clone(), self.cur_token_is(TokenType::TRUE));
+        //let cur_token_tmp = self.cur_token.clone();
+        let exp = Boolean::new(self.cur_token_is(TokenType::TRUE));
         Some(Box::new(Expression::Boolean(exp)))
     }
     fn parse_infix_expression(&mut self, left: Box<Expression>) -> Option<Box<Expression>> {
-        let cur_token_tmp = self.cur_token.clone();
+        //let cur_token_tmp = self.cur_token.clone();
         let operator_tmp = self.cur_token.literal.clone();
         let precedence = self.cur_precedence();
         self.next_token();
-        let exp = InfixExpression::new(
-            cur_token_tmp,
-            left,
-            operator_tmp,
-            self.parse_expression(precedence)?,
-        );
+        let exp = InfixExpression::new(left, operator_tmp, self.parse_expression(precedence)?);
         Some(Box::new(Expression::Infix(exp)))
     }
     fn parse_prefix_expression(&mut self) -> Option<Box<Expression>> {
-        let cur_token_tmp = self.cur_token.clone();
+        //let cur_token_tmp = self.cur_token.clone();
         let operator_tmp = self.cur_token.literal.clone();
         self.next_token();
-        let exp = PrefixExpression::new(
-            cur_token_tmp,
-            operator_tmp,
-            self.parse_expression(Precedence::Prefix)?,
-        );
+        let exp = PrefixExpression::new(operator_tmp, self.parse_expression(Precedence::Prefix)?);
         Some(Box::new(Expression::Prefix(exp)))
     }
     fn parse_identifier(&mut self) -> Option<Box<Expression>> {
+        //let cur_token_tmp = self.cur_token.clone();
         Some(Box::new(Expression::Identifier(Identifier::new(
-            self.cur_token.clone(),
             self.cur_token.literal.clone(),
         ))))
     }
     fn parse_integer_literal(&mut self) -> Option<Box<Expression>> {
-        let cur_token_tmp = self.cur_token.clone();
+        //let cur_token_tmp = self.cur_token.clone();
         let value = self.cur_token.literal.parse::<i64>();
         if let Ok(value) = value {
-            Some(Box::new(Expression::Integer(IntegerLiteral::new(
-                cur_token_tmp,
-                value,
-            ))))
+            Some(Box::new(Expression::Integer(IntegerLiteral::new(value))))
         } else {
             None
         }
@@ -365,9 +353,8 @@ impl Parser {
         None
     }
     fn parse_expression_statement(&mut self) -> Option<Box<Statement>> {
-        let cur_token_tmp = self.cur_token.clone();
-        let stmt =
-            ExpressionStatement::new(cur_token_tmp, self.parse_expression(Precedence::Lowest)?);
+        //let cur_token_tmp = self.cur_token.clone();
+        let stmt = ExpressionStatement::new(self.parse_expression(Precedence::Lowest)?);
         // check for optional SEMICOLON
         if self.peek_token_is(TokenType::SEMICOLON) {
             self.next_token();
@@ -403,30 +390,27 @@ impl Parser {
             .push(format!("no prefix parse function for {:?} found", t));
     }
     fn parse_return_statement(&mut self) -> Option<Box<Statement>> {
-        let cur_token_tmp = self.cur_token.clone();
+        //let cur_token_tmp = self.cur_token.clone();
         self.next_token();
         let ret_val_tmp = self.parse_expression(Precedence::Lowest)?;
         if self.peek_token_is(TokenType::SEMICOLON) {
             self.next_token();
         }
-        let stmt = ReturnStatement::new(cur_token_tmp, ret_val_tmp);
+        let stmt = ReturnStatement::new(ret_val_tmp);
         Some(Box::new(Statement::Return(stmt)))
     }
     fn parse_let_statement(&mut self) -> Option<Box<Statement>> {
-        let cur_token_tmp = self.cur_token.clone();
+        //let cur_token_tmp = self.cur_token.clone();
         if !self.expect_peek(TokenType::IDENT) {
             return None;
         }
-        let name_tmp = Identifier::new(self.cur_token.clone(), self.cur_token.literal.clone());
+        //let cur_token_ident_tmp = self.cur_token.clone();
+        let name_tmp = Identifier::new(self.cur_token.literal.clone());
         if !self.expect_peek(TokenType::ASSIGN) {
             return None;
         }
         self.next_token();
-        let mut stmt = LetStatement::new(
-            cur_token_tmp,
-            name_tmp,
-            self.parse_expression(Precedence::Lowest)?,
-        );
+        let mut stmt = LetStatement::new(name_tmp, self.parse_expression(Precedence::Lowest)?);
         // Added for recursive functions
         if let Expression::Function(ref mut fn_lit) = &mut *stmt.value {
             fn_lit.name = stmt.name.value.clone();
@@ -523,14 +507,6 @@ mod test {
     }
 
     fn test_let_statement(stmt: &Statement, name: &str) -> bool {
-        if stmt.token_literal() != "let" {
-            eprintln!(
-                "stmt.token_literal() not 'let'. got='{}'",
-                stmt.token_literal()
-            );
-            return false;
-        }
-
         let Statement::Let(let_stmt) = stmt else {
             eprintln!("stmt is not a LetStatement. got={:?}", stmt);
             return false;
@@ -545,11 +521,10 @@ mod test {
             return false;
         }
 
-        if let_stmt.name_token_literal() != name {
+        if let_stmt.name.value != name {
             eprintln!(
                 "let_stmt.name.token_literal() not '{}'. got='{}'",
-                name,
-                let_stmt.name_token_literal()
+                name, let_stmt.name.value
             );
             return false;
         }
@@ -587,12 +562,6 @@ mod test {
             let Statement::Return(ret_stmt) = stmt else {
                 panic!("stmt not ReturnStatement. got={:?}", stmt);
             };
-            assert_eq!(
-                ret_stmt.token_literal(),
-                "return",
-                "ret_stmt.token_literal() not 'return', got={:?}",
-                ret_stmt.token_literal()
-            );
             if !test_literal_expression(&ret_stmt.return_value, expected_val) {
                 panic!()
             }
@@ -655,13 +624,14 @@ mod test {
             "literal.value not {}. got={:?}",
             5, literal.value
         );
-        assert_eq!(
-            literal.token_literal(),
-            "5",
-            "literal.token_literal() not {}. got={}",
-            "5",
-            literal.token_literal()
-        );
+        // TODO: this test shouldn't be removed since the ast should contain a string not an i64
+        //assert_eq!(
+        //    literal.token_literal(),
+        //    "5",
+        //    "literal.token_literal() not {}. got={}",
+        //    "5",
+        //    literal.token_literal()
+        //);
     }
 
     #[test]
@@ -690,13 +660,14 @@ mod test {
             "literal.value not {}. got={:?}",
             true, literal.value
         );
-        assert_eq!(
-            literal.token_literal(),
-            "true",
-            "literal.token_literal() not {}. got={}",
-            "true",
-            literal.token_literal()
-        );
+        // TODO: this test might need to come back, idk.
+        //assert_eq!(
+        //    literal.token_literal(),
+        //    "true",
+        //    "literal.token_literal() not {}. got={}",
+        //    "true",
+        //    literal.token_literal()
+        //);
     }
     #[test]
     fn test_parsing_prefix_expressions() {
@@ -746,14 +717,6 @@ mod test {
         };
         if integ.value != value {
             eprintln!("integ.value not {}. got={}", value, integ.value);
-            return false;
-        }
-        if integ.token_literal() != format!("{}", value) {
-            eprintln!(
-                "integ.token_literal() not {}. got={}",
-                value,
-                integ.token_literal()
-            );
             return false;
         }
         true
@@ -873,14 +836,6 @@ mod test {
             eprintln!("ident.value not {}. got={}", value, ident.value);
             return false;
         }
-        if ident.token_literal() != value {
-            eprintln!(
-                "ident.token_literal() not {}. got={}",
-                value,
-                ident.token_literal()
-            );
-            return false;
-        }
         true
     }
     fn test_literal_expression(exp: &Expression, expected: &dyn Any) -> bool {
@@ -900,18 +855,23 @@ mod test {
         false
     }
     fn test_boolean_literal(exp: &Expression, value: bool) -> bool {
-        let Expression::Boolean(bool_exp) = exp else {
+        let Expression::Boolean(boolean) = exp else {
             eprintln!("exp not ast::Boolean. got={}", exp);
             return false;
         };
-        if bool_exp.token_literal() != format!("{}", value) {
-            eprintln!(
-                "integ.token_literal() not {}. got={}",
-                value,
-                bool_exp.token_literal()
-            );
+
+        if boolean.value != value {
+            eprintln!("boolean.value not {}. got={}", value, boolean.value);
             return false;
         }
+        //if bool_exp.token_literal() != format!("{}", value) {
+        //    eprintln!(
+        //        "integ.token_literal() not {}. got={}",
+        //        value,
+        //        bool_exp.token_literal()
+        //    );
+        //    return false;
+        //}
         true
     }
     fn test_infix_expression(

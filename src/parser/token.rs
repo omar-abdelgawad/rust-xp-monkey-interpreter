@@ -1,6 +1,6 @@
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Default)]
-pub enum TokenType {
+pub(super) enum TokenType {
     ILLEGAL,
     #[default]
     EOF,
@@ -45,7 +45,7 @@ pub enum TokenType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct Token {
+pub(super) struct Token {
     pub ttype: TokenType,
     pub literal: String,
 }

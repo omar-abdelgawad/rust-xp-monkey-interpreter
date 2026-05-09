@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::token::{Token, TokenType};
+use super::token::{Token, TokenType};
 
 pub(super) struct Lexer {
     input: String,
@@ -184,7 +184,6 @@ fn is_letter(ch: u8) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*; // <- cleaner, imports Token and TokenType
-    use crate::token::Token;
 
     #[test]
     fn test_next_token() {

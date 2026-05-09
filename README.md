@@ -30,10 +30,11 @@ examples of TODOs in future:
 - [x] reduce cloning objects by making them Rc<Object>
 - [x] remove all clippy warnings.
 - [x] the wasm interactive stuff ofc (prob too much web work, maybe I can vibe code it)
-- [ ] I think there is still work to be done when using the stack. popping should just give up ownership not clone
+- [x] Remove the token field from the AST structs and fix the corresponding tests.
 - [ ] make both engines (tree walking evaluator and VM) pluggable through an Engine Trait or a Type that is Generic
+- [ ] I think there is still work to be done when using the stack. popping should just give up ownership not clone
 - [ ] Add history for repl
-- [ ] how to have global mappings without a function at runtime?
+- [ ] how to have global mappings without a function at runtime? LazyLock?
 - [ ] reduce cloning as much as possible.
 - [ ] refactor the stack into standalone struct
 - [ ] add more monkey code examples like map
@@ -42,11 +43,10 @@ examples of TODOs in future:
 - [ ] Refactor objects into single files and maybe implement Into<Object> trait for ergonomic use later.
 - [ ] Add a halt instruction and exit builtin?
 - [ ] Use enumKind or Write your own macros for repetitive blocks.
-- [ ] I don't like the token field but removing it will break many tests unfortunately.
 - [ ] Empty code blocks should return NULL like python.
 - [ ] make an assembler?
-- [ ] Also clean up the wasm module its currently really bad because it was mainly ai-generated
-- [ ] trust me when I say there is much more stuff to do but I forgot.
+- [ ] clean up the wasm module as it was mainly ai-generated
+- [ ] there is probably much more stuff to do but I forgot.
 
 ## 🚀 Getting Started
 

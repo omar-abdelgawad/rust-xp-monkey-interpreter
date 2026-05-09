@@ -1,4 +1,3 @@
-use crate::token::Token;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -96,46 +95,6 @@ impl Display for Expression {
         }
     }
 }
-impl Node {
-    pub fn token_literal(&self) -> String {
-        match self {
-            Node::Statement(stmt) => stmt.token_literal(),
-            Node::Expression(expr) => expr.token_literal(),
-            Node::Program(expr) => expr.token_literal(),
-        }
-    }
-}
-
-impl Statement {
-    pub fn token_literal(&self) -> String {
-        match self {
-            Statement::Let(s) => s.token_literal(),
-            Statement::Return(s) => s.token_literal(),
-            Statement::Expression(s) => s.token_literal(),
-            Statement::Block(s) => s.token_literal(),
-        }
-    }
-}
-
-impl Expression {
-    pub fn token_literal(&self) -> String {
-        match self {
-            Expression::Identifier(e) => e.token_literal(),
-            Expression::Boolean(e) => e.token_literal(),
-            Expression::Integer(e) => e.token_literal(),
-            Expression::Prefix(e) => e.token_literal(),
-            Expression::Infix(e) => e.token_literal(),
-            Expression::If(e) => e.token_literal(),
-            Expression::Function(e) => e.token_literal(),
-            Expression::Call(e) => e.token_literal(),
-            Expression::Str(e) => e.token_literal(),
-            Expression::Arr(e) => e.token_literal(),
-            Expression::Ind(e) => e.token_literal(),
-            Expression::Hash(e) => e.token_literal(),
-            Expression::While(e) => e.token_literal(),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct Program {
@@ -153,62 +112,37 @@ impl Program {
     pub fn new(statements: Vec<Statement>) -> Self {
         Program { statements }
     }
-    pub fn token_literal(&self) -> String {
-        if !self.statements.is_empty() {
-            self.statements[0].token_literal()
-        } else {
-            "".to_string()
-        }
-    }
 }
+
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct LetStatement {
-    token: Token, // the token.let token
     pub name: Identifier,
     pub value: Box<Expression>,
 }
 impl LetStatement {
-    pub fn new(token: Token, name: Identifier, value: Box<Expression>) -> Self {
-        LetStatement { token, name, value }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
+    pub fn new(name: Identifier, value: Box<Expression>) -> Self {
+        LetStatement { name, value }
     }
     pub fn name_value(&self) -> String {
         self.name.value.clone()
-    }
-    #[cfg(test)]
-    pub fn name_token_literal(&self) -> String {
-        self.name.token_literal()
     }
 }
 impl Display for LetStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // e.g., "let var_name = val;"
-        write!(
-            f,
-            "{} {} = {};",
-            self.token_literal(),
-            self.name,
-            self.value
-        )
+        write!(f, "let {} = {};", self.name, self.value)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Identifier {
-    token: Token, // the token.IDENT token
     pub value: String,
 }
 impl Identifier {
-    pub fn new(token: Token, value: impl Into<String>) -> Self {
+    pub fn new(value: impl Into<String>) -> Self {
         Identifier {
-            token,
             value: value.into(),
         }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
     }
 }
 
@@ -219,18 +153,14 @@ impl Display for Identifier {
 }
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct Boolean {
-    token: Token,
-    pub value: bool,
+    pub value: bool, // TODO: integer literals should store the str representation but does that
+                     // apply here as well?
 }
 impl Boolean {
-    pub fn new(token: Token, value: impl Into<bool>) -> Self {
+    pub fn new(value: impl Into<bool>) -> Self {
         Boolean {
-            token,
             value: value.into(),
         }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
     }
 }
 impl Display for Boolean {
@@ -240,36 +170,26 @@ impl Display for Boolean {
 }
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct ReturnStatement {
-    token: Token, // the 'return' token
     pub return_value: Box<Expression>,
 }
 impl ReturnStatement {
-    pub fn new(token: Token, return_value: Box<Expression>) -> Self {
-        ReturnStatement {
-            token,
-            return_value,
-        }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
+    pub fn new(return_value: Box<Expression>) -> Self {
+        ReturnStatement { return_value }
     }
 }
 impl Display for ReturnStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {};", self.token_literal(), self.return_value)
+        write!(f, "return {};", self.return_value)
     }
 }
+
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct ExpressionStatement {
-    token: Token, // the first token of the Expression
     pub expression: Box<Expression>,
 }
 impl ExpressionStatement {
-    pub fn new(token: Token, expression: Box<Expression>) -> Self {
-        ExpressionStatement { token, expression }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
+    pub fn new(expression: Box<Expression>) -> Self {
+        ExpressionStatement { expression }
     }
 }
 impl Display for ExpressionStatement {
@@ -279,38 +199,29 @@ impl Display for ExpressionStatement {
 }
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct IntegerLiteral {
-    pub token: Token,
-    pub value: i64,
+    pub value: i64, // should probably store the string itself and evaluate it later
 }
 impl IntegerLiteral {
-    pub fn new(token: Token, value: i64) -> Self {
-        IntegerLiteral { token, value }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
+    pub fn new(value: i64) -> Self {
+        IntegerLiteral { value }
     }
 }
 impl Display for IntegerLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.token.literal)
+        write!(f, "{}", self.value)
     }
 }
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct PrefixExpression {
-    pub token: Token, // the prefix token
     pub operator: String,
     pub right: Box<Expression>,
 }
 impl PrefixExpression {
-    pub fn new(token: Token, operator: impl Into<String>, right: Box<Expression>) -> Self {
+    pub fn new(operator: impl Into<String>, right: Box<Expression>) -> Self {
         PrefixExpression {
-            token,
             operator: operator.into(),
             right,
         }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
     }
 }
 impl Display for PrefixExpression {
@@ -320,27 +231,17 @@ impl Display for PrefixExpression {
 }
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct InfixExpression {
-    token: Token, // the operator token
     pub left: Box<Expression>,
     pub operator: String,
     pub right: Box<Expression>,
 }
 impl InfixExpression {
-    pub fn new(
-        token: Token,
-        left: Box<Expression>,
-        operator: impl Into<String>,
-        right: Box<Expression>,
-    ) -> Self {
+    pub fn new(left: Box<Expression>, operator: impl Into<String>, right: Box<Expression>) -> Self {
         InfixExpression {
-            token,
             left,
             operator: operator.into(),
             right,
         }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
     }
 }
 impl Display for InfixExpression {
@@ -350,27 +251,21 @@ impl Display for InfixExpression {
 }
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct IfExpression {
-    token: Token, // the 'if' token
     pub condition: Box<Expression>,
     pub consequence: Box<BlockStatement>,
     pub alternative: Option<Box<BlockStatement>>,
 }
 impl IfExpression {
     pub fn new(
-        token: Token,
         condition: Box<Expression>,
         consequence: Box<BlockStatement>,
         alternative: Option<Box<BlockStatement>>,
     ) -> Self {
         Self {
-            token,
             condition,
             consequence,
             alternative,
         }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
     }
 }
 impl Display for IfExpression {
@@ -384,16 +279,12 @@ impl Display for IfExpression {
 }
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct BlockStatement {
-    token: Token, // the { token
     pub statements: Vec<Statement>,
 }
 
 impl BlockStatement {
-    pub fn new(token: Token, statements: Vec<Statement>) -> Self {
-        BlockStatement { token, statements }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
+    pub fn new(statements: Vec<Statement>) -> Self {
+        BlockStatement { statements }
     }
 }
 impl Display for BlockStatement {
@@ -407,28 +298,23 @@ impl Display for BlockStatement {
 
 #[derive(Debug, PartialEq, Clone, Eq)]
 pub struct FunctionLiteral {
-    token: Token, // the 'fn' token
     pub parameters: Vec<Identifier>,
     pub body: Box<BlockStatement>,
     pub name: String,
 }
 impl FunctionLiteral {
-    pub fn new(token: Token, parameters: Vec<Identifier>, body: Box<BlockStatement>) -> Self {
+    pub fn new(parameters: Vec<Identifier>, body: Box<BlockStatement>) -> Self {
         Self {
-            token,
             parameters,
             body,
             name: "".to_string(),
         }
     }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
-    }
 }
 impl Display for FunctionLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let params: Vec<String> = self.parameters.iter().map(|p| p.to_string()).collect();
-        write!(f, "{}", self.token.literal)?;
+        write!(f, "fn")?;
         if !self.name.is_empty() {
             write!(f, "<{}>", self.name)?;
         }
@@ -439,20 +325,15 @@ impl Display for FunctionLiteral {
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct CallExpression {
-    token: Token, // the '(' token
     pub function: Box<Expression>,
     pub arguments: Vec<Expression>,
 }
 impl CallExpression {
-    pub fn new(token: Token, function: Box<Expression>, arguments: Vec<Expression>) -> Self {
+    pub fn new(function: Box<Expression>, arguments: Vec<Expression>) -> Self {
         Self {
-            token,
             function,
             arguments,
         }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
     }
 }
 impl Display for CallExpression {
@@ -464,18 +345,13 @@ impl Display for CallExpression {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StringLiteral {
-    token: Token,
     pub value: String,
 }
 impl StringLiteral {
-    pub fn new(token: Token, value: impl Into<String>) -> Self {
+    pub fn new(value: impl Into<String>) -> Self {
         Self {
-            token,
             value: value.into(),
         }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
     }
 }
 
@@ -487,15 +363,11 @@ impl Display for StringLiteral {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArrayLiteral {
-    token: Token, // the [ token
     pub elements: Vec<Expression>,
 }
 impl ArrayLiteral {
-    pub fn new(token: Token, elements: Vec<Expression>) -> Self {
-        Self { token, elements }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
+    pub fn new(elements: Vec<Expression>) -> Self {
+        Self { elements }
     }
 }
 
@@ -508,16 +380,12 @@ impl Display for ArrayLiteral {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IndexExpression {
-    token: Token, // the [ token
     pub left: Box<Expression>,
     pub index: Box<Expression>,
 }
 impl IndexExpression {
-    pub fn new(token: Token, left: Box<Expression>, index: Box<Expression>) -> Self {
-        Self { token, left, index }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
+    pub fn new(left: Box<Expression>, index: Box<Expression>) -> Self {
+        Self { left, index }
     }
 }
 
@@ -529,16 +397,12 @@ impl Display for IndexExpression {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HashLiteral {
-    token: Token, // the { token
     pub pairs: HashMap<Expression, Expression>,
 }
 
 impl HashLiteral {
-    pub fn new(token: Token, pairs: HashMap<Expression, Expression>) -> Self {
-        Self { token, pairs }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
+    pub fn new(pairs: HashMap<Expression, Expression>) -> Self {
+        Self { pairs }
     }
 }
 
@@ -555,20 +419,15 @@ impl Display for HashLiteral {
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct WhileExpression {
-    token: Token, // the 'while' token
     pub condition: Box<Expression>,
     pub loop_body: Box<BlockStatement>,
 }
 impl WhileExpression {
-    pub fn new(token: Token, condition: Box<Expression>, loop_body: Box<BlockStatement>) -> Self {
+    pub fn new(condition: Box<Expression>, loop_body: Box<BlockStatement>) -> Self {
         Self {
-            token,
             condition,
             loop_body,
         }
-    }
-    pub fn token_literal(&self) -> String {
-        self.token.literal.clone()
     }
 }
 impl Display for WhileExpression {
@@ -581,17 +440,12 @@ impl Display for WhileExpression {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::token::TokenType;
     #[test]
     fn test_string() {
         let program = Program {
             statements: vec![Statement::Let(LetStatement {
-                token: Token::new(TokenType::LET, "let"),
-                name: Identifier::new(Token::new(TokenType::IDENT, "myVar"), "myVar"),
-                value: Box::new(Expression::Identifier(Identifier::new(
-                    Token::new(TokenType::IDENT, "anotherVar"),
-                    "anotherVar",
-                ))),
+                name: Identifier::new("myVar"),
+                value: Box::new(Expression::Identifier(Identifier::new("anotherVar"))),
             })],
         };
         let prog_str = format!("{}", program);
