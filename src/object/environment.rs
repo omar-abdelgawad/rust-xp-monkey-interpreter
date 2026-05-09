@@ -26,9 +26,6 @@ impl Environment {
         }
     }
     pub fn get(&self, name: &str) -> Option<ObjRef> {
-        // TODO: cloned should be removed
-        // and eval() should return Option<&Object>
-        // since the actual values are owned by the env
         let mut obj = self.store.get(name).cloned();
         if obj.is_none() {
             if let Some(outer_env) = &self.outer {

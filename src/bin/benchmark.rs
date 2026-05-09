@@ -3,11 +3,11 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use clap::Parser;
-use monkey_rs::ast::Node;
+use monkey_rs::ast::{Node, Program};
 use monkey_rs::compiler::Compiler;
 use monkey_rs::evaluator::eval;
 use monkey_rs::object::environment::Environment;
-use monkey_rs::object::ObjectTrait;
+use monkey_rs::object::{ObjRef, ObjectTrait};
 use monkey_rs::parser::Parser as MonkeyParser;
 use monkey_rs::vm::VM;
 
@@ -31,39 +31,17 @@ fn main() {
     let program = MonkeyParser::parse(input.to_string());
 
     println!("Finished parsing!");
-    let (result, duration) = match cli.engine {
-        Engine::Vm => {
-            let mut compiler = Compiler::new();
-            if let Err(err) = compiler.compile(Node::Program(program)) {
-                eprintln!("compiler error: {}", err);
-                return;
-            }
+    let engine: &mut dyn InterpreterEngine = match cli.engine {
+        Engine::Vm => &mut VMEngine::new(),
+        Engine::Eval => &mut TreeWalkingEngine::new(),
+    };
+    let (result, duration) = {
+        println!("Started time!");
+        let start = Instant::now();
+        let result = engine.evaluate_program(program);
+        let duration = start.elapsed();
 
-            let bytecode = compiler.bytecode();
-            let mut machine = VM::new(bytecode);
-
-            println!("Started time after compiling!");
-            let start = Instant::now();
-            if let Err(err) = machine.run() {
-                eprintln!("vm error: {}", err);
-                return;
-            }
-            let duration = start.elapsed();
-
-            let result = machine.last_popped_stack_elem();
-            (result, duration)
-        }
-
-        Engine::Eval => {
-            let env = Rc::new(RefCell::new(Environment::new()));
-
-            println!("Started time!");
-            let start = Instant::now();
-            let result = eval(Node::Program(program), env);
-            let duration = start.elapsed();
-
-            (result, duration)
-        }
+        (result, duration)
     };
 
     println!(
@@ -85,4 +63,50 @@ struct Cli {
 enum Engine {
     Vm,
     Eval,
+}
+trait InterpreterEngine {
+    fn evaluate_program(&mut self, program: Program) -> ObjRef;
+}
+struct VMEngine {
+    compiler: Compiler,
+    //vm: VM,
+}
+impl VMEngine {
+    fn new() -> Self {
+        Self {
+            compiler: Compiler::new(),
+        }
+    }
+}
+impl InterpreterEngine for VMEngine {
+    fn evaluate_program(&mut self, program: Program) -> ObjRef {
+        if let Err(err) = self.compiler.compile(Node::Program(program)) {
+            panic!("compiler error: {}", err);
+        }
+
+        let bytecode = self.compiler.bytecode();
+        let mut machine = VM::new(bytecode);
+
+        if let Err(err) = machine.run() {
+            panic!("vm error: {}", err);
+        }
+
+        machine.last_popped_stack_elem()
+    }
+}
+struct TreeWalkingEngine {
+    env: Rc<RefCell<Environment>>,
+}
+impl TreeWalkingEngine {
+    fn new() -> Self {
+        Self {
+            env: Rc::new(RefCell::new(Environment::new())),
+        }
+    }
+}
+
+impl InterpreterEngine for TreeWalkingEngine {
+    fn evaluate_program(&mut self, program: Program) -> ObjRef {
+        eval(Node::Program(program), self.env.clone())
+    }
 }

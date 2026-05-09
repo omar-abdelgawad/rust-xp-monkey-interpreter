@@ -31,8 +31,8 @@ examples of TODOs in future:
 - [x] remove all clippy warnings.
 - [x] the wasm interactive stuff ofc (prob too much web work, maybe I can vibe code it)
 - [x] Remove the token field from the AST structs and fix the corresponding tests.
-- [ ] make both engines (tree walking evaluator and VM) pluggable through an Engine Trait or a Type that is Generic
-- [ ] I think there is still work to be done when using the stack. popping should just give up ownership not clone
+- [x] make both engines (tree walking evaluator and VM) pluggable through an Engine Trait or a Type that is Generic
+- [ ] I think there is still work to be done when using the stack. popping should just give up ownership not clone Rc
 - [ ] Add history for repl
 - [ ] how to have global mappings without a function at runtime? LazyLock?
 - [ ] reduce cloning as much as possible.
