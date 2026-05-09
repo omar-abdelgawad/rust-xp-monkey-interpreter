@@ -206,6 +206,9 @@ impl Compiler {
                     // keep the last evaluated expression because if itself is an expression
                     if self.last_instruction_is(Opcode::Pop) {
                         self.remove_last_pop();
+                    } else {
+                        // if block always leaves a value on the stack.
+                        self.emit(Opcode::Null, &[]);
                     }
                     let jump_pos = self.emit(Opcode::Jump, &[9999]);
                     let after_consequence_pos = self.current_instructions().len();
@@ -221,6 +224,9 @@ impl Compiler {
                             self.compile(Node::Statement(St::Block(*alt_exp)))?;
                             if self.last_instruction_is(Opcode::Pop) {
                                 self.remove_last_pop();
+                            } else {
+                                // if block always leaves a value on the stack.
+                                self.emit(Opcode::Null, &[]);
                             }
                         }
                     };
@@ -809,28 +815,18 @@ mod tests {
         run_compiler_tests(tests);
     }
 
-    // TODO: fix this later (handle empty if consequence blocks)
-    // HARD FIX: just added fix as well to look at it when rg ing
-    #[ignore = "idk maybe I should look at this soon"]
     #[test]
-    fn test_custom_empty_block_returns_null() {
-        // also what about "if (true) {}"
+    fn test_if_expression_block_permutations() {
         let tests = vec![
             CompilerTestCase::new(
                 "if (false) { 10 } else { };",
                 vec![Box::new(10i64)],
                 vec![
-                    // 0000 1 byte
                     Instructions::new(make(Op::False, &[])),
-                    // 0001 3 bytes
                     Instructions::new(make(Op::JumpNotTruthy, &[10])),
-                    // 0004 3 bytes
                     Instructions::new(make(Op::Constant, &[0])),
-                    // 0007 3 bytes
                     Instructions::new(make(Op::Jump, &[11])),
-                    // 0010 1 bytes
                     Instructions::new(make(Op::Null, &[])),
-                    // 0011 1 byte
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),
@@ -838,17 +834,53 @@ mod tests {
                 "if (false) {}",
                 vec![],
                 vec![
-                    // 0000 1 byte
                     Instructions::new(make(Op::False, &[])),
-                    // 0001 3 bytes
                     Instructions::new(make(Op::JumpNotTruthy, &[8])),
-                    // 0004 1 bytes
                     Instructions::new(make(Op::Null, &[])),
-                    // 0005 3 bytes
                     Instructions::new(make(Op::Jump, &[9])),
-                    // 0008 1 bytes
                     Instructions::new(make(Op::Null, &[])),
-                    // 0009 1 byte
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "if (false) {} else { 10 };",
+                vec![Box::new(10i64)],
+                vec![
+                    Instructions::new(make(Op::False, &[])),
+                    Instructions::new(make(Op::JumpNotTruthy, &[8])),
+                    Instructions::new(make(Op::Null, &[])),
+                    Instructions::new(make(Op::Jump, &[11])),
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "if (false) { let a = 1; } else { let b = 2; };",
+                vec![Box::new(1i64), Box::new(2i64)],
+                vec![
+                    Instructions::new(make(Op::False, &[])),
+                    Instructions::new(make(Op::JumpNotTruthy, &[14])),
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::SetGlobal, &[0])),
+                    Instructions::new(make(Op::Null, &[])),
+                    Instructions::new(make(Op::Jump, &[21])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::SetGlobal, &[1])),
+                    Instructions::new(make(Op::Null, &[])),
+                    Instructions::new(make(Op::Pop, &[])),
+                ],
+            ),
+            CompilerTestCase::new(
+                "if (false) { 10 } else { let a = 1; };",
+                vec![Box::new(10i64), Box::new(1i64)],
+                vec![
+                    Instructions::new(make(Op::False, &[])),
+                    Instructions::new(make(Op::JumpNotTruthy, &[10])),
+                    Instructions::new(make(Op::Constant, &[0])),
+                    Instructions::new(make(Op::Jump, &[17])),
+                    Instructions::new(make(Op::Constant, &[1])),
+                    Instructions::new(make(Op::SetGlobal, &[0])),
+                    Instructions::new(make(Op::Null, &[])),
                     Instructions::new(make(Op::Pop, &[])),
                 ],
             ),

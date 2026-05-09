@@ -798,6 +798,21 @@ mod tests {
                 "if ((if (false) { 10 })) { 10 } else { 20 }",
                 Box::new(20i64),
             ),
+            // empty block tests
+            VmTestCase::new("if (true) {}", Box::new(Null)),
+            VmTestCase::new("if (false) {}", Box::new(Null)),
+            VmTestCase::new("if (true) {} else { 20 }", Box::new(Null)),
+            VmTestCase::new("if (false) {} else { 20 }", Box::new(20i64)),
+            VmTestCase::new("if (true) { 10 } else {}", Box::new(10i64)),
+            VmTestCase::new("if (false) { 10 } else {}", Box::new(Null)),
+            // Let statement in block tests
+            VmTestCase::new("if (true) { let a = 1; }", Box::new(Null)),
+            VmTestCase::new("if (true) { let a = 1; } else { let b = 2; }", Box::new(Null)),
+            VmTestCase::new("if (false) { let a = 1; } else { let b = 2; }", Box::new(Null)),
+            VmTestCase::new("if (true) { 10 } else { let b = 2; }", Box::new(10i64)),
+            VmTestCase::new("if (false) { 10 } else { let b = 2; }", Box::new(Null)),
+            VmTestCase::new("if (true) { let a = 1; } else { 20 }", Box::new(Null)),
+            VmTestCase::new("if (false) { let a = 1; } else { 20 }", Box::new(20i64)),
         ];
         run_vm_tests(tests);
     }
