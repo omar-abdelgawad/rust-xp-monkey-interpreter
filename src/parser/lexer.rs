@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::token::{Token, TokenType};
 
-pub struct Lexer {
+pub(super) struct Lexer {
     input: String,
     position: i32,
     read_position: i32,

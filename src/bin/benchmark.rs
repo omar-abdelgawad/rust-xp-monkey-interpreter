@@ -6,7 +6,6 @@ use clap::Parser;
 use monkey_rs::ast::Node;
 use monkey_rs::compiler::Compiler;
 use monkey_rs::evaluator::eval;
-use monkey_rs::lexer::Lexer;
 use monkey_rs::object::environment::Environment;
 use monkey_rs::object::ObjectTrait;
 use monkey_rs::parser::Parser as MonkeyParser;
@@ -29,9 +28,7 @@ fn main() {
     fibonacci(35);
     "#;
 
-    let l = Lexer::new(input.to_string());
-    let mut p = MonkeyParser::new(l);
-    let program = p.parse_program();
+    let program = MonkeyParser::parse(input.to_string());
 
     println!("Finished parsing!");
     let (result, duration) = match cli.engine {

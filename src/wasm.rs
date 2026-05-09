@@ -5,7 +5,6 @@ use wasm_bindgen::prelude::*;
 use crate::ast::Node;
 use crate::compiler::Compiler;
 use crate::evaluator;
-use crate::lexer::Lexer;
 use crate::object::environment::Environment;
 use crate::object::ObjectTrait;
 use crate::parser::Parser;
@@ -54,8 +53,7 @@ impl MonkeyInterpreter {
     /// This blocks until completion — no incremental output for long programs.
     #[wasm_bindgen]
     pub fn evaluate(&mut self, code: &str) -> String {
-        let lexer = Lexer::new(code);
-        let mut parser = Parser::new(lexer);
+        let mut parser = Parser::new(code.to_string());
         let program = parser.parse_program();
 
         if !parser.errors().is_empty() {
@@ -94,8 +92,7 @@ impl MonkeyVM {
     /// On failure, streams error messages via the output callback and returns false.
     #[wasm_bindgen]
     pub fn compile(&mut self, code: &str) -> bool {
-        let lexer = Lexer::new(code);
-        let mut parser = Parser::new(lexer);
+        let mut parser = Parser::new(code.to_string());
         let program = parser.parse_program();
 
         if !parser.errors().is_empty() {
@@ -158,8 +155,7 @@ impl MonkeyVM {
     /// Convenience method: compile and run the entire program in one call (blocking).
     #[wasm_bindgen]
     pub fn evaluate(&mut self, code: &str) -> String {
-        let lexer = Lexer::new(code);
-        let mut parser = Parser::new(lexer);
+        let mut parser = Parser::new(code.to_string());
         let program = parser.parse_program();
 
         if !parser.errors().is_empty() {

@@ -1,7 +1,6 @@
 use crate::ast::Node;
 use crate::compiler::symbol_table::{SymbolTable, SymbolTableRef};
 use crate::compiler::Compiler;
-use crate::lexer::Lexer;
 use crate::object::builtins::BUILTINS;
 use crate::object::{garbage_obj, ObjectTrait};
 use crate::parser::Parser;
@@ -54,8 +53,8 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) {
         }
         //// End Read user input
 
-        let l = Lexer::new(line.trim());
-        let mut p = Parser::new(l);
+        //let l = Lexer::new(line.trim());
+        let mut p = Parser::new(line.trim().to_string());
         let program = p.parse_program();
         if !p.errors().is_empty() {
             print_parser_errors(&mut output, p.errors());
@@ -95,8 +94,7 @@ pub fn execute_file(mut input: impl BufRead, mut output: impl Write) {
     input
         .read_to_string(&mut file)
         .expect("Failed to read whole file");
-    let l = Lexer::new(&file);
-    let mut p = Parser::new(l);
+    let mut p = Parser::new(file);
     let program = p.parse_program();
     if !p.errors().is_empty() {
         print_parser_errors(&mut output, p.errors());

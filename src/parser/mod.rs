@@ -5,9 +5,10 @@ use crate::{
         IntegerLiteral, LetStatement, PrefixExpression, Program, ReturnStatement, Statement,
         StringLiteral, WhileExpression,
     },
-    lexer::Lexer,
     token::{Token, TokenType},
 };
+mod lexer;
+use lexer::Lexer;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
@@ -33,7 +34,7 @@ pub struct Parser {
     infix_parse_fns: HashMap<TokenType, InfixParseFn>,
 }
 impl Parser {
-    pub fn new(l: Lexer) -> Self {
+    fn with_lexer(l: Lexer) -> Self {
         let mut parser = Parser {
             l,
             cur_token: Token::default(),
@@ -77,6 +78,11 @@ impl Parser {
         parser
     }
 
+    pub fn new(input: String) -> Self {
+        let l = Lexer::new(input);
+        Parser::with_lexer(l)
+    }
+
     pub fn parse_program(&mut self) -> Program {
         let mut program = Program::new(vec![]);
         while !self.cur_token_is(TokenType::EOF) {
@@ -91,8 +97,7 @@ impl Parser {
 
     /// Encapsulating Function for both lexer and parser structs
     pub fn parse(input: String) -> Program {
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input);
         p.parse_program()
     }
 
@@ -494,8 +499,7 @@ mod test {
             ("let foobar = y;", "foobar", &"y"),
         ];
         for (input, expected_ident, expected_val) in tests {
-            let l = Lexer::new(input);
-            let mut p = Parser::new(l);
+            let mut p = Parser::new(input.to_string());
             let program = p.parse_program();
             check_parser_errors(p);
             assert_eq!(
@@ -570,8 +574,7 @@ mod test {
             ("return foobar;", &"foobar"),
         ];
         for (input, expected_val) in tests {
-            let l = Lexer::new(input);
-            let mut p = Parser::new(l);
+            let mut p = Parser::new(input.to_string());
             let program = p.parse_program();
             check_parser_errors(p);
             assert_eq!(
@@ -599,8 +602,7 @@ mod test {
     fn test_identifier_expression() {
         let input = "foobar;";
 
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
         assert_eq!(
@@ -627,8 +629,7 @@ mod test {
     #[test]
     fn test_integer_literal_exp() {
         let input = "5;";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
         assert_eq!(
@@ -666,8 +667,7 @@ mod test {
     #[test]
     fn test_boolean_exp() {
         let input = "true;";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
         assert_eq!(
@@ -709,8 +709,7 @@ mod test {
             ("+15;", "+", &15i64),
         ];
         for (input, operator, integer_value) in prefix_tests {
-            let l = Lexer::new(input);
-            let mut p = Parser::new(l);
+            let mut p = Parser::new(input.to_string());
             let program = p.parse_program();
             check_parser_errors(p);
             assert_eq!(
@@ -777,8 +776,7 @@ mod test {
             ("false == false", &false, "==", &false),
         ];
         for (input, left_val, op, right_val) in infix_tests {
-            let l = Lexer::new(input);
-            let mut p = Parser::new(l);
+            let mut p = Parser::new(input.to_string());
             let program = p.parse_program();
             check_parser_errors(p);
             assert_eq!(
@@ -859,8 +857,7 @@ mod test {
             ),
         ];
         for (input, expected) in tests {
-            let l = Lexer::new(input);
-            let mut p = Parser::new(l);
+            let mut p = Parser::new(input.to_string());
             let program = p.parse_program();
             check_parser_errors(p);
             let actual = program.to_string();
@@ -947,8 +944,7 @@ mod test {
     #[test]
     fn test_if_expression() {
         let input = "if (x < y) { x }";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
         assert_eq!(
@@ -1003,8 +999,7 @@ mod test {
     #[test]
     fn test_if_else_expression() {
         let input = "if (x < y) { x } else { y }";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
         assert_eq!(
@@ -1070,8 +1065,7 @@ mod test {
     #[test]
     fn test_function_literal_parsing() {
         let input = "fn(x, y) {x + y}";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
         assert_eq!(
@@ -1129,8 +1123,7 @@ mod test {
             ("fn(x, y, z) {}", vec!["x", "y", "z"]),
         ];
         for (input, expected_params) in tests {
-            let l = Lexer::new(input);
-            let mut p = Parser::new(l);
+            let mut p = Parser::new(input.to_string());
             let program = p.parse_program();
             check_parser_errors(p);
             let Statement::Expression(express_stmt) = &program.statements[0] else {
@@ -1156,8 +1149,7 @@ mod test {
     #[test]
     fn test_call_expression_parsing() {
         let input = "add(1, 2 * 3, 4 + 5)";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
         assert_eq!(
@@ -1197,8 +1189,7 @@ mod test {
     #[test]
     fn test_string_literal_expression() {
         let input = "\"hello world\"";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
 
@@ -1218,8 +1209,7 @@ mod test {
     #[test]
     fn test_parsing_array_literals() {
         let input = "[1, 2 * 2, 3 + 3]";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
 
@@ -1261,8 +1251,7 @@ mod test {
     #[test]
     fn test_parsing_index_expressions() {
         let input = "myArray[1 + 1]";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
 
@@ -1283,8 +1272,7 @@ mod test {
     #[test]
     fn test_parsing_hash_literal_string_keys() {
         let input = "{\"one\": 1, \"two\": 2, \"three\": 3}";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
         let Statement::Expression(exp_stmt) = &program.statements[0] else {
@@ -1330,8 +1318,7 @@ mod test {
     #[test]
     fn test_parsing_empty_hash_lit() {
         let input = "{}";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
         let Statement::Expression(exp_stmt) = &program.statements[0] else {
@@ -1355,8 +1342,7 @@ mod test {
     #[test]
     fn test_parsing_hash_literal_with_expression() {
         let input = "{\"one\": 0 + 1, \"two\": 10 - 8, \"three\": 15 / 5}";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
         let Statement::Expression(exp_stmt) = &program.statements[0] else {
@@ -1415,8 +1401,7 @@ mod test {
     #[test]
     fn test_while_expression() {
         let input = "while (x < y) { x }";
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
         assert_eq!(
@@ -1469,8 +1454,7 @@ mod test {
             y # trailing comment
         "#;
 
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
 
@@ -1512,8 +1496,7 @@ mod test {
     fn test_function_literal_with_name() {
         let input = "let myFunction = fn() { };";
 
-        let l = Lexer::new(input);
-        let mut p = Parser::new(l);
+        let mut p = Parser::new(input.to_string());
         let program = p.parse_program();
         check_parser_errors(p);
 
