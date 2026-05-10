@@ -22,9 +22,8 @@
         </header>
 
         <div class="toolbar">
-            <div class="engine-toggle" role="group" aria-label="Execution engine">
-                <button class="engine-btn active" data-engine="vm" id="engine-vm">VM (Bytecode)</button>
-                <button class="engine-btn" data-engine="interpreter" id="engine-tree-walker">Tree-Walker</button>
+            <div class="engine-toggle" role="group" aria-label="Execution engine" style="visibility: hidden">
+                <!-- Engine toggle was removed, keeping div for flex spacing or just remove it -->
             </div>
             <div class="toolbar-right">
                 <select id="example-selector" aria-label="Load example">
@@ -66,6 +65,15 @@
                 </div>
                 <div id="output" class="output-container">
                     <div class="output-placeholder">Output will appear here...</div>
+                </div>
+            </div>
+            
+            <div class="panel compiler-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Compiler (Bytecode)</span>
+                </div>
+                <div id="compiler-output" class="output-container compiler-container">
+                    <div class="output-placeholder">Bytecode instructions will appear here...</div>
                 </div>
             </div>
         </div>

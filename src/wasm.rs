@@ -1,11 +1,8 @@
 use std::cell::RefCell;
-use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
 use crate::ast::Node;
 use crate::compiler::Compiler;
-use crate::evaluator;
-use crate::object::environment::Environment;
 use crate::object::ObjectTrait;
 use crate::parser::Parser;
 use crate::vm::VM;
@@ -33,59 +30,23 @@ pub fn stream_output(text: &str) {
     });
 }
 
-/// Tree-walking interpreter exposed to WASM.
-/// Only supports blocking `evaluate()` — fine for short programs.
-#[wasm_bindgen]
-pub struct MonkeyInterpreter {
-    env: Rc<RefCell<Environment>>,
-}
-
-#[wasm_bindgen]
-impl MonkeyInterpreter {
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> MonkeyInterpreter {
-        MonkeyInterpreter {
-            env: Rc::new(RefCell::new(Environment::new())),
-        }
-    }
-
-    /// Evaluate code using the tree-walking interpreter.
-    /// This blocks until completion — no incremental output for long programs.
-    #[wasm_bindgen]
-    pub fn evaluate(&mut self, code: &str) -> String {
-        let mut parser = Parser::new(code.to_string());
-        let program = parser.parse_program();
-
-        if !parser.errors().is_empty() {
-            let mut error_msg = String::from("Parser errors:\n");
-            for error in parser.errors() {
-                error_msg.push_str(&format!("  {}\n", error));
-            }
-            return error_msg;
-        }
-
-        let result = evaluator::eval(Node::Program(program), Rc::clone(&self.env));
-        result.inspect()
-    }
-
-    #[wasm_bindgen]
-    pub fn reset(&mut self) {
-        self.env = Rc::new(RefCell::new(Environment::new()));
-    }
-}
 
 /// Bytecode VM exposed to WASM.
 /// Supports incremental execution via `compile()` + `step()` loop.
 #[wasm_bindgen]
 pub struct MonkeyVM {
     vm: Option<VM>,
+    bytecode_str: String,
 }
 
 #[wasm_bindgen]
 impl MonkeyVM {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        Self { vm: None }
+        Self {
+            vm: None,
+            bytecode_str: String::new(),
+        }
     }
 
     /// Parse and compile the code, creating the VM. Returns true on success.
@@ -113,8 +74,25 @@ impl MonkeyVM {
         }
 
         let bytecode = compiler.bytecode();
+        let mut instructions_str = String::new();
+        instructions_str.push_str("Main:\n");
+        instructions_str.push_str(&bytecode.instructions.to_string());
+        for (i, constant) in bytecode.constants.iter().enumerate() {
+            if let crate::object::Object::CompiledFunction(func) = &**constant {
+                instructions_str.push_str(&format!("\nFunction {}:\n", i));
+                instructions_str.push_str(&func.instructions.to_string());
+            }
+        }
+        self.bytecode_str = instructions_str;
+
         self.vm = Some(VM::new(bytecode));
         true
+    }
+
+    /// Get the formatted bytecode instructions.
+    #[wasm_bindgen]
+    pub fn get_instructions(&self) -> String {
+        self.bytecode_str.clone()
     }
 
     /// Execute one bytecode instruction. Returns true on success, false on error.
@@ -183,6 +161,7 @@ impl MonkeyVM {
     #[wasm_bindgen]
     pub fn reset(&mut self) {
         self.vm = None;
+        self.bytecode_str.clear();
     }
 }
 
