@@ -13,7 +13,6 @@ pub struct Compiler {
     constants: Vec<ObjRef>,
     symbol_table: SymbolTableRef, // note that symbol_table and scopes are related
     scopes: Vec<CompilationScope>,
-    scope_index: usize, // TODO: does this variable actually need to exist?
 }
 
 #[derive(Debug, Clone, Default)]
@@ -65,11 +64,10 @@ impl Compiler {
             constants: vec![],
             symbol_table: Rc::new(RefCell::new(symbol_table)),
             scopes: vec![main_scope],
-            scope_index: 0,
         }
     }
     fn current_instructions(&mut self) -> &mut Instructions {
-        &mut self.scopes[self.scope_index].instructions
+        &mut self.scopes.last_mut().unwrap().instructions
     }
 
     pub fn compile(&mut self, node: ast::Node) -> Result<(), String> {
@@ -357,7 +355,7 @@ impl Compiler {
     pub fn bytecode(&self) -> Bytecode {
         // should I clone here? I still am not sure
         Bytecode::new(
-            self.scopes[self.scope_index].instructions.clone(), // current_instructions
+            self.scopes.last().unwrap().instructions.clone(), // current_instructions
             self.constants.clone(),
         )
     }
@@ -376,7 +374,7 @@ impl Compiler {
     }
 
     fn set_last_instruction(&mut self, op: Opcode, pos: usize) {
-        let scope = &mut self.scopes[self.scope_index];
+        let scope = self.scopes.last_mut().unwrap();
         scope.previous_instruction = std::mem::replace(
             &mut scope.last_instruction,
             EmittedInstruction::new(op, pos),
@@ -390,21 +388,23 @@ impl Compiler {
     }
 
     fn last_instruction_is(&self, op: Opcode) -> bool {
-        if self.scopes[self.scope_index].instructions.is_empty() {
+        if self.scopes.last().unwrap().instructions.is_empty() {
             return false;
         }
-        self.scopes[self.scope_index].last_instruction.opcode == op
+        self.scopes.last().unwrap().last_instruction.opcode == op
     }
 
     fn remove_last_pop(&mut self) {
-        let last_pos = self.scopes[self.scope_index].last_instruction.position;
-        let previous = self.scopes[self.scope_index].previous_instruction.clone();
+        let last_pos = self.scopes.last().unwrap().last_instruction.position;
+        let previous = self.scopes.last().unwrap().previous_instruction.clone();
 
-        self.scopes[self.scope_index]
+        self.scopes
+            .last_mut()
+            .unwrap()
             .instructions
             .0
             .truncate(last_pos);
-        self.scopes[self.scope_index].last_instruction = previous;
+        self.scopes.last_mut().unwrap().last_instruction = previous;
     }
 
     fn change_operand(&mut self, op_pos: usize, operand: i64) {
@@ -430,7 +430,6 @@ impl Compiler {
     fn enter_scope(&mut self) {
         let scope = CompilationScope::default();
         self.scopes.push(scope);
-        self.scope_index += 1;
         self.symbol_table = SymbolTable::new_enclosed_symbol_table(self.symbol_table.clone())
     }
     fn leave_scope(&mut self) -> Instructions {
@@ -438,7 +437,6 @@ impl Compiler {
             .scopes
             .pop()
             .expect("There should always be a scope entered");
-        self.scope_index -= 1;
         let outer = self
             .symbol_table
             .borrow()
@@ -451,10 +449,10 @@ impl Compiler {
     }
 
     fn replace_last_pop_with_return(&mut self) {
-        let last_pos = self.scopes[self.scope_index].last_instruction.position;
+        let last_pos = self.scopes.last().unwrap().last_instruction.position;
         self.replace_instruction(last_pos, &make(Opcode::ReturnValue, &[]));
 
-        self.scopes[self.scope_index].last_instruction.opcode = Opcode::ReturnValue;
+        self.scopes.last_mut().unwrap().last_instruction.opcode = Opcode::ReturnValue;
     }
     fn load_symbol(&mut self, s: &Symbol) {
         match s.scope {
@@ -1187,25 +1185,25 @@ two;
     fn test_compiler_scopes() {
         let mut compiler = Compiler::new();
         assert_eq!(
-            compiler.scope_index, 0,
+            compiler.scopes.len() - 1,
+            0,
             "scope_index wrong. got={}, want=0",
-            compiler.scope_index
+            compiler.scopes.len() - 1
         );
         let global_symbol_table = compiler.symbol_table.clone();
         compiler.emit(Opcode::Mul, &[]);
         compiler.enter_scope();
         assert_eq!(
-            compiler.scope_index, 1,
+            compiler.scopes.len() - 1,
+            1,
             "scope_index wrong. got={}, want=1",
-            compiler.scope_index
+            compiler.scopes.len() - 1
         );
         compiler.emit(Opcode::Sub, &[]);
-        let len = compiler.scopes[compiler.scope_index].instructions.len();
+        let len = compiler.scopes.last().unwrap().instructions.len();
         assert_eq!(len, 1, "instructions length wrong. got={len}",);
 
-        let last = compiler.scopes[compiler.scope_index]
-            .last_instruction
-            .clone();
+        let last = compiler.scopes.last().unwrap().last_instruction.clone();
         assert_eq!(
             last.opcode,
             Opcode::Sub,
@@ -1227,9 +1225,10 @@ two;
 
         compiler.leave_scope();
         assert_eq!(
-            compiler.scope_index, 0,
+            compiler.scopes.len() - 1,
+            0,
             "scope_index wrong. got={}, want=0",
-            compiler.scope_index
+            compiler.scopes.len() - 1
         );
 
         if compiler.symbol_table != global_symbol_table {
@@ -1240,12 +1239,10 @@ two;
         }
 
         compiler.emit(Opcode::Add, &[]);
-        let len = compiler.scopes[compiler.scope_index].instructions.len();
+        let len = compiler.scopes.last().unwrap().instructions.len();
         assert_eq!(len, 2, "instructions length wrong. got={len}",);
 
-        let last = compiler.scopes[compiler.scope_index]
-            .last_instruction
-            .clone();
+        let last = compiler.scopes.last().unwrap().last_instruction.clone();
         assert_eq!(
             last.opcode,
             Opcode::Add,
@@ -1253,9 +1250,7 @@ two;
             last.opcode,
             Opcode::Add
         );
-        let prev = compiler.scopes[compiler.scope_index]
-            .previous_instruction
-            .clone();
+        let prev = compiler.scopes.last().unwrap().previous_instruction.clone();
         assert_eq!(
             prev.opcode,
             Opcode::Mul,

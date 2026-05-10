@@ -173,40 +173,40 @@ impl Definition {
 }
 
 pub fn lookup(opcode: u8) -> Definition {
-    //let opcode: Op = unsafe { std::mem::transmute(opcode) };
-    match Op::try_from(opcode) {
-        Ok(Op::Constant) => Definition::new("OpConstant".into(), vec![2]),
-        Ok(Op::Add) => Definition::new("OpAdd".into(), vec![]),
-        Ok(Op::Pop) => Definition::new("OpPop".into(), vec![]),
-        Ok(Op::Sub) => Definition::new("OpSub".into(), vec![]),
-        Ok(Op::Mul) => Definition::new("OpMul".into(), vec![]),
-        Ok(Op::Div) => Definition::new("OpDiv".into(), vec![]),
-        Ok(Op::True) => Definition::new("OpTrue".into(), vec![]),
-        Ok(Op::False) => Definition::new("OpFalse".into(), vec![]),
-        Ok(Op::Equal) => Definition::new("OpEqual".into(), vec![]),
-        Ok(Op::NotEqual) => Definition::new("OpNotEqual".into(), vec![]),
-        Ok(Op::GreaterThan) => Definition::new("OpGreaterThan".into(), vec![]),
-        Ok(Op::Minus) => Definition::new("OpMinus".into(), vec![]),
-        Ok(Op::Bang) => Definition::new("OpBang".into(), vec![]),
-        Ok(Op::JumpNotTruthy) => Definition::new("OpJumpNotTruthy".into(), vec![2]),
-        Ok(Op::Jump) => Definition::new("OpJump".into(), vec![2]),
-        Ok(Op::Null) => Definition::new("OpNull".into(), vec![]),
-        Ok(Op::GetGlobal) => Definition::new("OpGetGlobal".into(), vec![2]),
-        Ok(Op::SetGlobal) => Definition::new("OpSetGlobal".into(), vec![2]),
-        Ok(Op::Array) => Definition::new("OpArray".into(), vec![2]), // max array size is 65536
-        Ok(Op::Hash) => Definition::new("OpHash".into(), vec![2]),   // max hash size is 65536/2
-        Ok(Op::Index) => Definition::new("OpIndex".into(), vec![]),
-        Ok(Op::Call) => Definition::new("OpCall".into(), vec![1]), // max num of args is 256
-        Ok(Op::ReturnValue) => Definition::new("OpReturnValue".into(), vec![]),
-        Ok(Op::Return) => Definition::new("OpReturn".into(), vec![]),
-        Ok(Op::GetLocal) => Definition::new("OpGetLocal".into(), vec![1]), // maximum local bindings is 256
-        Ok(Op::SetLocal) => Definition::new("OpSetLocal".into(), vec![1]), // maximum local bindings is 256
-        Ok(Op::GetBuiltin) => Definition::new("OpGetBuiltin".into(), vec![1]), // maximum builtins is 256
-        Ok(Op::Closure) => Definition::new("OpClosure".into(), vec![2, 1]), // const_ind for comp_fn and num_free_variables on the stack
-        Ok(Op::GetFree) => Definition::new("OpGetFree".into(), vec![1]),
-        Ok(Op::CurrentClosure) => Definition::new("OpCurrentClosure".into(), vec![]),
+    let (name, operand_widths) = match Op::try_from(opcode) {
+        Ok(Op::Constant) => ("OpConstant", vec![2]),
+        Ok(Op::Add) => ("OpAdd", vec![]),
+        Ok(Op::Pop) => ("OpPop", vec![]),
+        Ok(Op::Sub) => ("OpSub", vec![]),
+        Ok(Op::Mul) => ("OpMul", vec![]),
+        Ok(Op::Div) => ("OpDiv", vec![]),
+        Ok(Op::True) => ("OpTrue", vec![]),
+        Ok(Op::False) => ("OpFalse", vec![]),
+        Ok(Op::Equal) => ("OpEqual", vec![]),
+        Ok(Op::NotEqual) => ("OpNotEqual", vec![]),
+        Ok(Op::GreaterThan) => ("OpGreaterThan", vec![]),
+        Ok(Op::Minus) => ("OpMinus", vec![]),
+        Ok(Op::Bang) => ("OpBang", vec![]),
+        Ok(Op::JumpNotTruthy) => ("OpJumpNotTruthy", vec![2]),
+        Ok(Op::Jump) => ("OpJump", vec![2]),
+        Ok(Op::Null) => ("OpNull", vec![]),
+        Ok(Op::GetGlobal) => ("OpGetGlobal", vec![2]),
+        Ok(Op::SetGlobal) => ("OpSetGlobal", vec![2]),
+        Ok(Op::Array) => ("OpArray", vec![2]), // max array size is 65536
+        Ok(Op::Hash) => ("OpHash", vec![2]),   // max hash size is 65536/2
+        Ok(Op::Index) => ("OpIndex", vec![]),
+        Ok(Op::Call) => ("OpCall", vec![1]), // max num of args is 256
+        Ok(Op::ReturnValue) => ("OpReturnValue", vec![]),
+        Ok(Op::Return) => ("OpReturn", vec![]),
+        Ok(Op::GetLocal) => ("OpGetLocal", vec![1]), // maximum local bindings is 256
+        Ok(Op::SetLocal) => ("OpSetLocal", vec![1]), // maximum local bindings is 256
+        Ok(Op::GetBuiltin) => ("OpGetBuiltin", vec![1]), // maximum builtins is 256
+        Ok(Op::Closure) => ("OpClosure", vec![2, 1]), // const_ind for comp_fn and num_free_variables on the stack
+        Ok(Op::GetFree) => ("OpGetFree", vec![1]),
+        Ok(Op::CurrentClosure) => ("OpCurrentClosure", vec![]),
         Err(op) => panic!("opcode {op:?} undefined"),
-    }
+    };
+    Definition::new(name.into(), operand_widths)
 }
 
 pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<i64>, i64) {
