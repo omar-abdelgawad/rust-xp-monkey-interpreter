@@ -2,9 +2,8 @@ use crate::code::{read_u16, Opcode};
 use crate::compiler::Bytecode;
 use crate::object::builtins::BUILTINS;
 use crate::object::{
-    false_obj, garbage_obj, native_bool_to_boolean_object, null_obj, true_obj, Array, BuiltinObj,
-    ClosureObj, CompiledFunctionObj, HashObj, HashPair, Hashable, Integer, IsHashable, ObjRef,
-    Object, ObjectTrait,
+    false_obj, garbage_obj, null_obj, true_obj, Array, BuiltinObj, ClosureObj, CompiledFunctionObj,
+    HashObj, HashPair, Hashable, Integer, IsHashable, ObjRef, Object, ObjectTrait,
 };
 use std::{collections::HashMap, rc::Rc};
 
@@ -160,7 +159,7 @@ impl VM {
                 self.execute_boolean_comparison(op, left_val.value, right_val.value)
             }
             _ => todo!(
-                "unsupported types for binary operation: {} {}",
+                "unsupported types for binary comparison operation: {} {}",
                 left.r#type(),
                 right.r#type()
             ),
@@ -179,7 +178,7 @@ impl VM {
             Opcode::GreaterThan => left > right,
             _ => return Err(format!("unknown operator: {op:?}")),
         };
-        self.push(native_bool_to_boolean_object(val))
+        self.push(Object::new_bool_var(val))
     }
 
     fn execute_boolean_comparison(
@@ -193,7 +192,7 @@ impl VM {
             Opcode::NotEqual => left != right,
             _ => return Err(format!("unknown operator: {op:?}")),
         };
-        self.push(native_bool_to_boolean_object(val))
+        self.push(Object::new_bool_var(val))
     }
 
     fn execute_bang_operator(&mut self) -> Result<(), String> {
@@ -228,14 +227,32 @@ impl VM {
         }
     }
 
-    fn execute_array_index(&mut self, arr_obj: &Array, int_obj: &Integer) -> Result<(), String> {
-        let i = int_obj.value;
-        let max = arr_obj.elements.len() as i64 - 1;
+    fn execute_array_index(&mut self, arr: &Array, index: &Integer) -> Result<(), String> {
+        let i = index.value;
+        let max = arr.elements.len() as i64 - 1;
         if i < 0 || i > max {
-            self.push(null_obj())
+            self.push(Object::new_error_var("index out of bounds"))
         } else {
-            self.push(arr_obj.elements[i as usize].clone())
+            self.push(arr.elements[i as usize].clone())
         }
+
+        // TODO: implement negative array indexing like evaluator
+        //let idx = if index.value < 0 {
+        //    (arr.elements.len() as i64 + index.value) as usize
+        //} else {
+        //    index.value as usize
+        //};
+        //if arr.elements.is_empty()
+        //    || idx > arr.elements.len() - 1
+        //    || index.value < -(arr.elements.len() as i64)
+        //{
+        //    Object::new_error_var(format!(
+        //        "array index out of bounds: the len is {} but the index is {}",
+        //        arr.elements.len(),
+        //        index.value
+        //    ));
+        //}
+        //arr.elements[idx].clone()
     }
 
     fn execute_hash_index(&mut self, hash_obj: &HashObj, index: ObjRef) -> Result<(), String> {
@@ -446,12 +463,7 @@ impl VM {
     }
 
     fn build_array(&mut self, start_ind: usize, end_ind: usize) -> ObjRef {
-        let mut elements = vec![null_obj(); end_ind - start_ind];
-        let mut i = start_ind;
-        while i < end_ind {
-            elements[i - start_ind] = self.stack[i].clone();
-            i += 1;
-        }
+        let elements = self.stack[start_ind..end_ind].to_vec();
         Object::new_array_var(elements)
     }
 
@@ -579,6 +591,9 @@ mod tests {
             VmTestCase::new("5 * 2 + 10", Box::new(20i64)),
             VmTestCase::new("5 + 2 * 10", Box::new(25i64)),
             VmTestCase::new("5 * (2 + 10)", Box::new(60i64)),
+            VmTestCase::new("+2", Box::new(2i64)),
+            VmTestCase::new("+-3", Box::new(-3i64)),
+            VmTestCase::new("-+4", Box::new(-4i64)),
             VmTestCase::new("-5", Box::new(-5i64)),
             VmTestCase::new("-10", Box::new(-10i64)),
             VmTestCase::new("-50 + 100 + -50", Box::new(0i64)),
@@ -798,6 +813,13 @@ mod tests {
     #[test]
     fn test_global_let_statements() {
         let tests = vec![
+            VmTestCase::new("let a = 5; a;", Box::new(5i64)),
+            VmTestCase::new("let a = 5 * 5; a;", Box::new(25i64)),
+            VmTestCase::new("let a = 5; let b = a; b;", Box::new(5i64)),
+            VmTestCase::new(
+                "let a = 5; let b = a; let c = a + b + 5; c;",
+                Box::new(15i64),
+            ),
             VmTestCase::new("let one = 1; one", Box::new(1i64)),
             VmTestCase::new("let one = 1; let two = 2; one + two", Box::new(3i64)),
             VmTestCase::new(
@@ -856,19 +878,17 @@ mod tests {
             VmTestCase::new("[1, 2, 3][1]", Box::new(2i64)),
             VmTestCase::new("[1, 2, 3][0 + 2]", Box::new(3i64)),
             VmTestCase::new("[[1, 1, 1]][0][0]", Box::new(1i64)),
-            VmTestCase::new("[][0]", Box::new(Null)),
-            VmTestCase::new("[1, 2, 3][99]", Box::new(Null)),
-            VmTestCase::new("[1][-1]", Box::new(Null)),
+            VmTestCase::new("[][0]", Box::new(Error::new("index out of bounds"))),
+            VmTestCase::new("[1, 2, 3][99]", Box::new(Error::new("index out of bounds"))),
+            VmTestCase::new("[1][-1]", Box::new(Error::new("index out of bounds"))),
             VmTestCase::new("{1: 1, 2: 2}[1]", Box::new(1i64)),
             VmTestCase::new("{1: 1, 2: 2}[2]", Box::new(2i64)),
-            VmTestCase::new(
-                "{1: 1}[0]",
-                Box::new(Error::new("key doesn't exist".to_string())),
-            ),
-            VmTestCase::new(
-                "{}[0]",
-                Box::new(Error::new("key doesn't exist".to_string())),
-            ),
+            VmTestCase::new("{1: 1}[0]", Box::new(Error::new("key doesn't exist"))),
+            VmTestCase::new("{}[0]", Box::new(Error::new("key doesn't exist"))),
+            // TODO: negative array indexing
+            //("[1, 2, 3][-1]", Some(3)),
+            //("[1, 2, 3][-3]", Some(1)),
+            //("[1, 2, 3][-4]", None),
         ];
         run_vm_tests(tests);
     }
@@ -1096,15 +1116,11 @@ outer() + globalNum;",
             VmTestCase::new(r#"len("hello world")"#, Box::new(11i64)),
             VmTestCase::new(
                 "len(1)",
-                Box::new(Error::new(
-                    "argument to `len` not supported, got INTEGER".to_string(),
-                )),
+                Box::new(Error::new("argument to `len` not supported, got INTEGER")),
             ),
             VmTestCase::new(
                 r#"len("one", "two")"#,
-                Box::new(Error::new(
-                    "wrong number of arguments. got=2, want=1".to_string(),
-                )),
+                Box::new(Error::new("wrong number of arguments. got=2, want=1")),
             ),
             VmTestCase::new("len([1, 2, 3])", Box::new(3i64)),
             VmTestCase::new("len([])", Box::new(0i64)),
@@ -1113,17 +1129,13 @@ outer() + globalNum;",
             VmTestCase::new("first([])", Box::new(Null)),
             VmTestCase::new(
                 "first(1)",
-                Box::new(Error::new(
-                    "argument to `first` must be ARRAY, got INTEGER".to_string(),
-                )),
+                Box::new(Error::new("argument to `first` must be ARRAY, got INTEGER")),
             ),
             VmTestCase::new("last([1, 2, 3])", Box::new(3i64)),
             VmTestCase::new("last([])", Box::new(Null)),
             VmTestCase::new(
                 "last(1)",
-                Box::new(Error::new(
-                    "argument to `last` must be ARRAY, got INTEGER".to_string(),
-                )),
+                Box::new(Error::new("argument to `last` must be ARRAY, got INTEGER")),
             ),
             VmTestCase::new("rest([1, 2, 3])", Box::new(vec![2i64, 3i64])),
             VmTestCase::new("push([], 1)", Box::new(vec![1i64])),
@@ -1397,5 +1409,123 @@ my_fn()
         ];
 
         run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_reduce() {
+        let tests = vec![VmTestCase::new(
+            "
+let reduce = fn(arr, initial, f) 
+    {
+        let iter = fn(arr, result) {
+            if (len(arr) == 0) {
+                result
+            } else {
+                iter(rest(arr), f(result, first(arr)));
+            }
+        };
+        iter(arr, initial);
+    };
+    let sum = fn(arr) {
+        reduce(arr, 0, fn(initial, el) { initial + el });
+    };
+    sum([1, 2, 3, 4, 5]);
+",
+            Box::new(15i64),
+        )];
+
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_map() {
+        let tests = vec![VmTestCase::new(
+            "let map = fn(arr, f) {
+                let iter = fn(arr, accumulated) 
+                {
+                    if (len(arr) == 0) {
+                        accumulated
+                    } else {
+                        iter(rest(arr), push(accumulated, f(first(arr))));
+                    }
+                };
+                iter(arr, []);
+            };
+            let a = [1,2,3,4];
+            let double = fn(x) { x * 2 };
+            map(a, double);",
+            Box::new(vec![2i64, 4, 6, 8]),
+        )];
+
+        run_vm_tests(tests);
+    }
+
+    #[ignore = "currently the vm panicks when the types are not aligned. This might be a good place for exceptions"]
+    #[test]
+    fn test_error_handling() {
+        let tests = vec![
+            VmTestCase::new(
+                "5 + true;",
+                Box::new(Error::new("type mismatch: INTEGER + BOOLEAN")),
+            ),
+            //("5 + true; 5;", "type mismatch: INTEGER + BOOLEAN"),
+            //("-true", "unknown operator: -BOOLEAN"),
+            //("true + false;", "unknown operator: BOOLEAN + BOOLEAN"),
+            //("5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"),
+            //(
+            //    "if (10 > 1) { true + false; }",
+            //    "unknown operator: BOOLEAN + BOOLEAN",
+            //),
+            //(
+            //    "if (10 > 1) {\
+            //        if (10 > 1) {\
+            //            return true + false;\
+            //        }\
+            //        return 1;\
+            //    }",
+            //    "unknown operator: BOOLEAN + BOOLEAN",
+            //),
+            //("foobar", "identifier not found: foobar"),
+            //("\"Hello\" - \"World\"", "unknown operator: STRING - STRING"),
+            //(
+            //    "{\"name\": \"Monkey\"}[fn(x) {x}];",
+            //    "unusable as hash key: FUNCTION",
+            //),
+            //(
+            //    "[1, 2, 3][3]",
+            //    "array index out of bounds: the len is 3 but the index is 3",
+            //),
+            //(
+            //    "[1, 2, 3][-4]",
+            //    "array index out of bounds: the len is 3 but the index is -4",
+            //),
+        ];
+        run_vm_tests(tests);
+    }
+
+    #[should_panic]
+    #[test]
+    fn test_return_outside_function() {
+        let tests = vec![VmTestCase::new("return 10;", Box::new(10i64))];
+        run_vm_tests(tests);
+    }
+
+    #[test]
+    fn test_object_identity() {
+        let obj1 = Object::new_bool_var(true);
+        let obj2 = Object::new_bool_var(true);
+
+        // Verify that both Rc pointers point to the exact same heap allocation
+        assert!(
+            Rc::ptr_eq(&obj1, &obj2),
+            "True objects should point to the same heap allocation"
+        );
+
+        let null1 = null_obj();
+        let null2 = null_obj();
+        assert!(
+            Rc::ptr_eq(&null1, &null2),
+            "Null objects should point to the same heap allocation"
+        );
     }
 }

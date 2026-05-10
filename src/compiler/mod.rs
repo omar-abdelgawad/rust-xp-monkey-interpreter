@@ -192,8 +192,13 @@ impl Compiler {
                 Exp::Prefix(pre_exp) => {
                     self.compile(Node::Expression(*pre_exp.right))?;
                     match pre_exp.operator.as_str() {
-                        "!" => self.emit(Opcode::Bang, &[]),
-                        "-" => self.emit(Opcode::Minus, &[]),
+                        "!" => {
+                            self.emit(Opcode::Bang, &[]);
+                        }
+                        "-" => {
+                            self.emit(Opcode::Minus, &[]);
+                        }
+                        "+" => { /*skip + when it is a prefix op*/ }
                         _ => return Err(format!("unknown operator {}", pre_exp.operator)),
                     };
                 }

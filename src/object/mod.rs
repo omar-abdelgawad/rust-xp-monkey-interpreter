@@ -44,14 +44,6 @@ pub fn garbage_obj() -> ObjRef {
 
 type BuiltinFunction = fn(args: &[ObjRef]) -> ObjRef;
 
-pub fn native_bool_to_boolean_object(input: bool) -> ObjRef {
-    if input {
-        true_obj()
-    } else {
-        false_obj()
-    }
-}
-
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum ObjectType {
@@ -128,6 +120,14 @@ pub enum Object {
     Closure(ClosureObj),
 }
 impl Object {
+    pub fn new_bool_var(value: bool) -> ObjRef {
+        if value {
+            true_obj()
+        } else {
+            false_obj()
+        }
+    }
+
     pub fn new_int_var(value: i64) -> ObjRef {
         Rc::new(Object::Integer(Integer::new(value)))
     }
@@ -144,8 +144,8 @@ impl Object {
     pub fn new_hash_var(value: HashMap<HashKey, HashPair>) -> ObjRef {
         Rc::new(Object::Hash(HashObj::new(value)))
     }
-    pub fn new_error_var(value: &str) -> ObjRef {
-        Rc::new(Object::Err(Error::new(value.to_string())))
+    pub fn new_error_var(value: impl Into<String>) -> ObjRef {
+        Rc::new(Object::Err(Error::new(value)))
     }
     pub fn is_truthy(&self) -> bool {
         match self {
@@ -310,8 +310,10 @@ pub struct Error {
     pub message: String,
 }
 impl Error {
-    pub fn new(message: String) -> Self {
-        Self { message }
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
     }
 }
 

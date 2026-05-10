@@ -5,8 +5,7 @@ use crate::ast::{self, Expression, HashLiteral, IfExpression, Node, Statement, W
 use crate::object::environment::Environment;
 use crate::object::{false_obj, null_obj, true_obj};
 use crate::object::{
-    native_bool_to_boolean_object, Array, Error, Function, HashObj, HashPair, Hashable,
-    ObjectTrait, ObjectType, StringObj,
+    Array, Error, Function, HashObj, HashPair, Hashable, ObjectTrait, ObjectType, StringObj,
 };
 use crate::object::{Integer, ObjRef, Object};
 
@@ -46,7 +45,7 @@ pub fn eval(node: Node, env: Rc<RefCell<Environment>>) -> ObjRef {
         },
         Node::Expression(exp) => match exp {
             Exp::Integer(int_lit) => Object::new_int_var(int_lit.value),
-            Exp::Boolean(bool_lit) => native_bool_to_boolean_object(bool_lit.value),
+            Exp::Boolean(bool_lit) => Object::new_bool_var(bool_lit.value),
             Exp::Prefix(prefix_exp) => {
                 let right = eval(Node::Expression(*prefix_exp.right), Rc::clone(&env));
                 if is_error(&right) {
@@ -171,10 +170,10 @@ fn eval_plus_prefix_operator_exprssion(right: ObjRef) -> ObjRef {
 fn eval_infix_expression(operator: &str, left: ObjRef, right: ObjRef) -> ObjRef {
     match (operator, &*left, &*right) {
         ("==", Object::Boolean(left), Object::Boolean(right)) => {
-            native_bool_to_boolean_object(left == right)
+            Object::new_bool_var(left == right)
         }
         ("!=", Object::Boolean(left), Object::Boolean(right)) => {
-            native_bool_to_boolean_object(left != right)
+            Object::new_bool_var(left != right)
         }
         (op, Object::Integer(left), Object::Integer(right)) => {
             eval_integer_infix_expression(op, left, right)
@@ -226,12 +225,12 @@ fn eval_integer_infix_expression(operator: &str, left: &Integer, right: &Integer
         "-" => Object::new_int_var(left_val - right_val),
         "*" => Object::new_int_var(left_val * right_val),
         "/" => Object::new_int_var(left_val / right_val),
-        "<" => native_bool_to_boolean_object(left_val < right_val),
-        ">" => native_bool_to_boolean_object(left_val > right_val),
-        "==" => native_bool_to_boolean_object(left_val == right_val),
-        "!=" => native_bool_to_boolean_object(left_val != right_val),
-        ">=" => native_bool_to_boolean_object(left_val >= right_val),
-        "<=" => native_bool_to_boolean_object(left_val <= right_val),
+        "<" => Object::new_bool_var(left_val < right_val),
+        ">" => Object::new_bool_var(left_val > right_val),
+        "==" => Object::new_bool_var(left_val == right_val),
+        "!=" => Object::new_bool_var(left_val != right_val),
+        ">=" => Object::new_bool_var(left_val >= right_val),
+        "<=" => Object::new_bool_var(left_val <= right_val),
         // I still hate this default operator shit
         op => new_error(format!(
             "unknown operator: {} {} {}",
@@ -385,8 +384,6 @@ fn eval_array_index_expresssion(arr: &Array, index: &Integer) -> ObjRef {
             index.value
         ));
     }
-    // FIX: this should be a reference but for now eval doesn't
-    // return references to Object so we are stuck cloning
     arr.elements[idx].clone()
 }
 
@@ -528,24 +525,6 @@ pub mod tests {
         } else {
             true
         }
-    }
-    #[test]
-    fn test_object_identity() {
-        let obj1 = native_bool_to_boolean_object(true);
-        let obj2 = native_bool_to_boolean_object(true);
-
-        // Verify that both Rc pointers point to the exact same heap allocation
-        assert!(
-            Rc::ptr_eq(&obj1, &obj2),
-            "True objects should point to the same heap allocation"
-        );
-
-        let null1 = null_obj();
-        let null2 = null_obj();
-        assert!(
-            Rc::ptr_eq(&null1, &null2),
-            "Null objects should point to the same heap allocation"
-        );
     }
     #[test]
     fn test_bang_operator() {
