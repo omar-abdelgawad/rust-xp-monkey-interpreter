@@ -1,12 +1,8 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::time::Instant;
 
 use clap::Parser;
 use monkey_rs::ast::{Node, Program};
 use monkey_rs::compiler::Compiler;
-use monkey_rs::evaluator::eval;
-use monkey_rs::object::environment::Environment;
 use monkey_rs::object::{ObjRef, ObjectTrait};
 use monkey_rs::parser::Parser as MonkeyParser;
 use monkey_rs::vm::VM;
@@ -33,7 +29,7 @@ fn main() {
     println!("Finished parsing!");
     let engine: &mut dyn InterpreterEngine = match cli.engine {
         Engine::Vm => &mut VMEngine::new(),
-        Engine::Eval => &mut TreeWalkingEngine::new(),
+        Engine::Eval => panic!("tree walking interpreter engine (mod evaluator) was removed"),
     };
     let (result, duration) = {
         println!("Started time!");
@@ -92,21 +88,5 @@ impl InterpreterEngine for VMEngine {
         }
 
         machine.last_popped_stack_elem()
-    }
-}
-struct TreeWalkingEngine {
-    env: Rc<RefCell<Environment>>,
-}
-impl TreeWalkingEngine {
-    fn new() -> Self {
-        Self {
-            env: Rc::new(RefCell::new(Environment::new())),
-        }
-    }
-}
-
-impl InterpreterEngine for TreeWalkingEngine {
-    fn evaluate_program(&mut self, program: Program) -> ObjRef {
-        eval(Node::Program(program), self.env.clone())
     }
 }

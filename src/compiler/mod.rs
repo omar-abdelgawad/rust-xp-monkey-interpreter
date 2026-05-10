@@ -492,9 +492,24 @@ mod tests {
 
     use crate::{
         code::{make, Opcode as Op},
-        evaluator::tests::test_integer_object,
         parser::Parser,
     };
+    pub fn test_integer_object(obj: &ObjRef, expected: i64) -> bool {
+        if let Object::Integer(result) = &**obj {
+            if result.value != expected {
+                eprintln!(
+                    "object has wrong value. got={}, want{}",
+                    result.value, expected
+                );
+                false
+            } else {
+                true
+            }
+        } else {
+            eprintln!("object is not Integer. got={:?} ({:?})", obj, obj);
+            false
+        }
+    }
     pub fn test_string_object(obj: &ObjRef, expected: &str) -> bool {
         if let Object::String(result) = &**obj {
             if result.value != expected {

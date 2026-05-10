@@ -1,15 +1,11 @@
 pub mod builtins;
-pub mod environment;
 
 use fnv::FnvHasher;
 use std::hash::Hasher;
 use std::{collections::HashMap, fmt::Display};
 
-use environment::Environment;
-use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ast::{BlockStatement, Identifier};
 use crate::code::Instructions;
 
 // `thread_local!` variables are initialized once per thread. If the VM ever
@@ -52,7 +48,6 @@ pub enum ObjectType {
     NULL_OBJ,
     RETURN_VALUE_OBJ,
     ERROR_OBJ,
-    FUNCTION_OBJ,
     String_OBJ,
     BuiltinFunction,
     ARRAY_OBJ, // arrays are immutable in monkey
@@ -69,7 +64,6 @@ impl Display for ObjectType {
             ObjT::NULL_OBJ => "NULL",
             ObjT::RETURN_VALUE_OBJ => "RETURN",
             ObjT::ERROR_OBJ => "ERROR",
-            ObjT::FUNCTION_OBJ => "FUNCTION",
             ObjT::String_OBJ => "STRING",
             ObjT::BuiltinFunction => "builtin function",
             ObjT::ARRAY_OBJ => "ARRAY",
@@ -108,10 +102,8 @@ impl HashKey {
 pub enum Object {
     Integer(Integer),
     Boolean(Boolean),
-    Null(Null),       // TODO: maybe remove this null unit struct
-    Ret(ReturnValue), // I believe this variant is never used by the VM, only the evaluator
+    Null(Null), // TODO: maybe remove this null unit struct
     Err(Error),
-    Func(Function),
     String(StringObj),
     Builtin(BuiltinObj),
     Arr(Array), // arrays are immutable in monkey
@@ -133,10 +125,6 @@ impl Object {
     }
     pub fn new_str_var(value: &str) -> ObjRef {
         Rc::new(Object::String(StringObj::new(value)))
-    }
-
-    pub fn new_ret_var(value: ObjRef) -> ObjRef {
-        Rc::new(Object::Ret(ReturnValue::new(value)))
     }
     pub fn new_array_var(value: Vec<ObjRef>) -> ObjRef {
         Rc::new(Object::Arr(Array::new(value)))
@@ -161,9 +149,7 @@ impl ObjectTrait for Object {
             Object::Integer(s) => s.r#type(),
             Object::Boolean(s) => s.r#type(),
             Object::Null(s) => s.r#type(),
-            Object::Ret(s) => s.r#type(),
             Object::Err(s) => s.r#type(),
-            Object::Func(s) => s.r#type(),
             Object::String(s) => s.r#type(),
             Object::Builtin(s) => s.r#type(),
             Object::Arr(s) => s.r#type(),
@@ -177,9 +163,7 @@ impl ObjectTrait for Object {
             Object::Integer(s) => s.inspect(),
             Object::Boolean(s) => s.inspect(),
             Object::Null(s) => s.inspect(),
-            Object::Ret(s) => s.inspect(),
             Object::Err(s) => s.inspect(),
-            Object::Func(s) => s.inspect(),
             Object::String(s) => s.inspect(),
             Object::Builtin(s) => s.inspect(),
             Object::Arr(s) => s.inspect(),
@@ -323,40 +307,6 @@ impl ObjectTrait for Error {
     }
     fn inspect(&self) -> String {
         format!("ERROR: {}", self.message)
-    }
-}
-#[derive(Debug, PartialEq, Clone)]
-pub struct Function {
-    pub parameters: Vec<Identifier>,
-    pub body: BlockStatement,
-    pub env: Rc<RefCell<Environment>>,
-}
-impl Function {
-    pub fn new(
-        parameters: Vec<Identifier>,
-        body: BlockStatement,
-        env: Rc<RefCell<Environment>>,
-    ) -> Self {
-        Self {
-            parameters,
-            body,
-            env,
-        }
-    }
-}
-
-impl ObjectTrait for Function {
-    fn r#type(&self) -> ObjectType {
-        ObjectType::FUNCTION_OBJ
-    }
-    fn inspect(&self) -> String {
-        let params = self
-            .parameters
-            .iter()
-            .map(|a| a.to_string())
-            .collect::<Vec<_>>()
-            .join(",");
-        format!("fn({}){{\n{}\n}}", params, self.body)
     }
 }
 

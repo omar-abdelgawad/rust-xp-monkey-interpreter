@@ -4,7 +4,6 @@ pub mod parser;
 pub mod repl;
 
 // Evaluation mods
-pub mod evaluator;
 pub mod object;
 
 // cli
