@@ -1,5 +1,4 @@
 import init, {
-    MonkeyInterpreter,
     MonkeyVM,
     get_example_code,
     get_available_examples,
@@ -10,9 +9,7 @@ const BATCH_SIZE = 500;
 
 class MonkeyWebApp {
     constructor() {
-        this.interpreter = null;
         this.vm = null;
-        this.engine = 'vm';
         this.isRunning = false;
         this.stepHandle = null;
         this.isInitialized = false;
@@ -27,7 +24,6 @@ class MonkeyWebApp {
                 this.appendToOutput(text);
             });
 
-            this.interpreter = new MonkeyInterpreter();
             this.vm = new MonkeyVM();
 
             this.setupEventListeners();
@@ -46,16 +42,6 @@ class MonkeyWebApp {
         document.getElementById('stop-code').addEventListener('click', () => this.stopExecution());
         document.getElementById('clear-editor').addEventListener('click', () => this.clearEditor());
         document.getElementById('example-selector').addEventListener('change', () => this.loadExample());
-
-        // Engine toggle
-        document.querySelectorAll('.engine-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (this.isRunning) return;
-                document.querySelectorAll('.engine-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.engine = btn.dataset.engine;
-            });
-        });
 
         // Ctrl+Enter
         document.getElementById('code-editor').addEventListener('keydown', (e) => {
@@ -98,6 +84,7 @@ class MonkeyWebApp {
     clearEditor() {
         document.getElementById('code-editor').value = '';
         this.clearOutput();
+        this.clearCompilerOutput();
         document.getElementById('example-selector').value = '';
     }
 
@@ -115,13 +102,10 @@ class MonkeyWebApp {
         }
 
         this.clearOutput();
+        this.clearCompilerOutput();
         this.setRunningState(true);
 
-        if (this.engine === 'vm') {
-            this.runCodeVM(code);
-        } else {
-            this.runCodeInterpreter(code);
-        }
+        this.runCodeVM(code);
     }
 
     runCodeVM(code) {
@@ -132,6 +116,10 @@ class MonkeyWebApp {
             this.setRunningState(false);
             return;
         }
+
+        const mainInstructions = this.vm.get_main_instructions();
+        const constantsStr = this.vm.get_constants();
+        this.updateCompilerOutputs(mainInstructions, constantsStr);
 
         const stepBatch = () => {
             if (!this.isRunning) {
@@ -162,23 +150,6 @@ class MonkeyWebApp {
         stepBatch();
     }
 
-    runCodeInterpreter(code) {
-        const startTime = performance.now();
-
-        try {
-            const result = this.interpreter.evaluate(code);
-            const duration = (performance.now() - startTime).toFixed(2);
-            if (result && result !== 'null') {
-                this.appendToOutput(result + '\n');
-            }
-            this.appendStatus(`✓ Completed in ${duration}ms (tree-walker)`);
-        } catch (error) {
-            this.showError(`Error: ${error.message}`);
-        }
-
-        this.setRunningState(false);
-    }
-
     stopExecution() {
         if (!this.isRunning) return;
         this.isRunning = false;
@@ -198,11 +169,9 @@ class MonkeyWebApp {
         if (running) {
             runBtn.style.display = 'none';
             stopBtn.style.display = 'inline-flex';
-            document.querySelectorAll('.engine-btn').forEach(b => b.style.pointerEvents = 'none');
         } else {
             runBtn.style.display = 'inline-flex';
             stopBtn.style.display = 'none';
-            document.querySelectorAll('.engine-btn').forEach(b => b.style.pointerEvents = '');
         }
     }
 
@@ -214,6 +183,34 @@ class MonkeyWebApp {
     clearOutput() {
         const output = document.getElementById('output');
         output.innerHTML = '<div class="output-placeholder">Output will appear here...</div>';
+    }
+
+    clearCompilerOutput() {
+        const compilerMain = document.getElementById('compiler-main-output');
+        const compilerConstants = document.getElementById('compiler-constants-output');
+        if (compilerMain) compilerMain.innerHTML = '<div class="output-placeholder">Main bytecode instructions...</div>';
+        if (compilerConstants) compilerConstants.innerHTML = '<div class="output-placeholder">Functions and constants...</div>';
+    }
+
+    updateCompilerOutputs(mainText, constantsText) {
+        const compilerMain = document.getElementById('compiler-main-output');
+        const compilerConstants = document.getElementById('compiler-constants-output');
+        
+        if (compilerMain) {
+            compilerMain.innerHTML = '';
+            const mainContentDiv = document.createElement('div');
+            mainContentDiv.className = 'output-content';
+            mainContentDiv.textContent = mainText;
+            compilerMain.appendChild(mainContentDiv);
+        }
+
+        if (compilerConstants) {
+            compilerConstants.innerHTML = '';
+            const constantsContentDiv = document.createElement('div');
+            constantsContentDiv.className = 'output-content';
+            constantsContentDiv.textContent = constantsText;
+            compilerConstants.appendChild(constantsContentDiv);
+        }
     }
 
     appendToOutput(text) {

@@ -187,6 +187,22 @@ header h1 {
     transition: border-color var(--transition);
 }
 
+.editor-panel {
+    grid-column: 1 / 2;
+}
+
+.output-panel {
+    grid-column: 2 / 3;
+}
+
+.compiler-main-panel {
+    grid-column: 1 / 2;
+}
+
+.compiler-constants-panel {
+    grid-column: 2 / 3;
+}
+
 .panel:focus-within {
     border-color: var(--border-focus);
 }
@@ -261,6 +277,10 @@ header h1 {
     font-family: var(--font-mono);
     font-size: 13.5px;
     line-height: 1.65;
+}
+
+.compiler-container {
+    height: 300px;
 }
 
 .output-placeholder {

@@ -89,29 +89,6 @@ function passStringToWasm0(arg, malloc, realloc) {
     return ptr;
 }
 /**
- * @returns {string}
- */
-export function get_available_examples() {
-    let deferred1_0;
-    let deferred1_1;
-    try {
-        const ret = wasm.get_available_examples();
-        deferred1_0 = ret[0];
-        deferred1_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
-    }
-}
-
-/**
- * @param {Function} callback
- */
-export function set_output_callback(callback) {
-    wasm.set_output_callback(callback);
-}
-
-/**
  * Get example Monkey source code by name.
  * Uses `include_str!` to embed files at compile time from `monkey_examples/`.
  * @param {string} example_name
@@ -132,54 +109,26 @@ export function get_example_code(example_name) {
     }
 }
 
-const MonkeyInterpreterFinalization = (typeof FinalizationRegistry === 'undefined')
-    ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_monkeyinterpreter_free(ptr >>> 0, 1));
 /**
- * Tree-walking interpreter exposed to WASM.
- * Only supports blocking `evaluate()` — fine for short programs.
+ * @param {Function} callback
  */
-export class MonkeyInterpreter {
+export function set_output_callback(callback) {
+    wasm.set_output_callback(callback);
+}
 
-    __destroy_into_raw() {
-        const ptr = this.__wbg_ptr;
-        this.__wbg_ptr = 0;
-        MonkeyInterpreterFinalization.unregister(this);
-        return ptr;
-    }
-
-    free() {
-        const ptr = this.__destroy_into_raw();
-        wasm.__wbg_monkeyinterpreter_free(ptr, 0);
-    }
-    constructor() {
-        const ret = wasm.monkeyinterpreter_new();
-        this.__wbg_ptr = ret >>> 0;
-        MonkeyInterpreterFinalization.register(this, this.__wbg_ptr, this);
-        return this;
-    }
-    reset() {
-        wasm.monkeyinterpreter_reset(this.__wbg_ptr);
-    }
-    /**
-     * Evaluate code using the tree-walking interpreter.
-     * This blocks until completion — no incremental output for long programs.
-     * @param {string} code
-     * @returns {string}
-     */
-    evaluate(code) {
-        let deferred2_0;
-        let deferred2_1;
-        try {
-            const ptr0 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-            const len0 = WASM_VECTOR_LEN;
-            const ret = wasm.monkeyinterpreter_evaluate(this.__wbg_ptr, ptr0, len0);
-            deferred2_0 = ret[0];
-            deferred2_1 = ret[1];
-            return getStringFromWasm0(ret[0], ret[1]);
-        } finally {
-            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
-        }
+/**
+ * @returns {string}
+ */
+export function get_available_examples() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.get_available_examples();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
     }
 }
 
@@ -210,6 +159,38 @@ export class MonkeyVM {
     is_running() {
         const ret = wasm.monkeyvm_is_running(this.__wbg_ptr);
         return ret !== 0;
+    }
+    /**
+     * Get the formatted constants and functions.
+     * @returns {string}
+     */
+    get_constants() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.monkeyvm_get_constants(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * Get the formatted main bytecode instructions.
+     * @returns {string}
+     */
+    get_main_instructions() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.monkeyvm_get_main_instructions(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
     }
     constructor() {
         const ret = wasm.monkeyvm_new();
