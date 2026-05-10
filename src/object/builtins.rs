@@ -13,14 +13,14 @@ pub static BUILTINS: &[(&str, BuiltinObj)] = &[
     ("push", builtin_push()),   // 5
 ];
 
-pub fn get_builtin_by_name(name: &str) -> Option<BuiltinObj> {
+pub fn get_builtin_by_name(name: &str) -> BuiltinObj {
     for (def_name, def_builtin) in BUILTINS {
         if *def_name == name {
             // TODO: should return a shared reference in the future
-            return Some(def_builtin.clone());
+            return def_builtin.clone();
         }
     }
-    None
+    unreachable!("maybe this function could even be const")
 }
 const fn builtin_len() -> BuiltinObj {
     BuiltinObj {

@@ -535,11 +535,17 @@ pub mod tests {
         let obj2 = native_bool_to_boolean_object(true);
 
         // Verify that both Rc pointers point to the exact same heap allocation
-        assert!(Rc::ptr_eq(&obj1, &obj2), "True objects should point to the same heap allocation");
-        
+        assert!(
+            Rc::ptr_eq(&obj1, &obj2),
+            "True objects should point to the same heap allocation"
+        );
+
         let null1 = null_obj();
         let null2 = null_obj();
-        assert!(Rc::ptr_eq(&null1, &null2), "Null objects should point to the same heap allocation");
+        assert!(
+            Rc::ptr_eq(&null1, &null2),
+            "Null objects should point to the same heap allocation"
+        );
     }
     #[test]
     fn test_bang_operator() {

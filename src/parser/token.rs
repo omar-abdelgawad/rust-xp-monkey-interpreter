@@ -1,4 +1,5 @@
 #[allow(non_camel_case_types)]
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Default)]
 pub(super) enum TokenType {
     ILLEGAL,

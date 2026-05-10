@@ -269,7 +269,6 @@ impl VM {
             .pairs
             .get(&index.hash_key())
             .ok_or("key doesn't exist");
-        // TODO: this seems like a good place to have an error type
         match pair {
             Ok(pair) => self.push(pair.val.clone()),
             Err(err_str) => self.push(Object::new_error_var(err_str)),
@@ -315,8 +314,6 @@ impl VM {
             }
             Opcode::Null => self.push(null_obj()),
             Opcode::SetGlobal => {
-                // FIX: refer to test_redeclaring_globals_still_doesnt_shadow_old_ones for
-                // documentation
                 let glob_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
                 self.current_frame_mut().ip += 2;
                 self.globals[glob_ind] = self.pop();
@@ -807,8 +804,14 @@ mod tests {
             VmTestCase::new("if (false) { 10 } else {}", Box::new(Null)),
             // Let statement in block tests
             VmTestCase::new("if (true) { let a = 1; }", Box::new(Null)),
-            VmTestCase::new("if (true) { let a = 1; } else { let b = 2; }", Box::new(Null)),
-            VmTestCase::new("if (false) { let a = 1; } else { let b = 2; }", Box::new(Null)),
+            VmTestCase::new(
+                "if (true) { let a = 1; } else { let b = 2; }",
+                Box::new(Null),
+            ),
+            VmTestCase::new(
+                "if (false) { let a = 1; } else { let b = 2; }",
+                Box::new(Null),
+            ),
             VmTestCase::new("if (true) { 10 } else { let b = 2; }", Box::new(10i64)),
             VmTestCase::new("if (false) { 10 } else { let b = 2; }", Box::new(Null)),
             VmTestCase::new("if (true) { let a = 1; } else { 20 }", Box::new(Null)),
