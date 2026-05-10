@@ -36,7 +36,8 @@ pub fn stream_output(text: &str) {
 #[wasm_bindgen]
 pub struct MonkeyVM {
     vm: Option<VM>,
-    bytecode_str: String,
+    main_instructions_str: String,
+    constants_str: String,
 }
 
 #[wasm_bindgen]
@@ -45,7 +46,8 @@ impl MonkeyVM {
     pub fn new() -> Self {
         Self {
             vm: None,
-            bytecode_str: String::new(),
+            main_instructions_str: String::new(),
+            constants_str: String::new(),
         }
     }
 
@@ -74,25 +76,47 @@ impl MonkeyVM {
         }
 
         let bytecode = compiler.bytecode();
-        let mut instructions_str = String::new();
-        instructions_str.push_str("Main:\n");
-        instructions_str.push_str(&bytecode.instructions.to_string());
+        self.main_instructions_str = bytecode.instructions.to_string();
+
+        let mut constants_str = String::new();
         for (i, constant) in bytecode.constants.iter().enumerate() {
-            if let crate::object::Object::CompiledFunction(func) = &**constant {
-                instructions_str.push_str(&format!("\nFunction {}:\n", i));
-                instructions_str.push_str(&func.instructions.to_string());
+            constants_str.push_str(&format!("CONSTANT {i}:\n"));
+            match &**constant {
+                crate::object::Object::CompiledFunction(func) => {
+                    constants_str.push_str("  [CompiledFunction]\n  Instructions:\n");
+                    for line in func.instructions.to_string().lines() {
+                        constants_str.push_str(&format!("    {line}\n"));
+                    }
+                }
+                crate::object::Object::Integer(int) => {
+                    constants_str.push_str(&format!("  [Integer] Value: {}\n", int.value));
+                }
+                crate::object::Object::String(s) => {
+                    constants_str.push_str(&format!("  [String] Value: \"{}\"\n", s.value));
+                }
+                _ => {
+                    use crate::object::ObjectTrait;
+                    constants_str.push_str(&format!("  [{}] {}\n", constant.r#type(), constant.inspect()));
+                }
             }
+            constants_str.push('\n');
         }
-        self.bytecode_str = instructions_str;
+        self.constants_str = constants_str;
 
         self.vm = Some(VM::new(bytecode));
         true
     }
 
-    /// Get the formatted bytecode instructions.
+    /// Get the formatted main bytecode instructions.
     #[wasm_bindgen]
-    pub fn get_instructions(&self) -> String {
-        self.bytecode_str.clone()
+    pub fn get_main_instructions(&self) -> String {
+        self.main_instructions_str.clone()
+    }
+
+    /// Get the formatted constants and functions.
+    #[wasm_bindgen]
+    pub fn get_constants(&self) -> String {
+        self.constants_str.clone()
     }
 
     /// Execute one bytecode instruction. Returns true on success, false on error.
@@ -161,7 +185,8 @@ impl MonkeyVM {
     #[wasm_bindgen]
     pub fn reset(&mut self) {
         self.vm = None;
-        self.bytecode_str.clear();
+        self.main_instructions_str.clear();
+        self.constants_str.clear();
     }
 }
 

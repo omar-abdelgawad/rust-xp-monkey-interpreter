@@ -195,8 +195,12 @@ header h1 {
     grid-column: 2 / 3;
 }
 
-.compiler-panel {
-    grid-column: 1 / -1;
+.compiler-main-panel {
+    grid-column: 1 / 2;
+}
+
+.compiler-constants-panel {
+    grid-column: 2 / 3;
 }
 
 .panel:focus-within {

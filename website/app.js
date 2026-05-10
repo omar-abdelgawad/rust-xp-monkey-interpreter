@@ -117,8 +117,9 @@ class MonkeyWebApp {
             return;
         }
 
-        const instructions = this.vm.get_instructions();
-        this.updateCompilerOutput(instructions);
+        const mainInstructions = this.vm.get_main_instructions();
+        const constantsStr = this.vm.get_constants();
+        this.updateCompilerOutputs(mainInstructions, constantsStr);
 
         const stepBatch = () => {
             if (!this.isRunning) {
@@ -185,18 +186,31 @@ class MonkeyWebApp {
     }
 
     clearCompilerOutput() {
-        const compilerOutput = document.getElementById('compiler-output');
-        compilerOutput.innerHTML = '<div class="output-placeholder">Bytecode instructions will appear here...</div>';
+        const compilerMain = document.getElementById('compiler-main-output');
+        const compilerConstants = document.getElementById('compiler-constants-output');
+        if (compilerMain) compilerMain.innerHTML = '<div class="output-placeholder">Main bytecode instructions...</div>';
+        if (compilerConstants) compilerConstants.innerHTML = '<div class="output-placeholder">Functions and constants...</div>';
     }
 
-    updateCompilerOutput(text) {
-        const compilerOutput = document.getElementById('compiler-output');
-        compilerOutput.innerHTML = '';
+    updateCompilerOutputs(mainText, constantsText) {
+        const compilerMain = document.getElementById('compiler-main-output');
+        const compilerConstants = document.getElementById('compiler-constants-output');
         
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'output-content';
-        contentDiv.textContent = text;
-        compilerOutput.appendChild(contentDiv);
+        if (compilerMain) {
+            compilerMain.innerHTML = '';
+            const mainContentDiv = document.createElement('div');
+            mainContentDiv.className = 'output-content';
+            mainContentDiv.textContent = mainText;
+            compilerMain.appendChild(mainContentDiv);
+        }
+
+        if (compilerConstants) {
+            compilerConstants.innerHTML = '';
+            const constantsContentDiv = document.createElement('div');
+            constantsContentDiv.className = 'output-content';
+            constantsContentDiv.textContent = constantsText;
+            compilerConstants.appendChild(constantsContentDiv);
+        }
     }
 
     appendToOutput(text) {
