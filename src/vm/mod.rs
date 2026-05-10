@@ -1,4 +1,4 @@
-use crate::code::{read_u16, Instructions, Opcode};
+use crate::code::{read_u16, Opcode};
 use crate::compiler::Bytecode;
 use crate::object::builtins::BUILTINS;
 use crate::object::{
@@ -8,35 +8,12 @@ use crate::object::{
 };
 use std::{collections::HashMap, rc::Rc};
 
+mod frame;
+use frame::Frame;
+
 const STACKSIZE: usize = 1 << 11;
 pub const GLOBALSSIZE: usize = 1 << 16;
 const MAXFRAMES: usize = 1 << 10;
-
-#[derive(Debug, Clone)]
-struct Frame {
-    cl: ClosureObj,
-    ip: i64,
-    bp: i64,
-}
-impl Frame {
-    fn new(cl: ClosureObj, bp: i64) -> Self {
-        Self { cl, ip: -1, bp }
-    }
-    fn garbage_value() -> Self {
-        Self {
-            cl: Default::default(),
-            ip: -1,
-            bp: -1,
-        }
-    }
-    //fn instructions_mut(&mut self) -> &mut Instructions {
-    //    &mut self.cl.comp_fn.instructions
-    //}
-
-    fn instructions(&self) -> &Instructions {
-        &self.cl.comp_fn.instructions
-    }
-}
 
 #[derive(Debug)]
 pub struct VM {
@@ -68,14 +45,12 @@ impl VM {
         let main_closure = ClosureObj::new(main_fn, vec![]);
         let main_frame = Frame::new(main_closure, 0);
 
-        let mut frames = vec![Frame::garbage_value(); 1];
-        frames[0] = main_frame;
         Self {
             constants,
             stack: vec![garbage_obj(); STACKSIZE],
             sp: 0,
             globals: vec![garbage_obj(); GLOBALSSIZE],
-            frames,
+            frames: vec![main_frame],
         }
     }
 

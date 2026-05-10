@@ -116,8 +116,8 @@ impl HashKey {
 pub enum Object {
     Integer(Integer),
     Boolean(Boolean),
-    Null(Null), // TODO: maybe remove this null unit struct
-    Ret(ReturnValue),
+    Null(Null),       // TODO: maybe remove this null unit struct
+    Ret(ReturnValue), // I believe this variant is never used by the VM, only the evaluator
     Err(Error),
     Func(Function),
     String(StringObj),
@@ -448,12 +448,11 @@ impl HashObj {
         Self { pairs }
     }
 
-    // FIX: this should return a reference but for now we just clone.
     pub fn get(&self, index: &Object) -> ObjRef {
         let pair = self.pairs.get(&index.hash_key());
         match pair {
             None => null_obj(),
-            Some(p) => p.val.clone(), // should be a reference
+            Some(p) => p.val.clone(),
         }
     }
 }

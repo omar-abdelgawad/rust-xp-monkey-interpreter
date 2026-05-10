@@ -45,6 +45,7 @@ examples of TODOs in future:
 - [ ] Use enumKind or Write your own macros for repetitive blocks.
 - [ ] Empty code blocks should return NULL like python.
 - [ ] make an assembler?
+- [ ] the Ret variant in Object is only there for the tree-walking interpreter not the VM. should I maybe just delete old engine?
 - [ ] clean up the wasm module as it was mainly ai-generated
 - [ ] there is probably much more stuff to do but I forgot.
 
