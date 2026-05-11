@@ -18,8 +18,11 @@ run-file FILE:
 bench:
   cargo run --release -q --bin benchmark
 
-flame:
-  cargo flamegraph --bin benchmark -- --engine v
+bench_flame:
+  cargo flamegraph --bin benchmark
+
+run-file_flame FILE:
+  cargo flamegraph -r -- {{FILE}}
 
 # records an interactive shells
 record:

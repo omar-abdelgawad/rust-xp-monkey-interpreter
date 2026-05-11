@@ -89,39 +89,72 @@ impl TryFrom<u8> for Op {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         // NOTE: don't forget to add any new opcode here as it won't give a compiler error
-        match value {
-            val if val == Op::Constant as u8 => Ok(Op::Constant),
-            val if val == Op::Add as u8 => Ok(Op::Add),
-            val if val == Op::Pop as u8 => Ok(Op::Pop),
-            val if val == Op::Sub as u8 => Ok(Op::Sub),
-            val if val == Op::Mul as u8 => Ok(Op::Mul),
-            val if val == Op::Div as u8 => Ok(Op::Div),
-            val if val == Op::True as u8 => Ok(Op::True),
-            val if val == Op::False as u8 => Ok(Op::False),
-            val if val == Op::Equal as u8 => Ok(Op::Equal),
-            val if val == Op::NotEqual as u8 => Ok(Op::NotEqual),
-            val if val == Op::GreaterThan as u8 => Ok(Op::GreaterThan),
-            val if val == Op::Minus as u8 => Ok(Op::Minus),
-            val if val == Op::Bang as u8 => Ok(Op::Bang),
-            val if val == Op::JumpNotTruthy as u8 => Ok(Op::JumpNotTruthy),
-            val if val == Op::Jump as u8 => Ok(Op::Jump),
-            val if val == Op::Null as u8 => Ok(Op::Null),
-            val if val == Op::GetGlobal as u8 => Ok(Op::GetGlobal),
-            val if val == Op::SetGlobal as u8 => Ok(Op::SetGlobal),
-            val if val == Op::Array as u8 => Ok(Op::Array),
-            val if val == Op::Hash as u8 => Ok(Op::Hash),
-            val if val == Op::Index as u8 => Ok(Op::Index),
-            val if val == Op::Call as u8 => Ok(Op::Call),
-            val if val == Op::ReturnValue as u8 => Ok(Op::ReturnValue),
-            val if val == Op::Return as u8 => Ok(Op::Return),
-            val if val == Op::GetLocal as u8 => Ok(Op::GetLocal),
-            val if val == Op::SetLocal as u8 => Ok(Op::SetLocal),
-            val if val == Op::GetBuiltin as u8 => Ok(Op::GetBuiltin),
-            val if val == Op::Closure as u8 => Ok(Op::Closure),
-            val if val == Op::GetFree as u8 => Ok(Op::GetFree),
-            val if val == Op::CurrentClosure as u8 => Ok(Op::CurrentClosure),
-            _ => Err(format!("unknown opcode {value}")),
-        }
+        Ok(unsafe { std::mem::transmute::<u8, Op>(value) })
+
+        // TODO: I am trying to optimize try_from but it might be best to just use unsafe here
+        //const OP_CONSTANT: u8 = Op::Constant as u8;
+        //const OP_ADD: u8 = Op::Add as u8;
+        //const OP_POP: u8 = Op::Pop as u8;
+        //const OP_SUB: u8 = Op::Sub as u8;
+        //const OP_MUL: u8 = Op::Mul as u8;
+        //const OP_DIV: u8 = Op::Div as u8;
+        //const OP_TRUE: u8 = Op::True as u8;
+        //const OP_FALSE: u8 = Op::False as u8;
+        //const OP_EQUAL: u8 = Op::Equal as u8;
+        //const OP_NOT_EQUAL: u8 = Op::NotEqual as u8;
+        //const OP_GREATER_THAN: u8 = Op::GreaterThan as u8;
+        //const OP_MINUS: u8 = Op::Minus as u8;
+        //const OP_BANG: u8 = Op::Bang as u8;
+        //const OP_JUMP_NOT_TRUTHY: u8 = Op::JumpNotTruthy as u8;
+        //const OP_JUMP: u8 = Op::Jump as u8;
+        //const OP_NULL: u8 = Op::Null as u8;
+        //const OP_GET_GLOBAL: u8 = Op::GetGlobal as u8;
+        //const OP_SET_GLOBAL: u8 = Op::SetGlobal as u8;
+        //const OP_ARRAY: u8 = Op::Array as u8;
+        //const OP_HASH: u8 = Op::Hash as u8;
+        //const OP_INDEX: u8 = Op::Index as u8;
+        //const OP_CALL: u8 = Op::Call as u8;
+        //const OP_RETURN_VALUE: u8 = Op::ReturnValue as u8;
+        //const OP_RETURN: u8 = Op::Return as u8;
+        //const OP_GET_LOCAL: u8 = Op::GetLocal as u8;
+        //const OP_SET_LOCAL: u8 = Op::SetLocal as u8;
+        //const OP_GET_BUILTIN: u8 = Op::GetBuiltin as u8;
+        //const OP_CLOSURE: u8 = Op::Closure as u8;
+        //const OP_GET_FREE: u8 = Op::GetFree as u8;
+        //const OP_CURRENT_CLOSURE: u8 = Op::CurrentClosure as u8;
+        //match value {
+        //    OP_CONSTANT => Ok(Op::Constant),
+        //    OP_ADD => Ok(Op::Add),
+        //    OP_POP => Ok(Op::Pop),
+        //    OP_SUB => Ok(Op::Sub),
+        //    OP_MUL => Ok(Op::Mul),
+        //    OP_DIV => Ok(Op::Div),
+        //    OP_TRUE => Ok(Op::True),
+        //    OP_FALSE => Ok(Op::False),
+        //    OP_EQUAL => Ok(Op::Equal),
+        //    OP_NOT_EQUAL => Ok(Op::NotEqual),
+        //    OP_GREATER_THAN => Ok(Op::GreaterThan),
+        //    OP_MINUS => Ok(Op::Minus),
+        //    OP_BANG => Ok(Op::Bang),
+        //    OP_JUMP_NOT_TRUTHY => Ok(Op::JumpNotTruthy),
+        //    OP_JUMP => Ok(Op::Jump),
+        //    OP_NULL => Ok(Op::Null),
+        //    OP_GET_GLOBAL => Ok(Op::GetGlobal),
+        //    OP_SET_GLOBAL => Ok(Op::SetGlobal),
+        //    OP_ARRAY => Ok(Op::Array),
+        //    OP_HASH => Ok(Op::Hash),
+        //    OP_INDEX => Ok(Op::Index),
+        //    OP_CALL => Ok(Op::Call),
+        //    OP_RETURN_VALUE => Ok(Op::ReturnValue),
+        //    OP_RETURN => Ok(Op::Return),
+        //    OP_GET_LOCAL => Ok(Op::GetLocal),
+        //    OP_SET_LOCAL => Ok(Op::SetLocal),
+        //    OP_GET_BUILTIN => Ok(Op::GetBuiltin),
+        //    OP_CLOSURE => Ok(Op::Closure),
+        //    OP_GET_FREE => Ok(Op::GetFree),
+        //    OP_CURRENT_CLOSURE => Ok(Op::CurrentClosure),
+        //    _ => Err(format!("unknown opcode {value}")),
+        //}
     }
 }
 
@@ -160,11 +193,11 @@ pub fn make(op: Op, operands: &[i64]) -> Vec<u8> {
 
 // for debugging purposes
 pub struct Definition {
-    name: String,
+    name: &'static str,
     operand_widths: Vec<u8>, // number of bytes of each operand only
 }
 impl Definition {
-    fn new(name: String, operand_widths: Vec<u8>) -> Self {
+    fn new(name: &'static str, operand_widths: Vec<u8>) -> Self {
         Self {
             name,
             operand_widths,
@@ -206,7 +239,7 @@ pub fn lookup(opcode: u8) -> Definition {
         Ok(Op::CurrentClosure) => ("OpCurrentClosure", vec![]),
         Err(op) => panic!("opcode {op:?} undefined"),
     };
-    Definition::new(name.into(), operand_widths)
+    Definition::new(name, operand_widths)
 }
 
 pub fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<i64>, i64) {

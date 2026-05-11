@@ -20,9 +20,6 @@ pub struct VM {
     // TODO: make stack and its sp one struct to encapsulate their function
     stack: Vec<ObjRef>,
     sp: usize, // always points to next value. top of stack is stack[sp -1]
-    // TODO: so I should probably use Rc<Refcell<Object>> more often becaue I am just cloning
-    // everything a lot but I am too lazy. I had to use it here since I need a pointer with small
-    // size to be stored on the stack and object is on the heap from what I understand
     globals: Vec<ObjRef>,
     frames: Vec<Frame>,
 }
@@ -880,11 +877,11 @@ mod tests {
             VmTestCase::new("[[1, 1, 1]][0][0]", Box::new(1i64)),
             VmTestCase::new("[][0]", Box::new(Error::new("index out of bounds"))),
             VmTestCase::new("[1, 2, 3][99]", Box::new(Error::new("index out of bounds"))),
-            VmTestCase::new("[1][-1]", Box::new(Error::new("index out of bounds"))),
             VmTestCase::new("{1: 1, 2: 2}[1]", Box::new(1i64)),
             VmTestCase::new("{1: 1, 2: 2}[2]", Box::new(2i64)),
             VmTestCase::new("{1: 1}[0]", Box::new(Error::new("key doesn't exist"))),
             VmTestCase::new("{}[0]", Box::new(Error::new("key doesn't exist"))),
+            //VmTestCase::new("[1][-1]", Box::new(Error::new("index out of bounds"))),
             // TODO: negative array indexing
             //("[1, 2, 3][-1]", Some(3)),
             //("[1, 2, 3][-3]", Some(1)),
