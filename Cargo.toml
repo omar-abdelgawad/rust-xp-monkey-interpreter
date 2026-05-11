@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 default-run = "main"
 
+# add for flamegraph
+[profile.release]
+debug = true
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

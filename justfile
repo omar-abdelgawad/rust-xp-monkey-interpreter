@@ -15,8 +15,8 @@ run-file FILE:
   cargo run --release -q -- {{FILE}}
 
 # run book's benchmark
-bench ENGINE="vm":
-  cargo run --release -q --bin benchmark -- --engine {{ENGINE}}
+bench:
+  cargo run --release -q --bin benchmark
 
 flame:
   cargo flamegraph --bin benchmark -- --engine v
