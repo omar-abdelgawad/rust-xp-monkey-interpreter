@@ -110,13 +110,6 @@ export function get_example_code(example_name) {
 }
 
 /**
- * @param {Function} callback
- */
-export function set_output_callback(callback) {
-    wasm.set_output_callback(callback);
-}
-
-/**
  * @returns {string}
  */
 export function get_available_examples() {
@@ -130,6 +123,13 @@ export function get_available_examples() {
     } finally {
         wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
     }
+}
+
+/**
+ * @param {Function} callback
+ */
+export function set_output_callback(callback) {
+    wasm.set_output_callback(callback);
 }
 
 const MonkeyVMFinalization = (typeof FinalizationRegistry === 'undefined')
