@@ -22,22 +22,16 @@ impl EvaluationStack {
         self.stack[self.sp].clone()
     }
 
-    // TODO: is this function really required? shouldn't it just be like extract_arr?
     pub fn extract_vec(&mut self, length: usize) -> Vec<ObjRef> {
-        let mut free = Vec::with_capacity(length);
-        // TODO: a lot of unnecessary cloning here
-        for i in 0..length {
-            free.push(self.stack[self.sp - length + i].clone());
-        }
+        let start_ind = self.sp - length;
+        let end_ind = self.sp;
+        let elements = self.stack[start_ind..end_ind].to_vec();
         self.sp -= length;
-        free
+        elements
     }
 
     pub fn extract_arr(&mut self, num_elements: usize) -> ObjRef {
-        let start_ind = self.sp - num_elements;
-        let end_ind = self.sp;
-        let elements = self.stack[start_ind..end_ind].to_vec();
-        self.sp -= num_elements;
+        let elements = self.extract_vec(num_elements);
         Object::new_array_var(elements)
     }
     //TODO: How could this extraction fail? Is it possible to return only ObjRef?
