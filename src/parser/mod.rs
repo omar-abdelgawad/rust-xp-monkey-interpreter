@@ -125,7 +125,7 @@ impl Parser {
 
     fn parse_hash_literal(&mut self) -> Option<Box<Expression>> {
         //let tmp_tok = self.cur_token.clone();
-        let mut tmp_pairs = HashMap::new();
+        let mut tmp_pairs = Vec::new();
         while !self.peek_token_is(TokenType::RBRACE) {
             self.next_token();
             let key = self.parse_expression(Precedence::Lowest).unwrap();
@@ -134,7 +134,7 @@ impl Parser {
             }
             self.next_token();
             let value = self.parse_expression(Precedence::Lowest).unwrap();
-            tmp_pairs.insert(*key, *value);
+            tmp_pairs.push((*key, *value));
             if !self.peek_token_is(TokenType::RBRACE) && !self.expect_peek(TokenType::COMMA) {
                 return None;
             }

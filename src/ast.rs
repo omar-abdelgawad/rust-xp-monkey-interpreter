@@ -1,7 +1,5 @@
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Display;
-use std::hash::{Hash, Hasher};
 
 #[derive(Debug)]
 pub enum Node {
@@ -19,7 +17,7 @@ impl Display for Node {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -52,27 +50,6 @@ pub enum Expression {
     Ind(IndexExpression),
     Hash(HashLiteral),
     While(WhileExpression), // always returns NULL
-}
-
-impl Hash for Expression {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        // intentionally left things that can't evaluate to str, int oro bool
-        match self {
-            Expression::Integer(i) => i.hash(state),
-            Expression::Boolean(b) => b.hash(state),
-            Expression::Str(s) => s.hash(state),
-            Expression::Identifier(ident) => ident.hash(state),
-            Expression::Infix(inf) => inf.hash(state),
-            Expression::Prefix(pre) => pre.hash(state),
-            Expression::If(if_exp) => if_exp.hash(state),
-            Expression::Call(call_exp) => call_exp.hash(state),
-            Expression::Ind(ind_exp) => ind_exp.hash(state),
-            def => panic!(
-                "rust tried to hash something not a str or int or bool (not hashing inside the language): {}",
-                def
-            ),
-        }
-    }
 }
 
 impl Display for Expression {
@@ -114,7 +91,7 @@ impl Program {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct LetStatement {
     pub name: Identifier,
     pub value: Box<Expression>,
@@ -134,7 +111,7 @@ impl Display for LetStatement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier {
     pub value: String,
 }
@@ -151,7 +128,7 @@ impl Display for Identifier {
         write!(f, "{}", self.value)
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct Boolean {
     pub value: bool, // TODO: integer literals should store the str representation but does that
                      // apply here as well?
@@ -168,7 +145,7 @@ impl Display for Boolean {
         write!(f, "{}", self.value)
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct ReturnStatement {
     pub return_value: Box<Expression>,
 }
@@ -183,7 +160,7 @@ impl Display for ReturnStatement {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct ExpressionStatement {
     pub expression: Box<Expression>,
 }
@@ -197,7 +174,7 @@ impl Display for ExpressionStatement {
         write!(f, "{}", self.expression)
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct IntegerLiteral {
     pub value: i64, // should probably store the string itself and evaluate it later
 }
@@ -211,7 +188,7 @@ impl Display for IntegerLiteral {
         write!(f, "{}", self.value)
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct PrefixExpression {
     pub operator: String,
     pub right: Box<Expression>,
@@ -229,7 +206,7 @@ impl Display for PrefixExpression {
         write!(f, "({}{})", self.operator, self.right)
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct InfixExpression {
     pub left: Box<Expression>,
     pub operator: String,
@@ -249,7 +226,7 @@ impl Display for InfixExpression {
         write!(f, "({} {} {})", self.left, self.operator, self.right)
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct IfExpression {
     pub condition: Box<Expression>,
     pub consequence: Box<BlockStatement>,
@@ -277,7 +254,7 @@ impl Display for IfExpression {
         Ok(())
     }
 }
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct BlockStatement {
     pub statements: Vec<Statement>,
 }
@@ -323,7 +300,7 @@ impl Display for FunctionLiteral {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct CallExpression {
     pub function: Box<Expression>,
     pub arguments: Vec<Expression>,
@@ -343,7 +320,7 @@ impl Display for CallExpression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StringLiteral {
     pub value: String,
 }
@@ -378,7 +355,7 @@ impl Display for ArrayLiteral {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexExpression {
     pub left: Box<Expression>,
     pub index: Box<Expression>,
@@ -397,11 +374,11 @@ impl Display for IndexExpression {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HashLiteral {
-    pub pairs: HashMap<Expression, Expression>,
+    pub pairs: Vec<(Expression, Expression)>,
 }
 
 impl HashLiteral {
-    pub fn new(pairs: HashMap<Expression, Expression>) -> Self {
+    pub fn new(pairs: Vec<(Expression, Expression)>) -> Self {
         Self { pairs }
     }
 }
@@ -417,7 +394,7 @@ impl Display for HashLiteral {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct WhileExpression {
     pub condition: Box<Expression>,
     pub loop_body: Box<BlockStatement>,

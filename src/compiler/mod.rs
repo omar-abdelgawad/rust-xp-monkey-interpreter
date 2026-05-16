@@ -303,23 +303,15 @@ impl Compiler {
                     self.emit(Opcode::Index, &[]);
                 }
                 Exp::Hash(hash_lit) => {
-                    // AI generated cause I was too lazy to read go docs
-                    // TODO: fix this AI cloning crap in the future
-                    // 1️⃣ Collect keys
-                    let mut keys: Vec<_> = hash_lit.pairs.keys().cloned().collect();
-                    // 2️⃣ Sort by string representation (like Go's String())
-                    keys.sort_by_key(|a| a.to_string());
-                    // 3️⃣ Compile key/value pairs
-                    for key in keys {
-                        let value = hash_lit.pairs.get(&key).unwrap().clone();
-                        // compile key
+                    let length = hash_lit.pairs.len() * 2;
+                    // Sort by key to maintain compilation order (not necessary now)
+                    //hash_lit.pairs.sort_by_key(|(a, _b)| a.to_string());
+                    for (key, value) in hash_lit.pairs {
                         self.compile(Node::Expression(key))?;
-
-                        // compile value
                         self.compile(Node::Expression(value))?;
                     }
-                    // 4️⃣ Emit OpHash
-                    self.emit(Opcode::Hash, &[(hash_lit.pairs.len() * 2) as i64]);
+                    // Emit OpHash
+                    self.emit(Opcode::Hash, &[length as i64]);
                 }
                 Exp::While(while_expression) => {
                     // while (condition) { body }
