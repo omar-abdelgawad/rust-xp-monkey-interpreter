@@ -201,12 +201,12 @@ impl VM {
         }
     }
 
-    fn execute_index_expression(&mut self, left: ObjRef, index: ObjRef) -> Result<(), String> {
-        match (&*left, &*index) {
+    fn execute_index_expression(&mut self, left: &Object, index: &Object) -> Result<(), String> {
+        match (left, index) {
             (Object::Arr(arr_obj), Object::Integer(int_obj)) => {
                 self.execute_array_index(arr_obj, int_obj)
             }
-            (Object::Hash(hash_obj), _index) => self.execute_hash_index(hash_obj, index.clone()),
+            (Object::Hash(hash_obj), index) => self.execute_hash_index(hash_obj, index),
             (left, right) => todo!(
                 "unsupported types for index operation: {} {}",
                 left.r#type(),
@@ -244,7 +244,7 @@ impl VM {
         //arr.elements[idx].clone()
     }
 
-    fn execute_hash_index(&mut self, hash_obj: &HashObj, index: ObjRef) -> Result<(), String> {
+    fn execute_hash_index(&mut self, hash_obj: &HashObj, index: &Object) -> Result<(), String> {
         index.is_hashable()?;
         let pair = hash_obj
             .pairs
@@ -326,7 +326,7 @@ impl VM {
                 let index = self.evaluation_stack.pop();
                 let left = self.evaluation_stack.pop();
 
-                self.execute_index_expression(left, index)
+                self.execute_index_expression(left.as_ref(), index.as_ref())
             }
             Opcode::Call => {
                 let num_args = ins[usize::try_from(ip + 1).unwrap()] as usize;

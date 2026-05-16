@@ -21,8 +21,13 @@ bench:
 bench_flame:
   cargo flamegraph --bin benchmark
 
-run-file_flame FILE:
-  cargo flamegraph -r -- {{FILE}}
+bench_samply:
+  cargo build -r --bin benchmark
+  samply record ./target/release/benchmark
+
+run-file_samply FILE:
+  cargo build -r
+  samply record ./target/release/main -- {{FILE}}
 
 # records an interactive shells
 record:

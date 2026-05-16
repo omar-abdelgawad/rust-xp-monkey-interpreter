@@ -1,6 +1,7 @@
 /target
 /pkg
 run.log
+profile.json.gz
 
 # custom
 website/monkey_rs.js
