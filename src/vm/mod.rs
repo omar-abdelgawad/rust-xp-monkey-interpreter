@@ -3,23 +3,22 @@ use crate::compiler::Bytecode;
 use crate::object::builtins::BUILTINS;
 use crate::object::{
     false_obj, garbage_obj, null_obj, true_obj, Array, BuiltinObj, ClosureObj, CompiledFunctionObj,
-    HashObj, HashPair, Hashable, Integer, IsHashable, ObjRef, Object, ObjectTrait,
+    HashObj, Hashable, Integer, IsHashable, ObjRef, Object, ObjectTrait,
 };
-use std::{collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
 mod frame;
 use frame::Frame;
+mod evaluation_stack;
+use evaluation_stack::EvaluationStack;
 
-const STACKSIZE: usize = 1 << 11;
 pub const GLOBALSSIZE: usize = 1 << 16;
 const MAXFRAMES: usize = 1 << 10;
 
 #[derive(Debug)]
 pub struct VM {
     constants: Vec<ObjRef>,
-    // TODO: make stack and its sp one struct to encapsulate their function
-    stack: Vec<ObjRef>,
-    sp: usize, // always points to next value. top of stack is stack[sp -1]
+    evaluation_stack: EvaluationStack,
     globals: Vec<ObjRef>,
     frames: Vec<Frame>,
 }
@@ -43,15 +42,14 @@ impl VM {
 
         Self {
             constants,
-            stack: vec![garbage_obj(); STACKSIZE],
-            sp: 0,
+            evaluation_stack: EvaluationStack::new(),
             globals: vec![garbage_obj(); GLOBALSSIZE],
             frames: vec![main_frame],
         }
     }
 
     pub fn last_popped_stack_elem(&self) -> ObjRef {
-        self.stack[self.sp].clone()
+        self.evaluation_stack.last_popped()
     }
 
     fn current_frame_mut(&mut self) -> &mut Frame {
@@ -75,28 +73,18 @@ impl VM {
     fn push_closure(&mut self, const_ind: usize, num_free: usize) -> Result<(), String> {
         let constant = self.constants[const_ind].clone();
         if let Object::CompiledFunction(function) = &*constant {
-            let mut free = Vec::with_capacity(num_free);
-            // TODO: a lot of unnecessary cloning here
-            for i in 0..num_free {
-                free.push(self.stack[self.sp - num_free + i].clone());
-            }
-            self.sp -= num_free;
+            let free = self.evaluation_stack.extract_vec(num_free);
             let closure = ClosureObj::new(function.clone(), free);
-            self.push(Rc::new(Object::Closure(closure)))
+            self.evaluation_stack
+                .push(Rc::new(Object::Closure(closure)))
         } else {
             Err(format!("not a function: {constant:?}"))
         }
     }
 
-    fn pop(&mut self) -> ObjRef {
-        let o = self.stack[self.sp - 1].clone();
-        self.sp -= 1;
-        o
-    }
-
     fn execute_binary_operation(&mut self, op: Opcode) -> Result<(), String> {
-        let right = self.pop();
-        let left = self.pop();
+        let right = self.evaluation_stack.pop();
+        let left = self.evaluation_stack.pop();
         match (&*left, &*right) {
             (Object::Integer(left_val), Object::Integer(right_val)) => {
                 self.execute_binary_integer_operation(op, left_val.value, right_val.value)
@@ -106,7 +94,7 @@ impl VM {
             }
             (Object::String(left_val), Object::Integer(right_val)) if op == Opcode::Add => {
                 let result = format!("{}{}", left_val.value, right_val.value);
-                self.push(Object::new_str_var(&result))
+                self.evaluation_stack.push(Object::new_str_var(&result))
             }
             (left, right) => Err(format!(
                 "unsupported types for binary operation: {} {}",
@@ -129,7 +117,7 @@ impl VM {
             Opcode::Div => left / right,
             _ => return Err(format!("unknown integer operator: {:?}", op)),
         };
-        self.push(Object::new_int_var(result))
+        self.evaluation_stack.push(Object::new_int_var(result))
     }
 
     fn execute_binary_string_operation(
@@ -142,12 +130,12 @@ impl VM {
             Opcode::Add => format!("{}{}", left, right),
             _ => return Err(format!("unknown integer operator: {:?}", op)),
         };
-        self.push(Object::new_str_var(&result))
+        self.evaluation_stack.push(Object::new_str_var(&result))
     }
 
     fn execute_comparison(&mut self, op: Opcode) -> Result<(), String> {
-        let right = self.pop();
-        let left = self.pop();
+        let right = self.evaluation_stack.pop();
+        let left = self.evaluation_stack.pop();
         match (&*left, &*right) {
             (Object::Integer(left_val), Object::Integer(right_val)) => {
                 self.execute_integer_comparison(op, left_val.value, right_val.value)
@@ -175,7 +163,7 @@ impl VM {
             Opcode::GreaterThan => left > right,
             _ => return Err(format!("unknown operator: {op:?}")),
         };
-        self.push(Object::new_bool_var(val))
+        self.evaluation_stack.push(Object::new_bool_var(val))
     }
 
     fn execute_boolean_comparison(
@@ -189,23 +177,26 @@ impl VM {
             Opcode::NotEqual => left != right,
             _ => return Err(format!("unknown operator: {op:?}")),
         };
-        self.push(Object::new_bool_var(val))
+        self.evaluation_stack.push(Object::new_bool_var(val))
     }
 
     fn execute_bang_operator(&mut self) -> Result<(), String> {
-        let right = self.pop();
-        match &*right {
-            Object::Boolean(b) if b.value => self.push(false_obj()),
-            Object::Boolean(b) if !b.value => self.push(true_obj()),
-            Object::Null(_) => self.push(true_obj()), // negation of NULL is true now even though it is still truthy
-            _ => self.push(false_obj()),              // anything other than false is "truthy"
-        }
+        let right = self.evaluation_stack.pop();
+        let out = match &*right {
+            Object::Boolean(b) if b.value => false_obj(),
+            Object::Boolean(b) if !b.value => true_obj(),
+            Object::Null(_) => true_obj(), // negation of NULL is true now even though it is still truthy
+            _ => false_obj(),              // anything other than false is "truthy"
+        };
+        self.evaluation_stack.push(out)
     }
 
     fn execute_minus_operator(&mut self) -> Result<(), String> {
-        let right = self.pop();
+        let right = self.evaluation_stack.pop();
         match &*right {
-            Object::Integer(right_val) => self.push(Object::new_int_var(-right_val.value)),
+            Object::Integer(right_val) => self
+                .evaluation_stack
+                .push(Object::new_int_var(-right_val.value)),
             _ => todo!("unsupported type for negation: {}", right.r#type()),
         }
     }
@@ -228,9 +219,10 @@ impl VM {
         let i = index.value;
         let max = arr.elements.len() as i64 - 1;
         if i < 0 || i > max {
-            self.push(Object::new_error_var("index out of bounds"))
+            self.evaluation_stack
+                .push(Object::new_error_var("index out of bounds"))
         } else {
-            self.push(arr.elements[i as usize].clone())
+            self.evaluation_stack.push(arr.elements[i as usize].clone())
         }
 
         // TODO: implement negative array indexing like evaluator
@@ -258,10 +250,11 @@ impl VM {
             .pairs
             .get(&index.hash_key())
             .ok_or("key doesn't exist");
-        match pair {
-            Ok(pair) => self.push(pair.val.clone()),
-            Err(err_str) => self.push(Object::new_error_var(err_str)),
-        }
+        let out = match pair {
+            Ok(pair) => pair.val.clone(),
+            Err(err_str) => Object::new_error_var(err_str),
+        };
+        self.evaluation_stack.push(out)
     }
 
     pub fn step(&mut self) -> Result<(), String> {
@@ -273,17 +266,18 @@ impl VM {
             Opcode::Constant => {
                 let const_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]);
                 self.current_frame_mut().ip += 2;
-                self.push(self.constants[const_ind as usize].clone())
+                self.evaluation_stack
+                    .push(self.constants[const_ind as usize].clone())
             }
             Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div => {
                 self.execute_binary_operation(op)
             }
             Opcode::Pop => {
-                self.pop();
+                self.evaluation_stack.pop();
                 Ok(())
             }
-            Opcode::True => self.push(true_obj()),
-            Opcode::False => self.push(false_obj()),
+            Opcode::True => self.evaluation_stack.push(true_obj()),
+            Opcode::False => self.evaluation_stack.push(false_obj()),
             Opcode::Equal | Opcode::NotEqual | Opcode::GreaterThan => self.execute_comparison(op),
             Opcode::Bang => self.execute_bang_operator(),
             Opcode::Minus => self.execute_minus_operator(),
@@ -295,44 +289,42 @@ impl VM {
             Opcode::JumpNotTruthy => {
                 let pos = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
                 self.current_frame_mut().ip += 2;
-                let condition = self.pop();
+                let condition = self.evaluation_stack.pop();
                 if !condition.is_truthy() {
                     self.current_frame_mut().ip = pos as i64 - 1;
                 }
                 Ok(())
             }
-            Opcode::Null => self.push(null_obj()),
+            Opcode::Null => self.evaluation_stack.push(null_obj()),
             Opcode::SetGlobal => {
                 let glob_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
                 self.current_frame_mut().ip += 2;
-                self.globals[glob_ind] = self.pop();
+                self.globals[glob_ind] = self.evaluation_stack.pop();
                 Ok(())
             }
             Opcode::GetGlobal => {
                 let glob_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
                 self.current_frame_mut().ip += 2;
 
-                self.push(self.globals[glob_ind].clone())
+                self.evaluation_stack.push(self.globals[glob_ind].clone())
             }
             Opcode::Array => {
                 let num_elements = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
                 self.current_frame_mut().ip += 2;
 
-                let array = self.build_array(self.sp - num_elements, self.sp);
-                self.sp -= num_elements;
-                self.push(array)
+                let array = self.evaluation_stack.extract_arr(num_elements);
+                self.evaluation_stack.push(array)
             }
             Opcode::Hash => {
                 let num_elements = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
                 self.current_frame_mut().ip += 2;
 
-                let hash = self.build_hash(self.sp - num_elements, self.sp)?;
-                self.sp -= num_elements;
-                self.push(hash)
+                let hash = self.evaluation_stack.extract_hash(num_elements)?;
+                self.evaluation_stack.push(hash)
             }
             Opcode::Index => {
-                let index = self.pop();
-                let left = self.pop();
+                let index = self.evaluation_stack.pop();
+                let left = self.evaluation_stack.pop();
 
                 self.execute_index_expression(left, index)
             }
@@ -343,26 +335,27 @@ impl VM {
                 self.execute_call(num_args)
             }
             Opcode::ReturnValue => {
-                let return_value = self.pop();
+                let return_value = self.evaluation_stack.pop();
 
                 let frame = self.pop_frame();
-                self.sp = usize::try_from(frame.bp).unwrap() - 1; // - 1 instead of popping the function obj
+                *self.evaluation_stack.sp_mut() = usize::try_from(frame.bp).unwrap() - 1; // - 1 instead of popping the function obj
 
-                self.push(return_value)
+                self.evaluation_stack.push(return_value)
             }
             Opcode::Return => {
                 let frame = self.pop_frame();
-                self.sp = usize::try_from(frame.bp).unwrap() - 1; // - 1 instead of popping the function obj
+                *self.evaluation_stack.sp_mut() = usize::try_from(frame.bp).unwrap() - 1; // - 1 instead of popping the function obj
 
-                self.push(null_obj())
+                self.evaluation_stack.push(null_obj())
             }
             Opcode::SetLocal => {
                 let local_ind = ins[usize::try_from(ip + 1).unwrap()] as usize;
                 self.current_frame_mut().ip += 1;
 
                 let frame_bp: usize = self.current_frame_mut().bp.try_into().unwrap();
-                let local_var_val = self.pop();
-                self.stack[frame_bp + local_ind] = local_var_val;
+                let local_var_val = self.evaluation_stack.pop();
+                self.evaluation_stack
+                    .set_variable(frame_bp + local_ind, local_var_val);
                 Ok(())
             }
             Opcode::GetLocal => {
@@ -370,7 +363,8 @@ impl VM {
                 self.current_frame_mut().ip += 1;
 
                 let frame_bp: usize = self.current_frame_mut().bp.try_into().unwrap();
-                self.push(self.stack[frame_bp + local_ind].clone())
+                self.evaluation_stack
+                    .push(self.evaluation_stack.get_variable(frame_bp + local_ind))
             }
             Opcode::GetBuiltin => {
                 let builtin_ind = ins[usize::try_from(ip + 1).unwrap()] as usize;
@@ -379,8 +373,8 @@ impl VM {
                 let definition = BUILTINS
                     .get(builtin_ind)
                     .expect("index is always valid from compiler");
-                // TODO: try to remove the clone by storing Rc<BuiltinObj>
-                self.push(Rc::new(Object::Builtin(definition.1.clone())))
+                self.evaluation_stack
+                    .push(Rc::new(Object::Builtin(definition.1.clone())))
             }
             Opcode::Closure => {
                 let const_ind = read_u16(&ins[ip as usize + 1..ip as usize + 3]) as usize;
@@ -392,11 +386,13 @@ impl VM {
                 let free_ind = ins[usize::try_from(ip + 1).unwrap()] as usize;
                 self.current_frame_mut().ip += 1;
                 let current_closure = &self.current_frame().cl;
-                self.push(current_closure.free[free_ind].clone())
+                self.evaluation_stack
+                    .push(current_closure.free[free_ind].clone())
             }
             Opcode::CurrentClosure => {
                 let current_closure = self.current_frame().cl.clone();
-                self.push(Rc::new(Object::Closure(current_closure)))
+                self.evaluation_stack
+                    .push(Rc::new(Object::Closure(current_closure)))
             }
         }
     }
@@ -413,7 +409,7 @@ impl VM {
     }
 
     fn execute_call(&mut self, num_args: usize) -> Result<(), String> {
-        let callee = self.stack[self.sp - 1 - num_args].clone();
+        let callee = self.evaluation_stack.get_callee(num_args);
         match &*callee {
             Object::Closure(closure_obj) => self.call_closure(closure_obj.clone(), num_args),
             Object::Builtin(builtin_obj) => self.call_builtin(builtin_obj.clone(), num_args),
@@ -429,58 +425,26 @@ impl VM {
             ));
         }
         let num_locals = cl.comp_fn.num_locals;
-        let frame = Frame::new(cl, usize::try_into(self.sp - num_args).unwrap());
+        let frame = Frame::new(
+            cl,
+            usize::try_into(self.evaluation_stack.sp() - num_args).unwrap(),
+        );
         let next_sp: usize = frame.bp as usize + num_locals;
         self.push_frame(frame);
-        self.sp = next_sp;
+        *self.evaluation_stack.sp_mut() = next_sp;
         Ok(())
     }
 
     fn call_builtin(&mut self, builtin_obj: BuiltinObj, num_args: usize) -> Result<(), String> {
-        let args = &self.stack[self.sp - num_args..self.sp];
+        let args = self.evaluation_stack.extract_slice(num_args);
         let result = (builtin_obj.function)(args);
-        self.sp = self.sp - num_args - 1;
-        self.push(result)
-    }
-
-    pub fn push(&mut self, o: ObjRef) -> Result<(), String> {
-        if self.sp >= STACKSIZE {
-            Err("woops! stack overflow".to_string())
-        } else {
-            self.stack[self.sp] = o;
-            self.sp += 1;
-            Ok(())
-        }
+        self.evaluation_stack.push(result)
     }
 
     pub fn new_with_globals_store(bytecode: Bytecode, s: Vec<ObjRef>) -> Self {
         let mut vm = VM::new(bytecode);
         vm.globals = s;
         vm
-    }
-
-    fn build_array(&mut self, start_ind: usize, end_ind: usize) -> ObjRef {
-        let elements = self.stack[start_ind..end_ind].to_vec();
-        Object::new_array_var(elements)
-    }
-
-    fn build_hash(&mut self, start_ind: usize, end_ind: usize) -> Result<ObjRef, String> {
-        let mut hashed_pairs = HashMap::new();
-        let mut i = start_ind;
-        while i < end_ind {
-            let key = self.stack[i].clone();
-            let value = self.stack[i + 1].clone();
-
-            // TODO: this hash_key should return result instead
-            key.is_hashable()?;
-            let hash_key = key.hash_key();
-
-            let pair = HashPair::new(key, value);
-            hashed_pairs.insert(hash_key, pair);
-
-            i += 2;
-        }
-        Ok(Object::new_hash_var(hashed_pairs))
     }
 }
 
